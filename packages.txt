@@ -1,7 +1,5 @@
-libgobject-2.0-dev
-libpango1.0-dev
+libpango-1.0-0
 libpangocairo-1.0-0
-libgdk-pixbuf-2.0-0
-libffi-dev
+libgdk-pixbuf2.0-0
 libcairo2
-shared-mime-info
+libffi-dev
