@@ -85,6 +85,9 @@ class GameAnalyzer:
             success_score
         )
 
+        # Analyze pricing (NEW)
+        pricing_analysis = self._analyze_pricing(game_data, sales_data)
+
         # Generate AI context
         ai_context = self._generate_ai_context(
             overall_success,
@@ -97,7 +100,8 @@ class GameAnalyzer:
             velocity_score,
             velocity_status,
             recent_reviews,
-            game_data
+            game_data,
+            pricing_analysis
         )
 
         return {
@@ -112,6 +116,7 @@ class GameAnalyzer:
             'velocity_score': velocity_score,
             'velocity_status': velocity_status,
             'recent_reviews': recent_reviews,
+            'pricing_analysis': pricing_analysis,
             'context_for_ai': ai_context,
             'is_highly_successful': success_score >= 75,
             'is_successful': success_score >= 60,
@@ -285,6 +290,66 @@ class GameAnalyzer:
         else:
             return 'struggling'
 
+    def _analyze_pricing(self, game_data: Dict[str, Any], sales_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Analyze pricing using Price-to-Content Index
+
+        Formula: Price / Median Hours = $/hour
+        - Excellent: < $0.50/hour
+        - Good: $0.50-$1/hour
+        - Fair: $1-$2/hour
+        - Poor: $2-$5/hour
+        - Overpriced: > $5/hour
+        """
+        price = game_data.get('price_raw', 0) or sales_data.get('price_raw', 0)
+        median_playtime_minutes = sales_data.get('median_playtime', 0)
+        median_playtime_hours = median_playtime_minutes / 60 if median_playtime_minutes > 0 else 0
+
+        # Calculate price-to-content index
+        if median_playtime_hours > 0 and price > 0:
+            price_per_hour = price / median_playtime_hours
+        else:
+            price_per_hour = 0
+
+        # Determine value rating
+        if price == 0:
+            value_rating = "Free-to-Play"
+            value_level = "free"
+            recommendation = "N/A for F2P games"
+        elif median_playtime_hours == 0:
+            value_rating = "Insufficient playtime data"
+            value_level = "unknown"
+            recommendation = "Cannot assess value without playtime data"
+        elif price_per_hour < 0.50:
+            value_rating = "Excellent value"
+            value_level = "excellent"
+            recommendation = f"Great value at ${price_per_hour:.2f}/hour - pricing is very competitive"
+        elif price_per_hour < 1.00:
+            value_rating = "Good value"
+            value_level = "good"
+            recommendation = f"Good value at ${price_per_hour:.2f}/hour - pricing is fair"
+        elif price_per_hour < 2.00:
+            value_rating = "Fair value"
+            value_level = "fair"
+            recommendation = f"Fair value at ${price_per_hour:.2f}/hour - consider slight price reduction"
+        elif price_per_hour < 5.00:
+            value_rating = "Below average value"
+            value_level = "poor"
+            recommendation = f"${price_per_hour:.2f}/hour is high - consider 20-30% price reduction"
+        else:
+            value_rating = "Overpriced"
+            value_level = "overpriced"
+            recommendation = f"${price_per_hour:.2f}/hour is very high - significant price reduction recommended"
+
+        return {
+            'price': price,
+            'median_hours': median_playtime_hours,
+            'price_per_hour': price_per_hour,
+            'value_rating': value_rating,
+            'value_level': value_level,
+            'recommendation': recommendation
+        }
+
     def _generate_ai_context(
         self,
         overall_success: str,
@@ -297,7 +362,8 @@ class GameAnalyzer:
         velocity_score: float = 0,
         velocity_status: str = 'Unknown',
         recent_reviews: int = 0,
-        game_data: Dict = None
+        game_data: Dict = None,
+        pricing_analysis: Dict = None
     ) -> str:
         """Generate context string for AI prompts"""
         context_parts = []
@@ -335,6 +401,28 @@ class GameAnalyzer:
                 context_parts.append(
                     f"⚠ Steam Deck: {readiness_level} compatibility ({readiness_score}/100). "
                     f"{deck_data.get('summary', '')} Consider: {', '.join(deck_data.get('issues', [])[:2])}"
+                )
+
+        # Price-to-Content Index context (NEW)
+        if pricing_analysis:
+            value_level = pricing_analysis.get('value_level', 'unknown')
+            if value_level in ['excellent', 'good']:
+                context_parts.append(
+                    f"💰 Pricing: {pricing_analysis.get('value_rating', 'N/A')} "
+                    f"(${pricing_analysis.get('price_per_hour', 0):.2f}/hour for {pricing_analysis.get('median_hours', 0):.1f} hours). "
+                    f"{pricing_analysis.get('recommendation', '')}"
+                )
+            elif value_level in ['poor', 'overpriced']:
+                context_parts.append(
+                    f"⚠ Pricing: {pricing_analysis.get('value_rating', 'N/A')} "
+                    f"(${pricing_analysis.get('price_per_hour', 0):.2f}/hour is high). "
+                    f"{pricing_analysis.get('recommendation', '')} This may impact sales velocity."
+                )
+            elif value_level == 'fair':
+                context_parts.append(
+                    f"💰 Pricing: {pricing_analysis.get('value_rating', 'N/A')} "
+                    f"(${pricing_analysis.get('price_per_hour', 0):.2f}/hour). "
+                    f"{pricing_analysis.get('recommendation', '')}"
                 )
 
         # Engagement context
