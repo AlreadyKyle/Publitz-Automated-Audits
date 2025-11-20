@@ -88,6 +88,9 @@ class GameAnalyzer:
         # Analyze pricing (NEW)
         pricing_analysis = self._analyze_pricing(game_data, sales_data)
 
+        # Analyze tag effectiveness (NEW)
+        tag_analysis = self._analyze_tag_effectiveness(game_data, sales_data, engagement['level'], quality['level'])
+
         # Generate AI context
         ai_context = self._generate_ai_context(
             overall_success,
@@ -101,7 +104,8 @@ class GameAnalyzer:
             velocity_status,
             recent_reviews,
             game_data,
-            pricing_analysis
+            pricing_analysis,
+            tag_analysis
         )
 
         return {
@@ -117,6 +121,7 @@ class GameAnalyzer:
             'velocity_status': velocity_status,
             'recent_reviews': recent_reviews,
             'pricing_analysis': pricing_analysis,
+            'tag_analysis': tag_analysis,
             'context_for_ai': ai_context,
             'is_highly_successful': success_score >= 75,
             'is_successful': success_score >= 60,
@@ -350,6 +355,134 @@ class GameAnalyzer:
             'recommendation': recommendation
         }
 
+    def _analyze_tag_effectiveness(
+        self,
+        game_data: Dict[str, Any],
+        sales_data: Dict[str, Any],
+        engagement_level: str,
+        quality_level: str
+    ) -> Dict[str, Any]:
+        """
+        Analyze tag effectiveness by comparing performance to tag category expectations
+
+        Different tag categories (Indie, AAA, F2P, etc.) have different performance expectations.
+        This analyzes if the game's performance matches what we'd expect for its tags.
+        """
+        tags = game_data.get('tags', sales_data.get('tags', []))
+        if not tags:
+            return {
+                'effectiveness': 'unknown',
+                'primary_category': 'Unknown',
+                'expectation_match': 'unknown',
+                'recommendation': 'No tag data available'
+            }
+
+        # Get top 5 tags
+        top_tags = tags[:5] if isinstance(tags, list) else list(tags.keys())[:5]
+
+        # Categorize game based on tags
+        tag_category = self._categorize_by_tags(top_tags)
+
+        # Expected performance for category
+        expected_engagement = self._get_expected_engagement(tag_category)
+
+        # Compare actual vs expected
+        expectation_match = self._compare_to_expectations(
+            engagement_level, quality_level, expected_engagement
+        )
+
+        # Generate recommendations
+        if expectation_match == 'exceeding':
+            effectiveness = 'highly_effective'
+            recommendation = f"Tags are working exceptionally well for a {tag_category} game. " \
+                           f"Consider leveraging similar tags in marketing campaigns."
+        elif expectation_match == 'meeting':
+            effectiveness = 'effective'
+            recommendation = f"Tags are performing as expected for a {tag_category} game. " \
+                           f"Tags are appropriate and discoverable."
+        elif expectation_match == 'below':
+            effectiveness = 'underperforming'
+            recommendation = f"Performance is below expectations for a {tag_category} game. " \
+                           f"Consider: 1) Adding more specific genre tags, 2) Reviewing tag relevance, " \
+                           f"3) Analyzing top performers with similar tags for insights."
+        else:
+            effectiveness = 'unknown'
+            recommendation = "Unable to assess tag effectiveness"
+
+        return {
+            'effectiveness': effectiveness,
+            'primary_category': tag_category,
+            'top_tags': top_tags,
+            'expectation_match': expectation_match,
+            'expected_engagement': expected_engagement,
+            'actual_engagement': engagement_level,
+            'recommendation': recommendation
+        }
+
+    def _categorize_by_tags(self, tags: List[str]) -> str:
+        """Categorize game by its primary tags"""
+        tags_lower = [t.lower() if isinstance(t, str) else str(t).lower() for t in tags]
+
+        # Check for major categories
+        if any(tag in tags_lower for tag in ['free to play', 'f2p', 'free']):
+            return 'Free-to-Play'
+        elif any(tag in tags_lower for tag in ['indie', 'casual']):
+            return 'Indie'
+        elif any(tag in tags_lower for tag in ['aaa', 'action', 'fps', 'multiplayer', 'mmo']):
+            return 'AAA/Mainstream'
+        elif any(tag in tags_lower for tag in ['strategy', 'simulation', 'management']):
+            return 'Strategy/Simulation'
+        elif any(tag in tags_lower for tag in ['rpg', 'adventure', 'story rich']):
+            return 'RPG/Adventure'
+        elif any(tag in tags_lower for tag in ['puzzle', 'platformer', 'arcade']):
+            return 'Casual/Puzzle'
+        else:
+            return 'General'
+
+    def _get_expected_engagement(self, category: str) -> str:
+        """Get expected engagement level for a category"""
+        expectations = {
+            'Free-to-Play': 'very_high',  # F2P games typically have high engagement
+            'AAA/Mainstream': 'very_high',  # AAA games should have high engagement
+            'Indie': 'moderate',  # Indie games vary widely
+            'Strategy/Simulation': 'high',  # Strategy games have dedicated audiences
+            'RPG/Adventure': 'high',  # RPGs typically have engaged audiences
+            'Casual/Puzzle': 'moderate',  # Casual games have variable engagement
+            'General': 'moderate'
+        }
+        return expectations.get(category, 'moderate')
+
+    def _compare_to_expectations(
+        self,
+        actual_engagement: str,
+        quality_level: str,
+        expected_engagement: str
+    ) -> str:
+        """Compare actual performance to expectations"""
+        # Map engagement levels to numeric scores for comparison
+        engagement_scores = {
+            'massive': 6,
+            'very_high': 5,
+            'high': 4,
+            'strong': 3,
+            'moderate': 2,
+            'low': 1
+        }
+
+        actual_score = engagement_scores.get(actual_engagement, 2)
+        expected_score = engagement_scores.get(expected_engagement, 2)
+
+        # Adjust for quality (high quality games should exceed expectations)
+        quality_bonus = 1 if quality_level in ['exceptional', 'outstanding', 'very_good'] else 0
+        adjusted_actual = actual_score + quality_bonus
+
+        if adjusted_actual > expected_score + 1:
+            return 'exceeding'
+        elif adjusted_actual >= expected_score:
+            return 'meeting'
+        else:
+            return 'below'
+
     def _generate_ai_context(
         self,
         overall_success: str,
@@ -363,7 +496,8 @@ class GameAnalyzer:
         velocity_status: str = 'Unknown',
         recent_reviews: int = 0,
         game_data: Dict = None,
-        pricing_analysis: Dict = None
+        pricing_analysis: Dict = None,
+        tag_analysis: Dict = None
     ) -> str:
         """Generate context string for AI prompts"""
         context_parts = []
@@ -423,6 +557,31 @@ class GameAnalyzer:
                     f"💰 Pricing: {pricing_analysis.get('value_rating', 'N/A')} "
                     f"(${pricing_analysis.get('price_per_hour', 0):.2f}/hour). "
                     f"{pricing_analysis.get('recommendation', '')}"
+                )
+
+        # Tag Effectiveness context (NEW)
+        if tag_analysis:
+            effectiveness = tag_analysis.get('effectiveness', 'unknown')
+            category = tag_analysis.get('primary_category', 'Unknown')
+            expectation_match = tag_analysis.get('expectation_match', 'unknown')
+
+            if effectiveness == 'highly_effective':
+                context_parts.append(
+                    f"🏷️ Tags: Highly effective for {category} category. "
+                    f"Tags: {', '.join(tag_analysis.get('top_tags', [])[:3])}. "
+                    f"{tag_analysis.get('recommendation', '')}"
+                )
+            elif effectiveness == 'effective':
+                context_parts.append(
+                    f"🏷️ Tags: Working well for {category} category. "
+                    f"Performance is meeting expectations. Tags are appropriate."
+                )
+            elif effectiveness == 'underperforming':
+                context_parts.append(
+                    f"⚠ Tags: Underperforming for {category} category. "
+                    f"Expected {tag_analysis.get('expected_engagement', 'N/A')} engagement, "
+                    f"got {tag_analysis.get('actual_engagement', 'N/A')}. "
+                    f"{tag_analysis.get('recommendation', '')}"
                 )
 
         # Engagement context
