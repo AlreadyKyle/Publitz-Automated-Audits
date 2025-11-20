@@ -3,6 +3,7 @@ from typing import Dict, List, Any, Optional
 import time
 from datetime import datetime
 import re
+from src.alternative_data_sources import AlternativeDataSource
 
 class GameSearch:
     """Game search and competitor finding using Steam API and SteamSpy"""
@@ -13,6 +14,7 @@ class GameSearch:
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
+        self.alternative_source = AlternativeDataSource()
 
     def parse_steam_url(self, url: str) -> Optional[int]:
         """
@@ -244,6 +246,10 @@ class GameSearch:
         """
         Get detailed information about a game
 
+        Priority order:
+        1. Alternative source (Steam store page scraping)
+        2. Steam API (fallback if scraping fails)
+
         Args:
             app_id: Steam app ID
 
@@ -258,7 +264,17 @@ class GameSearch:
                 except ValueError:
                     raise Exception(f"Invalid app_id: {app_id}")
 
-            # Get Steam store data
+            # PRIORITY 1: Try alternative source
+            try:
+                alt_data = self.alternative_source.get_game_data_from_store_page(app_id)
+                if alt_data and alt_data.get('name'):
+                    print(f"✓ Got game details from alternative source for {app_id}")
+                    # Format alternative data to match our structure
+                    return self._format_alternative_game_data(alt_data, app_id)
+            except Exception as e:
+                print(f"Alternative source failed for game details: {e}, trying Steam API...")
+
+            # PRIORITY 2: Try Steam store API
             response = requests.get(
                 f"{self.steam_api_base}/appdetails",
                 params={'appids': app_id},
@@ -332,6 +348,41 @@ class GameSearch:
                 'tags': [],
                 'price': 'Unknown'
             }
+
+    def _format_alternative_game_data(self, alt_data: Dict[str, Any], app_id: int) -> Dict[str, Any]:
+        """Format alternative source data to match our game details structure"""
+        # Build capsule image URLs
+        capsule_images = {
+            'header': f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg",
+            'capsule_main': f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/capsule_616x353.jpg",
+            'capsule_small': f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/capsule_231x87.jpg"
+        }
+
+        # Analyze Steam Deck readiness
+        categories = alt_data.get('categories', [])
+        platforms = {'windows': True, 'mac': False, 'linux': False}  # Default assumption
+        steam_deck_data = self._analyze_steam_deck_readiness(categories, platforms)
+
+        return {
+            'name': alt_data.get('name', 'Unknown'),
+            'app_id': app_id,
+            'developer': alt_data.get('developer', 'Unknown'),
+            'publisher': alt_data.get('publisher', alt_data.get('developer', 'Unknown')),
+            'release_date': alt_data.get('release_date', 'Unknown'),
+            'genres': alt_data.get('genres', ['Unknown']),
+            'tags': alt_data.get('tags', []),
+            'price': alt_data.get('price', 'Unknown'),
+            'price_raw': alt_data.get('price_raw', 0),
+            'description': alt_data.get('description', ''),
+            'categories': categories,
+            'platforms': platforms,
+            'metacritic': {},  # Not available from alternative source
+            'recommendations': 0,  # Not available from alternative source
+            'review_score': alt_data.get('review_score_raw', 0),
+            'review_count': alt_data.get('reviews_total', 0),
+            'steam_deck_compatibility': steam_deck_data,
+            'capsule_images': capsule_images
+        }
 
     def get_steamspy_data(self, app_id: int) -> Dict[str, Any]:
         """Get SteamSpy data for a game"""

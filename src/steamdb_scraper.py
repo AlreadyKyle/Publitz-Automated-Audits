@@ -1,6 +1,7 @@
 import requests
 from typing import Dict, Any, Optional
 import time
+from src.alternative_data_sources import AlternativeDataSource
 
 class SteamDBScraper:
     """Scraper for Steam sales and revenue data"""
@@ -10,16 +11,16 @@ class SteamDBScraper:
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
+        self.alternative_source = AlternativeDataSource()
 
     def get_sales_data(self, app_id: Any) -> Dict[str, Any]:
         """
         IMPROVED: Get sales and revenue estimates using multiple methods
 
-        Uses both SteamSpy ownership data AND review-count estimation:
-        - Method 1: SteamSpy owners × price × 0.7 (Steam's cut)
-        - Method 2: Reviews × 50-100 (review-to-sale ratio) × price × 0.7
-        - Takes higher estimate for popular games
-        - Applies quality multiplier for highly-rated games
+        Priority order:
+        1. Alternative source (Steam store page scraping) - works when API is blocked
+        2. SteamSpy API - fallback if scraping fails
+        3. Fallback estimates - last resort
 
         Args:
             app_id: Steam app ID
@@ -30,8 +31,23 @@ class SteamDBScraper:
         if app_id == 'unknown' or app_id == 'fallback' or str(app_id).startswith('fallback'):
             return self._generate_fallback_sales_data()
 
+        # PRIORITY 1: Try alternative source (Steam store page scraping)
         try:
-            # Get SteamSpy data
+            print(f"Attempting to fetch data using alternative source for app {app_id}...")
+            alt_data = self.alternative_source.get_complete_game_data(int(app_id))
+
+            if alt_data and alt_data.get('reviews_total', 0) > 0:
+                print(f"✓ Successfully retrieved data from alternative source")
+                # Convert alternative source data to our format
+                return self._format_alternative_data(alt_data)
+            else:
+                print("Alternative source returned incomplete data, trying SteamSpy API...")
+        except Exception as e:
+            print(f"Alternative source failed: {e}, trying SteamSpy API...")
+
+        # PRIORITY 2: Try SteamSpy API (original method)
+        try:
+            print(f"Attempting to fetch data using SteamSpy API for app {app_id}...")
             response = requests.get(
                 self.steamspy_api_base,
                 params={'request': 'appdetails', 'appid': app_id},
@@ -148,6 +164,36 @@ class SteamDBScraper:
         except Exception as e:
             print(f"Error getting sales data: {e}")
             return self._generate_fallback_sales_data()
+
+    def _format_alternative_data(self, alt_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert alternative source data to our standard format"""
+        return {
+            'app_id': alt_data.get('app_id'),
+            'owners_min': alt_data.get('owners_min', 0),
+            'owners_max': alt_data.get('owners_max', 0),
+            'owners_avg': alt_data.get('owners_avg', 0),
+            'owners_display': alt_data.get('owners_display', '0 .. 0'),
+            'estimated_revenue': alt_data.get('estimated_revenue', '$0'),
+            'estimated_revenue_raw': alt_data.get('estimated_revenue_raw', 0),
+            'revenue_range': alt_data.get('revenue_range', '$0 - $0'),
+            'revenue_confidence_low': alt_data.get('revenue_confidence_low', 0),
+            'revenue_confidence_high': alt_data.get('revenue_confidence_high', 0),
+            'estimation_method': alt_data.get('estimation_method', 'alternative_source'),
+            'quality_multiplier': alt_data.get('quality_multiplier', 1.0),
+            'price': alt_data.get('price', '$0.00'),
+            'price_raw': alt_data.get('price_raw', 0),
+            'reviews_total': alt_data.get('reviews_total', 0),
+            'reviews_positive': alt_data.get('reviews_positive', 0),
+            'reviews_negative': alt_data.get('reviews_negative', 0),
+            'review_score': alt_data.get('review_score', '0%'),
+            'review_score_raw': alt_data.get('review_score_raw', 0),
+            'players_2weeks': 0,  # Not available from alternative source
+            'players_forever': 0,  # Not available from alternative source
+            'average_playtime': 0,  # Not available from alternative source
+            'median_playtime': 0,  # Not available from alternative source
+            'ccu': 0,  # Not available from alternative source
+            'tags': alt_data.get('tags', [])
+        }
 
     def _parse_owners_range(self, owners_str: str) -> Dict[str, int]:
         """Parse owner range string like '20,000 .. 50,000'"""
