@@ -33,13 +33,33 @@ class AlternativeDataSource:
         """
         try:
             url = f"https://store.steampowered.com/app/{app_id}"
-            response = self.session.get(url, timeout=15)
+
+            # Add age gate bypass cookies (birthtime = Jan 1, 1990)
+            cookies = {
+                'birthtime': '631152000',  # Timestamp for age verification
+                'mature_content': '1'
+            }
+
+            print(f"Fetching Steam store page for app {app_id}...")
+            response = self.session.get(url, cookies=cookies, timeout=8)  # Reduced timeout
             response.raise_for_status()
 
-            soup = BeautifulSoup(response.text, 'lxml')
+            print(f"Parsing HTML (length: {len(response.text)} chars)...")
+            soup = BeautifulSoup(response.text, 'html.parser')  # Use html.parser for reliability
+
+            # Check if we got an age gate or error page
+            if 'Please enter your birth date' in response.text or 'agegate' in response.text.lower():
+                print("Warning: Age gate detected despite cookies")
+                # Try to continue anyway with limited data
 
             # Extract JSON data embedded in the page
             game_data = self._extract_game_data_from_html(soup, app_id)
+
+            if not game_data.get('name'):
+                print(f"Warning: Could not extract game name from HTML")
+                return {}
+
+            print(f"Found game: {game_data.get('name')}")
 
             # Get review data from Steam review widget
             review_data = self._get_reviews_from_store_page(app_id)
@@ -47,11 +67,19 @@ class AlternativeDataSource:
             # Merge data
             if review_data:
                 game_data.update(review_data)
+                print(f"Got {review_data.get('reviews_total', 0):,} reviews")
+            else:
+                print("Warning: No review data found")
 
             return game_data
 
+        except requests.Timeout:
+            print(f"Timeout fetching Steam store page for app {app_id}")
+            return {}
         except Exception as e:
             print(f"Error scraping Steam store page: {e}")
+            import traceback
+            traceback.print_exc()
             return {}
 
     def _extract_game_data_from_html(self, soup: BeautifulSoup, app_id: int) -> Dict[str, Any]:
@@ -59,15 +87,30 @@ class AlternativeDataSource:
         data = {'app_id': app_id}
 
         try:
-            # Game name
-            name_elem = soup.find('div', class_='apphub_AppName')
-            if name_elem:
-                data['name'] = name_elem.text.strip()
+            # Game name - try multiple selectors
+            name_elem = (soup.find('div', class_='apphub_AppName') or
+                        soup.find('div', id='appHubAppName') or
+                        soup.find('div', class_='page_title_area'))
 
-            # Price
-            price_elem = soup.find('div', class_='game_purchase_price') or soup.find('div', class_='discount_final_price')
+            if name_elem:
+                # Clean up the name
+                name_text = name_elem.get_text(strip=True)
+                data['name'] = name_text
+            else:
+                # Try to get from page title
+                title = soup.find('title')
+                if title:
+                    title_text = title.text
+                    if ' on Steam' in title_text:
+                        data['name'] = title_text.replace(' on Steam', '').strip()
+
+            # Price - try multiple selectors
+            price_elem = (soup.find('div', class_='game_purchase_price') or
+                         soup.find('div', class_='discount_final_price') or
+                         soup.find('div', class_='game_area_purchase_game'))
+
             if price_elem:
-                price_text = price_elem.text.strip()
+                price_text = price_elem.get_text(strip=True)
                 # Extract numeric price
                 price_match = re.search(r'[\$€£]?\s*(\d+[.,]\d{2})', price_text)
                 if price_match:
@@ -75,36 +118,44 @@ class AlternativeDataSource:
                     data['price'] = price_text
                     data['price_raw'] = float(price_str)
 
+            # If price not found, might be free
+            if 'price_raw' not in data:
+                if 'Free to Play' in str(soup) or 'Play for Free' in str(soup):
+                    data['price'] = 'Free'
+                    data['price_raw'] = 0.0
+
             # Description
             desc_elem = soup.find('div', class_='game_description_snippet')
             if desc_elem:
-                data['description'] = desc_elem.text.strip()
+                data['description'] = desc_elem.get_text(strip=True)
 
             # Developer/Publisher
             dev_elem = soup.find('div', id='developers_list')
             if dev_elem:
                 dev_link = dev_elem.find('a')
                 if dev_link:
-                    data['developer'] = dev_link.text.strip()
+                    data['developer'] = dev_link.get_text(strip=True)
 
             pub_elem = soup.find('div', class_='dev_row')
             if pub_elem and 'Publisher:' in pub_elem.text:
                 pub_link = pub_elem.find('a')
                 if pub_link:
-                    data['publisher'] = pub_link.text.strip()
+                    data['publisher'] = pub_link.get_text(strip=True)
 
             # Release date
             release_elem = soup.find('div', class_='release_date')
             if release_elem:
                 date_elem = release_elem.find('div', class_='date')
                 if date_elem:
-                    data['release_date'] = date_elem.text.strip()
+                    data['release_date'] = date_elem.get_text(strip=True)
 
             # Tags
             tags = []
             tag_elements = soup.find_all('a', class_='app_tag')
             for tag in tag_elements[:15]:
-                tags.append(tag.text.strip())
+                tag_text = tag.get_text(strip=True)
+                if tag_text:
+                    tags.append(tag_text)
             data['tags'] = tags
 
             # Genres
@@ -129,8 +180,9 @@ class AlternativeDataSource:
     def _get_reviews_from_store_page(self, app_id: int) -> Dict[str, Any]:
         """Get review statistics from Steam store page review widget"""
         try:
+            print(f"Fetching reviews for app {app_id}...")
             url = f"https://store.steampowered.com/appreviews/{app_id}?json=1&num_per_page=0"
-            response = self.session.get(url, timeout=10)
+            response = self.session.get(url, timeout=5)  # Shorter timeout
             response.raise_for_status()
 
             data = response.json()
@@ -140,6 +192,8 @@ class AlternativeDataSource:
             positive = query_summary.get('total_positive', 0)
             negative = query_summary.get('total_negative', 0)
 
+            print(f"Found {total:,} total reviews ({positive:,} positive, {negative:,} negative)")
+
             return {
                 'reviews_total': total,
                 'reviews_positive': positive,
@@ -147,6 +201,9 @@ class AlternativeDataSource:
                 'review_score_raw': (positive / total * 100) if total > 0 else 0,
                 'review_score': f"{(positive / total * 100):.1f}%" if total > 0 else "N/A"
             }
+        except requests.Timeout:
+            print(f"Timeout getting review data for app {app_id}")
+            return {}
         except Exception as e:
             print(f"Error getting review data: {e}")
             return {}

@@ -52,10 +52,17 @@ class SteamDBScraper:
                 self.steamspy_api_base,
                 params={'request': 'appdetails', 'appid': app_id},
                 headers=self.headers,
-                timeout=10
+                timeout=5  # Reduced timeout for faster fallback
             )
             response.raise_for_status()
+
+            # Check if we got "Access denied"
+            if response.text == "Access denied":
+                print("SteamSpy API returned 'Access denied' - IP may be blocked")
+                raise Exception("Access denied by SteamSpy")
+
             data = response.json()
+            print(f"✓ Got data from SteamSpy API")
 
             # Parse owner data
             owners = data.get('owners', '0 .. 0')
