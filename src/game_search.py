@@ -203,6 +203,11 @@ class GameSearch:
             total_reviews = spy_data.get('reviews', 0)
             review_score_percent = (positive_reviews / total_reviews * 100) if total_reviews > 0 else 0
 
+            # Extract price information
+            price_overview = game_data.get('price_overview', {})
+            price_formatted = price_overview.get('final_formatted', 'Free')
+            price_raw = price_overview.get('final', 0) / 100 if price_overview.get('final') else 0  # Convert cents to dollars
+
             # Extract relevant information
             return {
                 'name': game_data.get('name', 'Unknown'),
@@ -212,7 +217,8 @@ class GameSearch:
                 'release_date': game_data.get('release_date', {}).get('date', 'Unknown'),
                 'genres': [g['description'] for g in game_data.get('genres', [])],
                 'tags': spy_data.get('tags', []),
-                'price': game_data.get('price_overview', {}).get('final_formatted', 'Free'),
+                'price': price_formatted,
+                'price_raw': price_raw,  # NEW: Raw price in dollars for comparison
                 'description': game_data.get('short_description', ''),
                 'categories': [c['description'] for c in game_data.get('categories', [])],
                 'platforms': game_data.get('platforms', {}),
@@ -275,7 +281,14 @@ class GameSearch:
         max_competitors: int = 10
     ) -> List[Dict[str, Any]]:
         """
-        Find competitor games based on tags, genres, and categories
+        IMPROVED: Find competitor games using similarity scoring
+
+        Uses multi-factor scoring:
+        - Genre match: 40 points per matching genre
+        - Tag match: 5 points per matching tag
+        - Price similarity: 20 points if within 30% price range
+        - Release window: 10 points if within 1 year
+        - Penalty for wrong types: -50 for F2P vs paid mismatch, -30 for multiplayer vs single-player
 
         IMPORTANT: This method ensures we ALWAYS find competitors (never returns zero)
 
@@ -285,56 +298,148 @@ class GameSearch:
             max_competitors: Maximum number of competitors to return
 
         Returns:
-            List of competitor game data
+            List of competitor game data, sorted by relevance score
         """
-        competitors = []
-
         try:
-            # Strategy 1: Find by primary tag
+            # Gather potential competitors from multiple sources
+            potential_competitors = []
+
+            # Strategy 1: Find by primary tag (cast wide net)
             tags = game_data.get('tags', [])
             if tags:
-                competitors.extend(self._find_by_tag(tags[0], max_competitors))
+                potential_competitors.extend(self._find_by_tag(tags[0], max_competitors * 3))
 
-            # Strategy 2: Find by genre if we don't have enough
-            if len(competitors) < min_competitors:
-                genres = game_data.get('genres', [])
-                if genres:
-                    competitors.extend(self._find_by_genre(genres[0], max_competitors))
+            # Strategy 2: Find by genre
+            genres = game_data.get('genres', [])
+            if genres:
+                potential_competitors.extend(self._find_by_genre(genres[0], max_competitors * 3))
 
-            # Strategy 3: Use broader search if still not enough
-            if len(competitors) < min_competitors:
-                competitors.extend(self._find_by_broad_category(game_data, max_competitors * 2))
+            # Strategy 3: Broader search if needed
+            if len(potential_competitors) < max_competitors * 2:
+                potential_competitors.extend(self._find_by_broad_category(game_data, max_competitors * 2))
 
-            # Remove duplicates and the original game
+            # Remove duplicates
             seen = set()
             unique_competitors = []
             original_app_id = game_data.get('app_id')
 
-            for comp in competitors:
+            for comp in potential_competitors:
                 comp_id = comp.get('app_id')
                 if comp_id not in seen and comp_id != original_app_id:
                     seen.add(comp_id)
                     unique_competitors.append(comp)
 
-            # Sort by relevance (review count as proxy for popularity)
-            unique_competitors.sort(
-                key=lambda x: x.get('review_count', 0),
-                reverse=True
-            )
+            # Score each competitor for relevance
+            scored_competitors = []
+            for comp in unique_competitors:
+                score = self._calculate_similarity_score(game_data, comp)
+                if score > 20:  # Minimum threshold - filter out very poor matches
+                    scored_competitors.append((score, comp))
 
-            # Return the top competitors
-            result = unique_competitors[:max_competitors]
+            # Sort by score (highest first)
+            scored_competitors.sort(reverse=True, key=lambda x: x[0])
 
-            # FAILSAFE: If we still have zero competitors, generate similar games
-            if len(result) == 0:
-                result = self._generate_fallback_competitors(game_data, min_competitors)
+            # Extract top competitors
+            result = [comp for score, comp in scored_competitors[:max_competitors]]
 
-            return result
+            # FAILSAFE: If we still have zero or too few competitors, generate fallback
+            if len(result) < min_competitors:
+                fallback = self._generate_fallback_competitors(game_data, min_competitors)
+                result.extend(fallback[:min_competitors - len(result)])
+
+            return result[:max_competitors]
 
         except Exception as e:
             print(f"Error finding competitors: {e}")
             # FAILSAFE: Return fallback competitors even on error
             return self._generate_fallback_competitors(game_data, min_competitors)
+
+    def _calculate_similarity_score(self, game_data: Dict[str, Any], competitor: Dict[str, Any]) -> int:
+        """
+        Calculate similarity score between game and potential competitor
+
+        Scoring factors:
+        - Genre match: +40 points per matching genre
+        - Tag match: +5 points per matching tag (up to 10 tags)
+        - Price similarity: +20 if within 30% price range
+        - Release window: +10 if within 1 year, +5 if within 2 years
+        - Same publisher: +15 points
+        - F2P vs Paid mismatch: -50 points
+        - Multiplayer vs Single-player mismatch: -30 points
+        """
+        score = 0
+
+        # Extract data
+        game_genres = set(game_data.get('genres', []))
+        comp_genres = set(competitor.get('genres', []))
+        game_tags = set(game_data.get('tags', []))
+        comp_tags = set(competitor.get('tags', []))
+        game_price = game_data.get('price_raw', 0) if 'price_raw' in game_data else 0
+        comp_price = competitor.get('price_raw', 0) if 'price_raw' in competitor else 0
+        game_categories = set(game_data.get('categories', []))
+        comp_categories = set(competitor.get('categories', []))
+
+        # 1. Genre matching (most important - 40 points per match)
+        genre_matches = len(game_genres & comp_genres)
+        score += genre_matches * 40
+
+        # 2. Tag matching (5 points per match, cap at 50 points)
+        tag_matches = len(game_tags & comp_tags)
+        score += min(tag_matches * 5, 50)
+
+        # 3. Price similarity (20 points if within 30% range)
+        if game_price > 0 and comp_price > 0:
+            price_ratio = min(game_price, comp_price) / max(game_price, comp_price)
+            if price_ratio >= 0.7:  # Within 30% range
+                score += 20
+        elif game_price == 0 and comp_price == 0:  # Both F2P
+            score += 20
+
+        # 4. Release window (10 points if within 1 year)
+        try:
+            game_release = game_data.get('release_date', '')
+            comp_release = competitor.get('release_date', '')
+            # Simple year extraction - not perfect but good enough
+            if game_release and comp_release:
+                import re as regex_module
+                game_year_match = regex_module.search(r'202\d', game_release)
+                comp_year_match = regex_module.search(r'202\d', comp_release)
+                if game_year_match and comp_year_match:
+                    year_diff = abs(int(game_year_match.group()) - int(comp_year_match.group()))
+                    if year_diff == 0:
+                        score += 10
+                    elif year_diff == 1:
+                        score += 5
+        except:
+            pass  # Ignore date parsing errors
+
+        # 5. Same publisher bonus (15 points)
+        if game_data.get('publisher') and competitor.get('publisher'):
+            if game_data.get('publisher') == competitor.get('publisher'):
+                score += 15
+
+        # 6. PENALTY: F2P vs Paid mismatch (-50 points)
+        game_is_free = game_price == 0
+        comp_is_free = comp_price == 0
+        if game_is_free != comp_is_free:
+            score -= 50
+
+        # 7. PENALTY: Multiplayer vs Single-player mismatch (-30 points)
+        game_is_singleplayer = 'Single-player' in game_categories or 'Singleplayer' in game_tags
+        comp_is_multiplayer = 'Multiplayer' in comp_categories or 'Multiplayer' in comp_tags or 'Co-op' in comp_tags
+
+        # If game is clearly single-player focused and competitor is multiplayer-focused
+        if game_is_singleplayer and comp_is_multiplayer and not ('Multiplayer' in game_categories):
+            score -= 30
+
+        # 8. BONUS: Similar player count tags
+        coop_tags = {'Co-op', 'Local Co-Op', 'Online Co-Op', 'Multiplayer'}
+        game_has_coop = len(game_tags & coop_tags) > 0
+        comp_has_coop = len(comp_tags & coop_tags) > 0
+        if game_has_coop == comp_has_coop:
+            score += 10
+
+        return max(score, 0)  # Never return negative score
 
     def find_competitors_broad(
         self,
