@@ -10,13 +10,19 @@ class SteamDBScraper:
 
     def get_sales_data(self, app_id: Any) -> Dict[str, Any]:
         """
-        Get sales and revenue estimates for a game
+        IMPROVED: Get sales and revenue estimates using multiple methods
+
+        Uses both SteamSpy ownership data AND review-count estimation:
+        - Method 1: SteamSpy owners × price × 0.7 (Steam's cut)
+        - Method 2: Reviews × 50-100 (review-to-sale ratio) × price × 0.7
+        - Takes higher estimate for popular games
+        - Applies quality multiplier for highly-rated games
 
         Args:
             app_id: Steam app ID
 
         Returns:
-            Dictionary with sales data
+            Dictionary with enhanced sales data including confidence ranges
         """
         if app_id == 'unknown' or app_id == 'fallback' or str(app_id).startswith('fallback'):
             return self._generate_fallback_sales_data()
@@ -35,11 +41,9 @@ class SteamDBScraper:
             owners = data.get('owners', '0 .. 0')
             owners_range = self._parse_owners_range(owners)
 
-            # Calculate revenue estimate
+            # Extract basic info
             price = data.get('price', 0) / 100  # Price in cents to dollars
             avg_owners = (owners_range['min'] + owners_range['max']) / 2
-
-            estimated_revenue = avg_owners * price * 0.7  # Steam takes 30%
 
             # Parse review data
             positive = data.get('positive', 0)
@@ -47,14 +51,81 @@ class SteamDBScraper:
             total_reviews = positive + negative
             review_score = (positive / total_reviews * 100) if total_reviews > 0 else 0
 
+            # METHOD 1: SteamSpy-based estimate (conservative)
+            steamspy_revenue = avg_owners * price * 0.7  # Steam takes 30%
+
+            # METHOD 2: Review-based estimate (often more accurate for popular games)
+            # Rule of thumb: 1 review per 50-100 sales depending on game type
+            # Popular/viral games: ~100:1, niche/hardcore: ~30:1, average: ~50:1
+            if total_reviews > 0:
+                # Determine review ratio based on game characteristics
+                if total_reviews > 20000:
+                    # Very popular games tend to have lower review rates
+                    review_ratio = 80
+                elif total_reviews > 5000:
+                    # Popular games
+                    review_ratio = 60
+                elif total_reviews > 1000:
+                    # Moderate popularity
+                    review_ratio = 50
+                else:
+                    # Smaller games often have higher review rates
+                    review_ratio = 40
+
+                estimated_sales = total_reviews * review_ratio
+                review_based_revenue = estimated_sales * price * 0.7
+            else:
+                review_based_revenue = 0
+
+            # Combine methods: use higher estimate for well-reviewed games
+            if total_reviews > 1000:
+                # For popular games, review-based is often more accurate
+                base_revenue = max(steamspy_revenue, review_based_revenue)
+            else:
+                # For smaller games, SteamSpy is more reliable
+                base_revenue = steamspy_revenue
+
+            # Apply quality multiplier for highly-rated games
+            # Great games often exceed estimates due to word-of-mouth
+            if review_score >= 95:
+                quality_multiplier = 1.5  # Exceptional games
+            elif review_score >= 90:
+                quality_multiplier = 1.3  # Great games
+            elif review_score >= 85:
+                quality_multiplier = 1.15  # Very good games
+            elif review_score >= 80:
+                quality_multiplier = 1.05  # Good games
+            else:
+                quality_multiplier = 1.0  # Average or below
+
+            enhanced_revenue = base_revenue * quality_multiplier
+
+            # Calculate confidence range
+            confidence_low = enhanced_revenue * 0.6   # Conservative
+            confidence_mid = enhanced_revenue          # Best estimate
+            confidence_high = enhanced_revenue * 1.8   # Optimistic
+
+            # Format ranges
+            if confidence_mid < 1000:
+                revenue_range = f"${confidence_low:,.0f} - ${confidence_high:,.0f}"
+            elif confidence_mid < 1000000:
+                revenue_range = f"${confidence_low/1000:,.0f}K - ${confidence_high/1000:,.0f}K"
+            else:
+                revenue_range = f"${confidence_low/1000000:,.1f}M - ${confidence_high/1000000:,.1f}M"
+
             return {
                 'app_id': app_id,
                 'owners_min': owners_range['min'],
                 'owners_max': owners_range['max'],
                 'owners_avg': int(avg_owners),
                 'owners_display': owners,
-                'estimated_revenue': f"${estimated_revenue:,.0f}",
-                'estimated_revenue_raw': estimated_revenue,
+                'estimated_revenue': f"${confidence_mid:,.0f}",  # Display mid estimate
+                'estimated_revenue_raw': confidence_mid,
+                'revenue_range': revenue_range,  # NEW: Range display
+                'revenue_confidence_low': confidence_low,  # NEW: Low estimate
+                'revenue_confidence_high': confidence_high,  # NEW: High estimate
+                'estimation_method': 'review-based' if review_based_revenue > steamspy_revenue else 'ownership-based',  # NEW: Which method used
+                'quality_multiplier': quality_multiplier,  # NEW: Applied multiplier
                 'price': f"${price:.2f}",
                 'price_raw': price,
                 'reviews_total': total_reviews,
@@ -95,6 +166,11 @@ class SteamDBScraper:
             'owners_display': '10,000 .. 50,000',
             'estimated_revenue': '$150,000',
             'estimated_revenue_raw': 150000,
+            'revenue_range': '$90K - $270K',
+            'revenue_confidence_low': 90000,
+            'revenue_confidence_high': 270000,
+            'estimation_method': 'fallback',
+            'quality_multiplier': 1.0,
             'price': '$14.99',
             'price_raw': 14.99,
             'reviews_total': 1500,
