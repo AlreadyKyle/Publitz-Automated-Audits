@@ -86,7 +86,6 @@ class GameSearch:
                 release_datetime = date_parser.parse(release_date)
             except ImportError:
                 # Fallback: simple year check if dateutil not available
-                import re
                 year_match = re.search(r'202[4-9]|20[3-9]\d', release_date)
                 if year_match:
                     year = int(year_match.group())
@@ -384,7 +383,8 @@ class GameSearch:
                         comp_details = self.get_game_details(int(app_id))
                         competitors.append(comp_details)
                         time.sleep(0.2)  # Rate limiting
-                    except:
+                    except Exception as e:
+                        print(f"Error getting competitor details for {app_id}: {e}")
                         continue
 
             return competitors[:min_competitors * 2]
@@ -410,7 +410,8 @@ class GameSearch:
                     game = self.get_game_details(int(app_id))
                     competitors.append(game)
                     time.sleep(0.2)  # Rate limiting
-                except:
+                except Exception as e:
+                    print(f"Error getting game by tag {app_id}: {e}")
                     continue
 
             return competitors
@@ -436,7 +437,8 @@ class GameSearch:
                     game = self.get_game_details(int(app_id))
                     competitors.append(game)
                     time.sleep(0.2)  # Rate limiting
-                except:
+                except Exception as e:
+                    print(f"Error getting game by genre {app_id}: {e}")
                     continue
 
             return competitors
@@ -467,7 +469,8 @@ class GameSearch:
                     game = self.get_game_details(int(app_id))
                     competitors.append(game)
                     time.sleep(0.2)
-                except:
+                except Exception as e:
+                    print(f"Error getting game in broad search {app_id}: {e}")
                     continue
 
             return competitors

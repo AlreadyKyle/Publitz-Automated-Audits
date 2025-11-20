@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import time
+import re
 from datetime import datetime
 from src.ai_generator import AIGenerator
 from src.game_search import GameSearch
@@ -35,6 +36,13 @@ def main():
                 st.warning("⚠️ Please enter your Anthropic API Key to continue")
                 st.info("💡 **Tip**: Set ANTHROPIC_API_KEY environment variable to skip this step")
                 st.stop()
+
+    # Validate API key format (basic check)
+    if api_key:
+        api_key = api_key.strip()
+        if len(api_key) < 20:
+            st.error("❌ Invalid API key format. Please check your API key.")
+            st.stop()
 
     # Main input - Steam URL
     st.markdown("### 🎮 Enter Steam Game URL")
@@ -125,7 +133,12 @@ def main():
                 # Step 5: Gather competitor Steam data
                 status_text.text("📊 Analyzing competitor performance...")
                 for competitor in competitor_data:
-                    competitor['steam_data'] = steamdb_scraper.get_sales_data(competitor['app_id'])
+                    try:
+                        competitor['steam_data'] = steamdb_scraper.get_sales_data(competitor['app_id'])
+                    except Exception as e:
+                        # If competitor data fails, use fallback
+                        print(f"Warning: Failed to get data for competitor {competitor.get('name', 'Unknown')}: {e}")
+                        competitor['steam_data'] = {}
                 progress_bar.progress(75)
 
                 # Step 6: Generate AI report
@@ -180,7 +193,10 @@ def main():
             # Download button
             st.markdown("---")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{game_name.replace(' ', '_')}_{report_type.replace('-', '_')}_Report_{timestamp}.md"
+            # Sanitize filename - remove invalid characters
+            safe_game_name = re.sub(r'[^\w\s-]', '', game_name).strip().replace(' ', '_')
+            safe_game_name = safe_game_name[:50]  # Limit length
+            filename = f"{safe_game_name}_{report_type.replace('-', '_')}_Report_{timestamp}.md"
 
             st.download_button(
                 label="📥 Download Report as Markdown",

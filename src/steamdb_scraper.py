@@ -81,7 +81,8 @@ class SteamDBScraper:
             min_owners = int(parts[0].strip().replace(',', ''))
             max_owners = int(parts[1].strip().replace(',', ''))
             return {'min': min_owners, 'max': max_owners}
-        except:
+        except Exception as e:
+            print(f"Error parsing owners range '{owners_str}': {e}")
             return {'min': 0, 'max': 0}
 
     def _generate_fallback_sales_data(self) -> Dict[str, Any]:
