@@ -145,10 +145,19 @@ Be analytical, actionable, and focused on driving results.
                 if hasattr(content_block, 'text'):
                     report_text += content_block.text
 
+            if not report_text:
+                raise Exception("Empty response from Claude API")
+
             return report_text
 
+        except anthropic.AuthenticationError as e:
+            raise Exception(f"Invalid API Key: {str(e)}")
+        except anthropic.RateLimitError as e:
+            raise Exception(f"Rate limit exceeded: {str(e)}. Please try again in a few moments.")
         except anthropic.APIError as e:
             raise Exception(f"Anthropic API Error: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Error generating report: {str(e)}")
 
     def generate_pre_launch_report(
         self,
@@ -272,10 +281,19 @@ Be strategic, actionable, and focused on maximizing launch success.
                 if hasattr(content_block, 'text'):
                     report_text += content_block.text
 
+            if not report_text:
+                raise Exception("Empty response from Claude API")
+
             return report_text
 
+        except anthropic.AuthenticationError as e:
+            raise Exception(f"Invalid API Key: {str(e)}")
+        except anthropic.RateLimitError as e:
+            raise Exception(f"Rate limit exceeded: {str(e)}. Please try again in a few moments.")
         except anthropic.APIError as e:
             raise Exception(f"Anthropic API Error: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Error generating report: {str(e)}")
 
     def _format_competitor_data(self, competitor_data: List[Dict[str, Any]]) -> str:
         """Format competitor data for the prompt"""

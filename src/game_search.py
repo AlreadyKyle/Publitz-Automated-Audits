@@ -21,12 +21,22 @@ class GameSearch:
         Returns:
             App ID as integer, or None if invalid URL
         """
+        if not url or not isinstance(url, str):
+            return None
+
+        # Clean up URL (remove whitespace)
+        url = url.strip()
+
         # Pattern: https://store.steampowered.com/app/{app_id}/...
+        # Also supports http:// and URLs without protocol
         pattern = r'store\.steampowered\.com/app/(\d+)'
         match = re.search(pattern, url)
 
         if match:
-            return int(match.group(1))
+            app_id = int(match.group(1))
+            # Validate app_id is reasonable (Steam app IDs are positive integers)
+            if app_id > 0:
+                return app_id
 
         return None
 
@@ -64,18 +74,32 @@ class GameSearch:
             return 'Pre-Launch'
 
         # Common pre-launch indicators
-        pre_launch_keywords = ['coming soon', 'to be announced', 'tba', 'unreleased']
+        pre_launch_keywords = ['coming soon', 'to be announced', 'tba', 'unreleased', 'q1', 'q2', 'q3', 'q4']
         if any(keyword in release_date.lower() for keyword in pre_launch_keywords):
             return 'Pre-Launch'
 
         # Check if it's a future date
         try:
-            # Try to parse various date formats
-            from dateutil import parser
-            release_datetime = parser.parse(release_date)
+            # Try to parse various date formats with fallback
+            try:
+                from dateutil import parser as date_parser
+                release_datetime = date_parser.parse(release_date)
+            except ImportError:
+                # Fallback: simple year check if dateutil not available
+                import re
+                year_match = re.search(r'202[4-9]|20[3-9]\d', release_date)
+                if year_match:
+                    year = int(year_match.group())
+                    current_year = datetime.now().year
+                    if year > current_year:
+                        return 'Pre-Launch'
+                return 'Post-Launch'
+
             if release_datetime > datetime.now():
                 return 'Pre-Launch'
-        except:
+        except Exception as e:
+            # If parsing fails, assume post-launch to be safe
+            print(f"Warning: Could not parse release date '{release_date}': {e}")
             pass
 
         # Default to post-launch if released
@@ -151,6 +175,13 @@ class GameSearch:
             Dictionary with game details
         """
         try:
+            # Ensure app_id is an integer
+            if isinstance(app_id, str):
+                try:
+                    app_id = int(app_id)
+                except ValueError:
+                    raise Exception(f"Invalid app_id: {app_id}")
+
             # Get Steam store data
             response = requests.get(
                 f"{self.steam_api_base}/appdetails",
@@ -163,10 +194,15 @@ class GameSearch:
             game_data = data.get(str(app_id), {}).get('data', {})
 
             if not game_data:
-                raise Exception("No game data found")
+                raise Exception(f"No game data found for app_id: {app_id}")
 
             # Get SteamSpy data for additional info
             spy_data = self.get_steamspy_data(app_id)
+
+            # Calculate review score percentage
+            positive_reviews = spy_data.get('positive', 0)
+            total_reviews = spy_data.get('reviews', 0)
+            review_score_percent = (positive_reviews / total_reviews * 100) if total_reviews > 0 else 0
 
             # Extract relevant information
             return {
@@ -183,8 +219,8 @@ class GameSearch:
                 'platforms': game_data.get('platforms', {}),
                 'metacritic': game_data.get('metacritic', {}),
                 'recommendations': game_data.get('recommendations', {}).get('total', 0),
-                'review_score': spy_data.get('positive', 0),
-                'review_count': spy_data.get('reviews', 0)
+                'review_score': review_score_percent,
+                'review_count': total_reviews
             }
 
         except Exception as e:

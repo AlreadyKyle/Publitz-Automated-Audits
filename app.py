@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import time
 from datetime import datetime
 from src.ai_generator import AIGenerator
 from src.game_search import GameSearch
@@ -147,7 +148,6 @@ def main():
                 status_text.text("✅ Report generated successfully!")
 
             # Clear progress indicators after short delay
-            import time
             time.sleep(1)
             progress_container.empty()
 
