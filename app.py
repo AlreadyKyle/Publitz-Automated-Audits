@@ -30,6 +30,8 @@ if 'sales_data' not in st.session_state:
     st.session_state.sales_data = None
 if 'game_data' not in st.session_state:
     st.session_state.game_data = None
+if 'generating' not in st.session_state:
+    st.session_state.generating = False
 
 def main():
     # Header
@@ -81,7 +83,15 @@ def main():
     # Generate button
     col1, col2 = st.columns([3, 1])
     with col1:
-        generate_button = st.button("🚀 Generate Audit Report", type="primary", use_container_width=True, key="generate_btn")
+        # Phase 2.1 & 2.4: Disable button during generation and show state
+        button_text = "⏳ Generating Report..." if st.session_state.generating else "🚀 Generate Audit Report"
+        generate_button = st.button(
+            button_text,
+            type="primary",
+            use_container_width=True,
+            key="generate_btn",
+            disabled=st.session_state.generating
+        )
     with col2:
         if st.session_state.report_generated:
             if st.button("🔄 Generate New Report", use_container_width=True, key="new_report_btn"):
@@ -89,6 +99,7 @@ def main():
                 st.session_state.report_generated = False
                 st.session_state.report_data = None
                 st.session_state.game_name = None
+                st.session_state.generating = False
                 st.rerun()
 
     # Only generate if button clicked and not already generated
@@ -97,9 +108,12 @@ def main():
             st.error("❌ Please enter a Steam URL")
             st.stop()
 
+        # Phase 2.1: Set generating state
+        st.session_state.generating = True
+
         try:
             # Initialize components
-            with st.spinner("Initializing..."):
+            with st.spinner("Initializing components..."):
                 game_search = GameSearch()
                 steamdb_scraper = SteamDBScraper()
                 ai_generator = AIGenerator(api_key)
@@ -107,9 +121,10 @@ def main():
             # Progress tracking
             progress_bar = st.progress(0, text="Starting...")
 
-            # Step 1: Parse URL and get game data
+            # Phase 2.2: Step 1 - Parse URL and get game data
             progress_bar.progress(10, text="🔍 Fetching game data from Steam...")
-            game_data = game_search.get_game_from_url(steam_url)
+            with st.spinner("🔍 Fetching game data from Steam..."):
+                game_data = game_search.get_game_from_url(steam_url)
 
             if not game_data:
                 st.error("❌ Invalid Steam URL or game not found. Please check the URL and try again.")
@@ -119,8 +134,9 @@ def main():
             st.success(f"✅ Found game: **{game_name}**")
             progress_bar.progress(20, text="🔎 Detecting launch status...")
 
-            # Step 2: Auto-detect launch status
-            report_type = game_search.detect_launch_status(game_data)
+            # Phase 2.2: Step 2 - Auto-detect launch status
+            with st.spinner("🔎 Detecting launch status..."):
+                report_type = game_search.detect_launch_status(game_data)
 
             # Show detected status
             status_col1, status_col2 = st.columns([1, 3])
@@ -134,45 +150,50 @@ def main():
 
             progress_bar.progress(30, text="🔍 Finding competitor games...")
 
-            # Step 3: Find competitor games
-            competitor_data = game_search.find_competitors(game_data, min_competitors=3, max_competitors=10)
+            # Phase 2.2: Step 3 - Find competitor games
+            with st.spinner("🔍 Finding competitor games..."):
+                competitor_data = game_search.find_competitors(game_data, min_competitors=3, max_competitors=10)
             num_competitors = len(competitor_data)
 
             if num_competitors == 0:
                 progress_bar.progress(40, text="🔍 Expanding competitor search...")
-                competitor_data = game_search.find_competitors_broad(game_data, min_competitors=5)
-                num_competitors = len(competitor_data)
+                with st.spinner("🔍 Expanding competitor search..."):
+                    competitor_data = game_search.find_competitors_broad(game_data, min_competitors=5)
+                    num_competitors = len(competitor_data)
 
             st.success(f"✅ Found {num_competitors} competitor games")
             progress_bar.progress(50, text="📊 Gathering Steam market data...")
 
-            # Step 4: Gather Steam data
-            sales_data = steamdb_scraper.get_sales_data(game_data['app_id'])
+            # Phase 2.2: Step 4 - Gather Steam data
+            with st.spinner("📊 Gathering Steam market data..."):
+                sales_data = steamdb_scraper.get_sales_data(game_data['app_id'])
             progress_bar.progress(65, text="📊 Analyzing competitor performance...")
 
-            # Step 5: Gather competitor Steam data
-            for competitor in competitor_data:
-                try:
-                    competitor['steam_data'] = steamdb_scraper.get_sales_data(competitor['app_id'])
-                except Exception as e:
-                    print(f"Warning: Failed to get data for competitor {competitor.get('name', 'Unknown')}: {e}")
-                    competitor['steam_data'] = {}
+            # Phase 2.2: Step 5 - Gather competitor Steam data
+            with st.spinner("📊 Analyzing competitor performance..."):
+                for competitor in competitor_data:
+                    try:
+                        competitor['steam_data'] = steamdb_scraper.get_sales_data(competitor['app_id'])
+                    except Exception as e:
+                        print(f"Warning: Failed to get data for competitor {competitor.get('name', 'Unknown')}: {e}")
+                        competitor['steam_data'] = {}
 
             progress_bar.progress(75, text="🤖 Generating comprehensive audit report with Claude AI...")
 
-            # Step 6: Generate AI report
-            if report_type == "Post-Launch":
-                report_data = ai_generator.generate_post_launch_report(
-                    game_data,
-                    sales_data,
-                    competitor_data,
-                    steamdb_data=sales_data
-                )
-            else:
-                report_data = ai_generator.generate_pre_launch_report(
-                    game_data,
-                    competitor_data
-                )
+            # Phase 2.2: Step 6 - Generate AI report
+            with st.spinner("🤖 Generating comprehensive audit report with Claude AI... (this may take 30-60 seconds)"):
+                if report_type == "Post-Launch":
+                    report_data = ai_generator.generate_post_launch_report(
+                        game_data,
+                        sales_data,
+                        competitor_data,
+                        steamdb_data=sales_data
+                    )
+                else:
+                    report_data = ai_generator.generate_pre_launch_report(
+                        game_data,
+                        competitor_data
+                    )
 
             progress_bar.progress(100, text="✅ Report generated successfully!")
 
@@ -185,6 +206,9 @@ def main():
             st.session_state.sales_data = sales_data
             st.session_state.game_data = game_data
 
+            # Phase 2.1: Reset generating state
+            st.session_state.generating = False
+
             # Clear progress bar
             time.sleep(0.5)
             progress_bar.empty()
@@ -193,6 +217,8 @@ def main():
             st.rerun()
 
         except Exception as e:
+            # Phase 2.1: Reset generating state on error
+            st.session_state.generating = False
             st.error(f"❌ An error occurred: {str(e)}")
             with st.expander("🔍 Error Details"):
                 st.exception(e)
@@ -217,6 +243,23 @@ def main():
                 st.metric("Est. Revenue", st.session_state.sales_data.get('estimated_revenue', 'N/A'))
             else:
                 st.metric("App ID", st.session_state.game_data.get('app_id', 'N/A'))
+
+        # Phase 2.3: Download button at top for easy access
+        st.markdown("---")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_game_name = re.sub(r'[^\w\s-]', '', st.session_state.game_name).strip().replace(' ', '_')
+        safe_game_name = safe_game_name[:50]
+        filename = f"{safe_game_name}_{st.session_state.report_type.replace('-', '_')}_Report_{timestamp}.md"
+
+        st.download_button(
+            label="📥 Download Report as Markdown",
+            data=st.session_state.report_data,
+            file_name=filename,
+            mime="text/markdown",
+            type="primary",
+            use_container_width=True,
+            key="download_btn_top"
+        )
 
         # Display full report
         st.markdown("---")
