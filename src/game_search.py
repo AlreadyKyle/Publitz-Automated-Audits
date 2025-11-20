@@ -426,7 +426,12 @@ class GameSearch:
             scored_competitors = []
             for comp in unique_competitors:
                 score = self._calculate_similarity_score(game_data, comp)
-                if score > 20:  # Minimum threshold - filter out very poor matches
+                # IMPROVED: Higher threshold (50) + require at least 1 genre match
+                game_genres = set(game_data.get('genres', []))
+                comp_genres = set(comp.get('genres', []))
+                has_genre_match = len(game_genres & comp_genres) > 0
+
+                if score >= 50 and has_genre_match:  # Stricter filtering
                     scored_competitors.append((score, comp))
 
             # Sort by score (highest first)
@@ -574,10 +579,11 @@ class GameSearch:
                 # Get tags for this game
                 game_spy_tags = set(spy_data.get('tags', {}).keys() if isinstance(spy_data.get('tags'), dict) else [])
 
-                # Calculate similarity
+                # Calculate similarity - require meaningful overlap
                 tag_overlap = len(game_tags & game_spy_tags)
 
-                if tag_overlap > 0:  # Any tag overlap
+                # IMPROVED: Require at least 3 tag matches to filter out generic matches
+                if tag_overlap >= 3:  # Meaningful tag overlap only
                     try:
                         comp_details = self.get_game_details(int(app_id))
                         competitors.append(comp_details)
