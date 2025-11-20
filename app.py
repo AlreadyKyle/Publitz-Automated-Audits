@@ -6,6 +6,7 @@ from datetime import datetime
 from src.ai_generator import AIGenerator
 from src.game_search import GameSearch
 from src.steamdb_scraper import SteamDBScraper
+from src.pdf_generator import create_downloadable_pdf
 
 # Page config - MUST be first Streamlit command
 st.set_page_config(
@@ -269,22 +270,50 @@ def main():
             else:
                 st.metric("App ID", st.session_state.game_data.get('app_id', 'N/A'))
 
-        # Phase 2.3: Download button at top for easy access
+        # Phase 2.3 & Phase 4: Download buttons at top for easy access
         st.markdown("---")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_game_name = re.sub(r'[^\w\s-]', '', st.session_state.game_name).strip().replace(' ', '_')
         safe_game_name = safe_game_name[:50]
-        filename = f"{safe_game_name}_{st.session_state.report_type.replace('-', '_')}_Report_{timestamp}.md"
 
-        st.download_button(
-            label="📥 Download Report as Markdown",
-            data=st.session_state.report_data,
-            file_name=filename,
-            mime="text/markdown",
-            type="primary",
-            use_container_width=True,
-            key="download_btn_top"
-        )
+        # Two column layout for download buttons
+        dl_col1, dl_col2 = st.columns(2)
+
+        with dl_col1:
+            # PDF Download
+            try:
+                pdf_bytes, pdf_filename = create_downloadable_pdf(
+                    st.session_state.report_data,
+                    st.session_state.game_name,
+                    st.session_state.report_type,
+                    st.session_state.audit_results
+                )
+
+                st.download_button(
+                    label="📄 Download as PDF",
+                    data=pdf_bytes,
+                    file_name=pdf_filename,
+                    mime="application/pdf",
+                    type="primary",
+                    use_container_width=True,
+                    key="download_pdf_top"
+                )
+            except Exception as e:
+                st.error(f"PDF generation unavailable: {str(e)}")
+
+        with dl_col2:
+            # Markdown Download
+            md_filename = f"{safe_game_name}_{st.session_state.report_type.replace('-', '_')}_Report_{timestamp}.md"
+
+            st.download_button(
+                label="📥 Download as Markdown",
+                data=st.session_state.report_data,
+                file_name=md_filename,
+                mime="text/markdown",
+                type="secondary",
+                use_container_width=True,
+                key="download_md_top"
+            )
 
         # Display full report
         st.markdown("---")
@@ -294,26 +323,53 @@ def main():
         with st.container():
             st.markdown(st.session_state.report_data)
 
-        # Download button
+        # Download buttons at bottom
         st.markdown("---")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        # Sanitize filename - remove invalid characters
         safe_game_name = re.sub(r'[^\w\s-]', '', st.session_state.game_name).strip().replace(' ', '_')
-        safe_game_name = safe_game_name[:50]  # Limit length
-        filename = f"{safe_game_name}_{st.session_state.report_type.replace('-', '_')}_Report_{timestamp}.md"
+        safe_game_name = safe_game_name[:50]
 
-        st.download_button(
-            label="📥 Download Report as Markdown",
-            data=st.session_state.report_data,
-            file_name=filename,
-            mime="text/markdown",
-            type="primary",
-            use_container_width=True,
-            key="download_btn"
-        )
+        # Two column layout for bottom download buttons
+        dl_col1_bottom, dl_col2_bottom = st.columns(2)
+
+        with dl_col1_bottom:
+            # PDF Download
+            try:
+                pdf_bytes, pdf_filename = create_downloadable_pdf(
+                    st.session_state.report_data,
+                    st.session_state.game_name,
+                    st.session_state.report_type,
+                    st.session_state.audit_results
+                )
+
+                st.download_button(
+                    label="📄 Download as PDF",
+                    data=pdf_bytes,
+                    file_name=pdf_filename,
+                    mime="application/pdf",
+                    type="primary",
+                    use_container_width=True,
+                    key="download_pdf_bottom"
+                )
+            except Exception as e:
+                st.error(f"PDF generation unavailable: {str(e)}")
+
+        with dl_col2_bottom:
+            # Markdown Download
+            md_filename = f"{safe_game_name}_{st.session_state.report_type.replace('-', '_')}_Report_{timestamp}.md"
+
+            st.download_button(
+                label="📥 Download as Markdown",
+                data=st.session_state.report_data,
+                file_name=md_filename,
+                mime="text/markdown",
+                type="secondary",
+                use_container_width=True,
+                key="download_md_bottom"
+            )
 
         # Success message
-        st.success("✅ Report generated successfully! Click the button above to download or use '🔄 Generate New Report' to analyze another game.")
+        st.success("✅ Report generated successfully! Download as PDF or Markdown, or use '🔄 Generate New Report' to analyze another game.")
 
 if __name__ == "__main__":
     main()
