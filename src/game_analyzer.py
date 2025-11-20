@@ -11,8 +11,10 @@ class GameAnalyzer:
     """Analyzes game performance to detect success levels"""
 
     def __init__(self):
-        # Success thresholds
+        # Success thresholds (IMPROVED: Extended for mega-hits)
         self.REVIEW_THRESHOLDS = {
+            'legendary': 200000,   # 200k+ reviews = legendary (Baldur's Gate 3, Hades 2)
+            'phenomenon': 100000,  # 100k+ reviews = phenomenon (Vampire Survivors)
             'massive': 50000,      # 50k+ reviews = massive success
             'very_high': 20000,    # 20k+ reviews = very high engagement
             'high': 10000,         # 10k+ reviews = high engagement
@@ -30,9 +32,11 @@ class GameAnalyzer:
         }
 
         self.OWNER_THRESHOLDS = {
+            'legendary': 50000000,     # 50M+ = legendary (PUBG, CS:GO)
+            'mega_blockbuster': 20000000,  # 20M+ = mega blockbuster (Elden Ring)
             'blockbuster': 10000000,   # 10M+ = blockbuster
             'major_hit': 5000000,      # 5M+ = major hit
-            'hit': 1000000,            # 1M+ = hit game
+            'hit': 1000000,            # 1M+ = hit game (Hades 2)
             'successful': 500000,      # 500k+ = successful
             'moderate': 100000,        # 100k+ = moderate success
             'niche': 10000             # 10k+ = niche success
@@ -130,7 +134,17 @@ class GameAnalyzer:
 
     def _analyze_engagement(self, review_count: int) -> Dict[str, str]:
         """Analyze engagement level based on review count"""
-        if review_count >= self.REVIEW_THRESHOLDS['massive']:
+        if review_count >= self.REVIEW_THRESHOLDS['legendary']:
+            return {
+                'level': 'legendary',
+                'description': f'Legendary community engagement with {review_count:,} reviews - top 0.01% of all Steam games'
+            }
+        elif review_count >= self.REVIEW_THRESHOLDS['phenomenon']:
+            return {
+                'level': 'phenomenon',
+                'description': f'Phenomenon-level engagement with {review_count:,} reviews - viral success'
+            }
+        elif review_count >= self.REVIEW_THRESHOLDS['massive']:
             return {
                 'level': 'massive',
                 'description': f'Massive community engagement with {review_count:,} reviews'
@@ -196,7 +210,17 @@ class GameAnalyzer:
 
     def _analyze_market_performance(self, owners: int) -> Dict[str, str]:
         """Analyze market performance based on ownership"""
-        if owners >= self.OWNER_THRESHOLDS['blockbuster']:
+        if owners >= self.OWNER_THRESHOLDS['legendary']:
+            return {
+                'level': 'legendary',
+                'description': f'Legendary sales with {owners:,} owners - top 10 Steam games of all time'
+            }
+        elif owners >= self.OWNER_THRESHOLDS['mega_blockbuster']:
+            return {
+                'level': 'mega_blockbuster',
+                'description': f'Mega blockbuster with {owners:,} owners - extraordinary commercial success'
+            }
+        elif owners >= self.OWNER_THRESHOLDS['blockbuster']:
             return {
                 'level': 'blockbuster',
                 'description': f'Blockbuster performance with {owners:,} owners'
@@ -239,34 +263,42 @@ class GameAnalyzer:
         # Quality score (0-40 points)
         quality_score = (review_score / 100) * 40
 
-        # Engagement score (0-30 points)
-        if review_count >= 50000:
+        # Engagement score (0-30 points) - IMPROVED: Extended for mega-hits
+        if review_count >= 200000:      # Legendary (Hades 2, BG3)
             engagement_score = 30
-        elif review_count >= 20000:
-            engagement_score = 27
-        elif review_count >= 10000:
-            engagement_score = 24
-        elif review_count >= 5000:
-            engagement_score = 20
-        elif review_count >= 1000:
-            engagement_score = 15
-        elif review_count >= 100:
-            engagement_score = 10
+        elif review_count >= 100000:    # Phenomenon
+            engagement_score = 30
+        elif review_count >= 50000:     # Massive
+            engagement_score = 28
+        elif review_count >= 20000:     # Very high
+            engagement_score = 25
+        elif review_count >= 10000:     # High
+            engagement_score = 22
+        elif review_count >= 5000:      # Strong
+            engagement_score = 18
+        elif review_count >= 1000:      # Moderate
+            engagement_score = 13
+        elif review_count >= 100:       # Low
+            engagement_score = 8
         else:
-            engagement_score = 5
+            engagement_score = 3
 
-        # Market performance score (0-30 points)
-        if owners >= 10000000:
+        # Market performance score (0-30 points) - IMPROVED: Extended for mega-hits
+        if owners >= 50000000:          # Legendary (PUBG, CS:GO)
             market_score = 30
-        elif owners >= 5000000:
-            market_score = 27
-        elif owners >= 1000000:
+        elif owners >= 20000000:        # Mega blockbuster (Elden Ring)
+            market_score = 30
+        elif owners >= 10000000:        # Blockbuster
+            market_score = 28
+        elif owners >= 5000000:         # Major hit
+            market_score = 26
+        elif owners >= 1000000:         # Hit (Hades 2)
             market_score = 24
-        elif owners >= 500000:
+        elif owners >= 500000:          # Successful
             market_score = 20
-        elif owners >= 100000:
+        elif owners >= 100000:          # Moderate
             market_score = 15
-        elif owners >= 10000:
+        elif owners >= 10000:           # Niche
             market_score = 10
         else:
             market_score = 5
