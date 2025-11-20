@@ -401,12 +401,14 @@ Generate a comprehensive {report_type.upper()} AUDIT REPORT for this game.
 4. Competitor Comparison
 5. Review & Sentiment Analysis
 6. Visibility & Discoverability (Tag effectiveness)
-7. Key Recommendations (Immediate, Short-term, Long-term)
+7. Store Page Messaging Analysis (Boxleiter Framework: value proposition, target audience, feature/benefit balance, clarity)
+8. Key Recommendations (Immediate, Short-term, Long-term)
 
 **IMPORTANT GUIDELINES:**
 - Use the SUCCESS CONTEXT above to calibrate your analysis
 - For highly successful games, focus on OPTIMIZATION not PROBLEMS
 - Tag effectiveness: High engagement = tags ARE working
+- Apply Boxleiter messaging framework: evaluate clarity and conversion focus of store page copy
 - Be data-driven and specific with metrics
 - Keep it professional and actionable
 
@@ -667,18 +669,31 @@ Generate a comprehensive, professional report with these sections:
    - Steam search and visibility
    - Discoverability assessment
 
-8. **STRATEGIC RECOMMENDATIONS**
+8. **STORE PAGE MESSAGING ANALYSIS (Boxleiter Framework)**
+   Evaluate the game's store page copy and messaging for conversion effectiveness:
+
+   - **Value Proposition Clarity**: Does the description immediately communicate what makes this game unique?
+   - **Target Audience Clarity**: Is it clear who this game is for?
+   - **Feature vs Benefit Balance**: Are features translated into player benefits?
+   - **Conversion Focus**: Does the copy compel action or just describe?
+   - **Clarity Score**: Is the messaging jargon-free and instantly understandable?
+
+   Based on the game description: "{game_data.get('description', 'No description available')[:200]}..."
+
+   Rate each dimension (1-10) and provide specific improvements for weak areas.
+
+9. **STRATEGIC RECOMMENDATIONS**
    - Immediate action items (0-30 days)
    - Short-term improvements (1-3 months)
    - Long-term strategy (3-6 months)
    - Be realistic based on success level
 
-9. **PRICING STRATEGY**
-   - Current pricing analysis
-   - Regional pricing recommendations
-   - Discount strategy suggestions
+10. **PRICING STRATEGY**
+    - Current pricing analysis
+    - Regional pricing recommendations
+    - Discount strategy suggestions
 
-10. **GROWTH OPPORTUNITIES**
+11. **GROWTH OPPORTUNITIES**
     - Content update recommendations
     - Community building strategies
     - Platform expansion possibilities
