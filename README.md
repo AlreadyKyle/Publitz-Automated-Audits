@@ -2,6 +2,12 @@
 
 Automated tool for generating comprehensive Steam launch readiness and post-launch performance reports.
 
+## ✨ Quick Start - Use Online
+
+**👉 [Deploy to Streamlit Cloud](DEPLOY.md)** - Get a web app you can access from anywhere!
+
+No localhost needed - just deploy once and use from any browser.
+
 ## Features
 
 - 🔍 **Auto-Detection**: Automatically detects if a game needs Pre-Launch or Post-Launch report
@@ -9,6 +15,7 @@ Automated tool for generating comprehensive Steam launch readiness and post-laun
 - 📊 **Data Collection**: Automatically scrapes Steam, SteamDB, and competitor data
 - 📄 **Professional Reports**: Generates comprehensive PDF reports matching manual templates
 - 🚀 **One-Click Operation**: Just paste a Steam URL and go
+- 🌐 **Web-Based**: Streamlit app accessible from anywhere (when deployed)
 
 ## Setup
 
