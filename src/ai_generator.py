@@ -466,6 +466,11 @@ Be strategic, actionable, and focused on maximizing launch success.
             draft_report, audit_results, report_type, review_stats, capsule_analysis
         )
 
+        # Phase 3.4: Add fallback data warnings if detected
+        fallback_warnings = self._detect_fallback_data(sales_data, competitor_data)
+        if fallback_warnings:
+            final_report = self._add_fallback_warnings(final_report, fallback_warnings)
+
         return final_report, audit_results
 
     def _generate_initial_draft(
@@ -904,3 +909,78 @@ Issues to Address:
 Recommendations:
 {chr(10).join('- ' + r for r in capsule_analysis.get('recommendations', []))}
 """
+
+    def _detect_fallback_data(
+        self,
+        sales_data: Dict[str, Any],
+        competitor_data: List[Dict[str, Any]]
+    ) -> List[str]:
+        """
+        Detect if fallback/placeholder data is being used
+
+        Returns:
+            List of warning messages for each type of fallback data detected
+        """
+        warnings = []
+
+        # Check if sales data is fallback
+        if (sales_data.get('app_id') == 'unknown' or
+            str(sales_data.get('app_id', '')).startswith('fallback') or
+            sales_data.get('estimation_method') == 'fallback'):
+            warnings.append("Sales and revenue data is using estimated fallback values (API data unavailable)")
+
+        # Check if competitors are fallback
+        fallback_competitor_count = sum(
+            1 for comp in competitor_data
+            if str(comp.get('app_id', '')).startswith('fallback')
+        )
+
+        if fallback_competitor_count > 0:
+            if fallback_competitor_count == len(competitor_data):
+                warnings.append("All competitor data is using placeholder values (no real competitors found)")
+            else:
+                warnings.append(f"{fallback_competitor_count} of {len(competitor_data)} competitors are placeholder values")
+
+        return warnings
+
+    def _add_fallback_warnings(self, report: str, warnings: List[str]) -> str:
+        """
+        Add prominent warnings to the report when fallback data is detected
+
+        Args:
+            report: The generated report markdown
+            warnings: List of warning messages
+
+        Returns:
+            Modified report with warnings at the top
+        """
+        warning_section = "---\n\n## ⚠️ DATA QUALITY WARNING\n\n"
+        warning_section += "**This report contains incomplete data. Please review carefully:**\n\n"
+
+        for warning in warnings:
+            warning_section += f"- ⚠️ {warning}\n"
+
+        warning_section += "\n**Impact:** The analysis below may not accurately reflect actual performance. "
+        warning_section += "Real-time API data could not be retrieved. Please verify critical metrics independently.\n\n"
+        warning_section += "**Recommendation:** Try regenerating the report, or check if the game exists on Steam. "
+        warning_section += "If the issue persists, some Steam API endpoints may be temporarily unavailable.\n\n"
+        warning_section += "---\n\n"
+
+        # Insert warnings after the first heading (title)
+        lines = report.split('\n')
+        insert_index = 0
+
+        # Find the first heading or first line
+        for i, line in enumerate(lines):
+            if line.strip().startswith('#'):
+                insert_index = i + 1
+                break
+
+        # Insert warning after first heading
+        if insert_index > 0:
+            lines.insert(insert_index, warning_section)
+        else:
+            # If no heading found, add at the very top
+            lines.insert(0, warning_section)
+
+        return '\n'.join(lines)
