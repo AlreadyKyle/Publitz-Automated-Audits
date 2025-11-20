@@ -4,7 +4,7 @@ Game Performance Analyzer
 Detects success levels and provides context for AI analysis
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 
 class GameAnalyzer:
