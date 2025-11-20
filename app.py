@@ -175,6 +175,12 @@ def main():
                 sales_data = steamdb_scraper.get_sales_data(game_data['app_id'])
                 # Get review velocity data
                 review_stats = steamdb_scraper.get_review_stats(game_data['app_id'])
+                # Analyze capsule image for CTR optimization
+                capsule_url = game_data.get('capsule_images', {}).get('capsule_main')
+                if capsule_url:
+                    capsule_analysis = ai_generator.analyze_capsule_image(capsule_url, game_name)
+                else:
+                    capsule_analysis = None
             progress_bar.progress(65, text="📊 Analyzing competitor performance...")
 
             # Phase 2.2: Step 5 - Gather competitor Steam data
@@ -209,7 +215,8 @@ def main():
                     competitor_data,
                     steamdb_data=sales_data,
                     report_type=report_type,
-                    review_stats=review_stats
+                    review_stats=review_stats,
+                    capsule_analysis=capsule_analysis
                 )
 
             progress_bar.progress(100, text="✅ Report generated successfully!")

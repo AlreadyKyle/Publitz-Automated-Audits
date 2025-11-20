@@ -1,6 +1,8 @@
 import anthropic
 from typing import Dict, List, Any, Tuple
 import json
+import requests
+import base64
 from src.game_analyzer import GameAnalyzer
 
 class AIGenerator:
@@ -30,6 +32,120 @@ class AIGenerator:
             raise Exception(f"Failed to initialize Anthropic client: {str(e)}")
         except Exception as e:
             raise Exception(f"Failed to initialize Anthropic client: {str(e)}. Check your API key.")
+
+    def analyze_capsule_image(self, capsule_url: str, game_name: str) -> Dict[str, Any]:
+        """
+        Analyze game capsule image for CTR risk factors using Claude Vision
+
+        Evaluates:
+        - Visual clarity and readability
+        - Contrast and color effectiveness
+        - Text density and legibility
+        - Focal point and composition
+        - Overall CTR optimization
+
+        Args:
+            capsule_url: URL to the game's capsule image
+            game_name: Name of the game for context
+
+        Returns:
+            Dictionary with analysis scores and recommendations
+        """
+        try:
+            # Fetch the image
+            response = requests.get(capsule_url, timeout=10)
+            response.raise_for_status()
+
+            # Convert to base64
+            image_data = base64.standard_b64encode(response.content).decode('utf-8')
+
+            # Analyze with Claude Vision
+            analysis_prompt = f"""Analyze this Steam game capsule image for "{game_name}" for Click-Through Rate (CTR) optimization.
+
+Evaluate the following critical factors that drive clicks on Steam:
+
+1. **Visual Clarity (0-10)**: Is the image immediately understandable at small sizes?
+2. **Contrast & Color (0-10)**: Does it stand out in a crowded store page?
+3. **Text Readability (0-10)**: Is any text crisp and legible at thumbnail size?
+4. **Focal Point (0-10)**: Does it have a clear visual focal point that draws the eye?
+5. **Genre Clarity (0-10)**: Can you tell what type of game this is from the image alone?
+
+For each dimension:
+- Provide a score 0-10
+- List specific strengths
+- List specific issues
+- Suggest concrete improvements
+
+Return ONLY valid JSON with this structure:
+{{
+  "clarity_score": 0-10,
+  "contrast_score": 0-10,
+  "text_score": 0-10,
+  "focal_point_score": 0-10,
+  "genre_clarity_score": 0-10,
+  "overall_ctr_score": 0-10,
+  "strengths": ["strength1", "strength2"],
+  "issues": ["issue1", "issue2"],
+  "recommendations": ["rec1", "rec2"],
+  "summary": "One sentence overall assessment"
+}}"""
+
+            vision_response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1500,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": image_data
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": analysis_prompt
+                        }
+                    ]
+                }]
+            )
+
+            # Extract response text
+            response_text = ""
+            for content_block in vision_response.content:
+                if hasattr(content_block, 'text'):
+                    response_text += content_block.text
+
+            # Parse JSON response
+            analysis = json.loads(response_text)
+            return analysis
+
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to fetch capsule image: {e}")
+            return self._get_fallback_capsule_analysis()
+        except json.JSONDecodeError as e:
+            print(f"Failed to parse vision response: {e}")
+            return self._get_fallback_capsule_analysis()
+        except Exception as e:
+            print(f"Error analyzing capsule: {e}")
+            return self._get_fallback_capsule_analysis()
+
+    def _get_fallback_capsule_analysis(self) -> Dict[str, Any]:
+        """Return fallback capsule analysis when vision analysis fails"""
+        return {
+            "clarity_score": 5,
+            "contrast_score": 5,
+            "text_score": 5,
+            "focal_point_score": 5,
+            "genre_clarity_score": 5,
+            "overall_ctr_score": 5,
+            "strengths": ["Unable to analyze image"],
+            "issues": ["Capsule analysis unavailable"],
+            "recommendations": ["Manually review capsule for clarity, contrast, and text readability"],
+            "summary": "Capsule image analysis could not be completed"
+        }
 
     def generate_post_launch_report(
         self,
@@ -315,7 +431,8 @@ Be strategic, actionable, and focused on maximizing launch success.
         competitor_data: List[Dict[str, Any]],
         steamdb_data: Dict[str, Any] = None,
         report_type: str = "Post-Launch",
-        review_stats: Dict[str, Any] = None
+        review_stats: Dict[str, Any] = None,
+        capsule_analysis: Dict[str, Any] = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Generate a report using the 3-pass system: Draft → Audit → Enhanced Final
@@ -335,7 +452,7 @@ Be strategic, actionable, and focused on maximizing launch success.
         """
         # Phase 3.1: Generate initial draft (fast)
         draft_report = self._generate_initial_draft(
-            game_data, sales_data, competitor_data, steamdb_data, report_type, review_stats
+            game_data, sales_data, competitor_data, steamdb_data, report_type, review_stats, capsule_analysis
         )
 
         # Phase 3.2: Audit the draft for accuracy issues
@@ -346,7 +463,7 @@ Be strategic, actionable, and focused on maximizing launch success.
         # Phase 3.3: Generate enhanced final report with corrections
         final_report = self._generate_enhanced_report(
             game_data, sales_data, competitor_data, steamdb_data,
-            draft_report, audit_results, report_type, review_stats
+            draft_report, audit_results, report_type, review_stats, capsule_analysis
         )
 
         return final_report, audit_results
@@ -358,7 +475,8 @@ Be strategic, actionable, and focused on maximizing launch success.
         competitor_data: List[Dict[str, Any]],
         steamdb_data: Dict[str, Any],
         report_type: str,
-        review_stats: Dict[str, Any] = None
+        review_stats: Dict[str, Any] = None,
+        capsule_analysis: Dict[str, Any] = None
     ) -> str:
         """
         Phase 3.1: Generate fast initial draft
@@ -391,6 +509,9 @@ Generate a comprehensive {report_type.upper()} AUDIT REPORT for this game.
 **SUCCESS CONTEXT FOR ANALYSIS:**
 {success_context}
 
+**CAPSULE IMAGE ANALYSIS:**
+{self._format_capsule_analysis(capsule_analysis) if capsule_analysis else "Capsule analysis not available"}
+
 **Competitors ({len(competitor_data)} found):**
 {self._format_competitor_data(competitor_data)}
 
@@ -401,8 +522,9 @@ Generate a comprehensive {report_type.upper()} AUDIT REPORT for this game.
 4. Competitor Comparison
 5. Review & Sentiment Analysis
 6. Visibility & Discoverability (Tag effectiveness)
-7. Store Page Messaging Analysis (Boxleiter Framework: value proposition, target audience, feature/benefit balance, clarity)
-8. Key Recommendations (Immediate, Short-term, Long-term)
+7. Capsule Image & Visual Marketing (CTR optimization based on clarity, contrast, text, focal point)
+8. Store Page Messaging Analysis (Boxleiter Framework: value proposition, target audience, feature/benefit balance, clarity)
+9. Key Recommendations (Immediate, Short-term, Long-term)
 
 **IMPORTANT GUIDELINES:**
 - Use the SUCCESS CONTEXT above to calibrate your analysis
@@ -575,7 +697,8 @@ Return ONLY valid JSON, no other text.
         draft_report: str,
         audit_results: Dict[str, Any],
         report_type: str,
-        review_stats: Dict[str, Any] = None
+        review_stats: Dict[str, Any] = None,
+        capsule_analysis: Dict[str, Any] = None
     ) -> str:
         """
         Phase 3.3: Generate enhanced final report with audit corrections applied
@@ -625,6 +748,9 @@ Apply these corrections in your analysis.
 
 **SUCCESS LEVEL ANALYSIS:**
 {success_context}
+
+**CAPSULE IMAGE ANALYSIS:**
+{self._format_capsule_analysis(capsule_analysis) if capsule_analysis else "Capsule analysis not available"}
 
 **Competitor Analysis ({len(competitor_data)} competitors):**
 {self._format_competitor_data(competitor_data)}
@@ -752,3 +878,29 @@ Competitor {i}: {comp.get('name', 'Unknown')}
             formatted.append(comp_info)
 
         return "\n".join(formatted)
+
+    def _format_capsule_analysis(self, capsule_analysis: Dict[str, Any]) -> str:
+        """Format capsule analysis data for the prompt"""
+        if not capsule_analysis:
+            return "Capsule analysis not available"
+
+        return f"""
+Capsule CTR Analysis (0-10 scale):
+- Visual Clarity: {capsule_analysis.get('clarity_score', 'N/A')}/10
+- Contrast & Color: {capsule_analysis.get('contrast_score', 'N/A')}/10
+- Text Readability: {capsule_analysis.get('text_score', 'N/A')}/10
+- Focal Point: {capsule_analysis.get('focal_point_score', 'N/A')}/10
+- Genre Clarity: {capsule_analysis.get('genre_clarity_score', 'N/A')}/10
+- Overall CTR Score: {capsule_analysis.get('overall_ctr_score', 'N/A')}/10
+
+Summary: {capsule_analysis.get('summary', 'No summary available')}
+
+Strengths:
+{chr(10).join('- ' + s for s in capsule_analysis.get('strengths', []))}
+
+Issues to Address:
+{chr(10).join('- ' + i for i in capsule_analysis.get('issues', []))}
+
+Recommendations:
+{chr(10).join('- ' + r for r in capsule_analysis.get('recommendations', []))}
+"""

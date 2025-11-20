@@ -286,6 +286,13 @@ class GameSearch:
             platforms = game_data.get('platforms', {})
             steam_deck_data = self._analyze_steam_deck_readiness(categories, platforms)
 
+            # Build capsule image URLs
+            capsule_images = {
+                'header': f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg",
+                'capsule_main': f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/capsule_616x353.jpg",
+                'capsule_small': f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/capsule_231x87.jpg"
+            }
+
             # Extract relevant information
             return {
                 'name': game_data.get('name', 'Unknown'),
@@ -304,7 +311,8 @@ class GameSearch:
                 'recommendations': game_data.get('recommendations', {}).get('total', 0),
                 'review_score': review_score_percent,
                 'review_count': total_reviews,
-                'steam_deck_compatibility': steam_deck_data  # NEW: Steam Deck readiness analysis
+                'steam_deck_compatibility': steam_deck_data,  # NEW: Steam Deck readiness analysis
+                'capsule_images': capsule_images  # NEW: Capsule image URLs for vision analysis
             }
 
         except Exception as e:
