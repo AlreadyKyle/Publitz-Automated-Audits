@@ -201,12 +201,74 @@ class SteamDBScraper:
         }
 
     def get_review_stats(self, app_id: Any) -> Dict[str, Any]:
-        """Get review statistics"""
+        """
+        Get review statistics including recent review data for velocity calculation
+
+        Returns review stats with velocity score:
+        - velocity_score = recent_reviews / total_reviews
+        - Higher score = growing momentum
+        - Lower score = declining/established game
+        """
         sales_data = self.get_sales_data(app_id)
+
+        # Get recent review data from Steam API
+        recent_data = self._get_recent_reviews(app_id)
+
+        total_reviews = sales_data.get('reviews_total', 0)
+        recent_reviews = recent_data.get('recent_reviews', 0)
+
+        # Calculate velocity score
+        velocity_score = (recent_reviews / total_reviews) if total_reviews > 0 else 0
+
+        # Interpret velocity
+        if velocity_score > 0.05:
+            velocity_status = "High momentum - actively growing"
+        elif velocity_score > 0.02:
+            velocity_status = "Moderate momentum"
+        elif velocity_score > 0.01:
+            velocity_status = "Steady state"
+        else:
+            velocity_status = "Declining or established game"
+
         return {
-            'total': sales_data.get('reviews_total', 0),
+            'total': total_reviews,
             'positive': sales_data.get('reviews_positive', 0),
             'negative': sales_data.get('reviews_negative', 0),
             'score': sales_data.get('review_score', 'N/A'),
-            'score_raw': sales_data.get('review_score_raw', 0)
+            'score_raw': sales_data.get('review_score_raw', 0),
+            'recent_reviews': recent_reviews,
+            'velocity_score': velocity_score,
+            'velocity_percentage': f"{velocity_score * 100:.2f}%",
+            'velocity_status': velocity_status
         }
+
+    def _get_recent_reviews(self, app_id: Any) -> Dict[str, int]:
+        """
+        Get recent review count from Steam API
+        Uses Steam's review endpoint with 'recent' filter (last 30 days)
+        """
+        if app_id == 'unknown' or app_id == 'fallback' or str(app_id).startswith('fallback'):
+            return {'recent_reviews': 0}
+
+        try:
+            response = requests.get(
+                f"https://store.steampowered.com/appreviews/{app_id}",
+                params={
+                    'json': 1,
+                    'filter': 'recent',  # Last 30 days
+                    'num_per_page': 0,   # We just want the count
+                    'language': 'all'
+                },
+                timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            query_summary = data.get('query_summary', {})
+            recent_reviews = query_summary.get('total_reviews', 0)
+
+            return {'recent_reviews': recent_reviews}
+
+        except Exception as e:
+            print(f"Error getting recent reviews: {e}")
+            return {'recent_reviews': 0}

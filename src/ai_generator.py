@@ -314,7 +314,8 @@ Be strategic, actionable, and focused on maximizing launch success.
         sales_data: Dict[str, Any],
         competitor_data: List[Dict[str, Any]],
         steamdb_data: Dict[str, Any] = None,
-        report_type: str = "Post-Launch"
+        report_type: str = "Post-Launch",
+        review_stats: Dict[str, Any] = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Generate a report using the 3-pass system: Draft → Audit → Enhanced Final
@@ -334,18 +335,18 @@ Be strategic, actionable, and focused on maximizing launch success.
         """
         # Phase 3.1: Generate initial draft (fast)
         draft_report = self._generate_initial_draft(
-            game_data, sales_data, competitor_data, steamdb_data, report_type
+            game_data, sales_data, competitor_data, steamdb_data, report_type, review_stats
         )
 
         # Phase 3.2: Audit the draft for accuracy issues
         audit_results = self._audit_report(
-            draft_report, game_data, sales_data, competitor_data
+            draft_report, game_data, sales_data, competitor_data, review_stats
         )
 
         # Phase 3.3: Generate enhanced final report with corrections
         final_report = self._generate_enhanced_report(
             game_data, sales_data, competitor_data, steamdb_data,
-            draft_report, audit_results, report_type
+            draft_report, audit_results, report_type, review_stats
         )
 
         return final_report, audit_results
@@ -356,7 +357,8 @@ Be strategic, actionable, and focused on maximizing launch success.
         sales_data: Dict[str, Any],
         competitor_data: List[Dict[str, Any]],
         steamdb_data: Dict[str, Any],
-        report_type: str
+        report_type: str,
+        review_stats: Dict[str, Any] = None
     ) -> str:
         """
         Phase 3.1: Generate fast initial draft
@@ -366,7 +368,7 @@ Be strategic, actionable, and focused on maximizing launch success.
         """
         # Get success context from analyzer
         analyzer = GameAnalyzer()
-        success_analysis = analyzer.analyze_success_level(game_data, sales_data)
+        success_analysis = analyzer.analyze_success_level(game_data, sales_data, review_stats)
         success_context = success_analysis['context_for_ai']
 
         prompt = f"""You are an expert game marketing analyst at Publitz.
@@ -434,7 +436,8 @@ Format in clear markdown with headings, bullet points, and specific data.
         draft_report: str,
         game_data: Dict[str, Any],
         sales_data: Dict[str, Any],
-        competitor_data: List[Dict[str, Any]]
+        competitor_data: List[Dict[str, Any]],
+        review_stats: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """
         Phase 3.2: Audit the draft report for accuracy issues
@@ -449,7 +452,7 @@ Format in clear markdown with headings, bullet points, and specific data.
         """
         # Get success metrics for audit
         analyzer = GameAnalyzer()
-        success_analysis = analyzer.analyze_success_level(game_data, sales_data)
+        success_analysis = analyzer.analyze_success_level(game_data, sales_data, review_stats)
 
         audit_prompt = f"""You are a quality auditor for game marketing reports.
 
@@ -569,7 +572,8 @@ Return ONLY valid JSON, no other text.
         steamdb_data: Dict[str, Any],
         draft_report: str,
         audit_results: Dict[str, Any],
-        report_type: str
+        report_type: str,
+        review_stats: Dict[str, Any] = None
     ) -> str:
         """
         Phase 3.3: Generate enhanced final report with audit corrections applied
@@ -580,7 +584,7 @@ Return ONLY valid JSON, no other text.
         """
         # Get success context
         analyzer = GameAnalyzer()
-        success_analysis = analyzer.analyze_success_level(game_data, sales_data)
+        success_analysis = analyzer.analyze_success_level(game_data, sales_data, review_stats)
         success_context = success_analysis['context_for_ai']
 
         # Build correction instructions from audit

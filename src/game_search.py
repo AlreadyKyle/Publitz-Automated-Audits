@@ -104,6 +104,79 @@ class GameSearch:
         # Default to post-launch if released
         return 'Post-Launch'
 
+    def _analyze_steam_deck_readiness(self, categories: List[str], platforms: Dict) -> Dict[str, Any]:
+        """
+        Analyze Steam Deck compatibility based on categories and platform support
+
+        Checks for:
+        - Controller support (full/partial)
+        - Linux/Proton compatibility
+        - Platform availability
+
+        Returns:
+            Dictionary with Steam Deck readiness score and recommendations
+        """
+        score = 0
+        max_score = 100
+        issues = []
+        strengths = []
+
+        # Check for controller support (40 points)
+        controller_categories = [cat.lower() for cat in categories]
+        if 'full controller support' in controller_categories:
+            score += 40
+            strengths.append("Full controller support - perfect for Steam Deck")
+        elif 'partial controller support' in controller_categories:
+            score += 20
+            issues.append("Only partial controller support - may need keyboard for some features")
+        else:
+            issues.append("No controller support listed - critical issue for Steam Deck")
+
+        # Check for Linux support (30 points)
+        linux_supported = platforms.get('linux', False)
+        if linux_supported:
+            score += 30
+            strengths.append("Native Linux support - excellent Proton compatibility expected")
+        else:
+            score += 15  # Proton can still run Windows games
+            issues.append("No native Linux support - relies on Proton compatibility (usually works)")
+
+        # Check for Steam Cloud (15 points) - important for Deck/Desktop switching
+        if 'steam cloud' in controller_categories:
+            score += 15
+            strengths.append("Steam Cloud enabled - seamless progress sync between Deck and PC")
+        else:
+            issues.append("No Steam Cloud - saves won't sync between Steam Deck and PC")
+
+        # Check for problematic features (15 points deduction)
+        if 'vr supported' in controller_categories or 'vr only' in controller_categories:
+            score -= 15
+            issues.append("VR game - not suitable for Steam Deck handheld mode")
+
+        # Overall readiness assessment
+        if score >= 80:
+            readiness = "Excellent"
+            summary = "Highly optimized for Steam Deck"
+        elif score >= 60:
+            readiness = "Good"
+            summary = "Compatible with Steam Deck, minor issues"
+        elif score >= 40:
+            readiness = "Playable"
+            summary = "Playable on Steam Deck but with limitations"
+        else:
+            readiness = "Poor"
+            summary = "Significant compatibility concerns for Steam Deck"
+
+        return {
+            'readiness_score': score,
+            'readiness_level': readiness,
+            'summary': summary,
+            'strengths': strengths,
+            'issues': issues,
+            'has_controller_support': 'full controller support' in controller_categories or 'partial controller support' in controller_categories,
+            'has_linux_support': linux_supported
+        }
+
     def search_game(self, game_name: str) -> Optional[Dict[str, Any]]:
         """
         Search for a game by name on Steam
@@ -208,6 +281,11 @@ class GameSearch:
             price_formatted = price_overview.get('final_formatted', 'Free')
             price_raw = price_overview.get('final', 0) / 100 if price_overview.get('final') else 0  # Convert cents to dollars
 
+            # Analyze Steam Deck readiness
+            categories = [c['description'] for c in game_data.get('categories', [])]
+            platforms = game_data.get('platforms', {})
+            steam_deck_data = self._analyze_steam_deck_readiness(categories, platforms)
+
             # Extract relevant information
             return {
                 'name': game_data.get('name', 'Unknown'),
@@ -220,12 +298,13 @@ class GameSearch:
                 'price': price_formatted,
                 'price_raw': price_raw,  # NEW: Raw price in dollars for comparison
                 'description': game_data.get('short_description', ''),
-                'categories': [c['description'] for c in game_data.get('categories', [])],
-                'platforms': game_data.get('platforms', {}),
+                'categories': categories,
+                'platforms': platforms,
                 'metacritic': game_data.get('metacritic', {}),
                 'recommendations': game_data.get('recommendations', {}).get('total', 0),
                 'review_score': review_score_percent,
-                'review_count': total_reviews
+                'review_count': total_reviews,
+                'steam_deck_compatibility': steam_deck_data  # NEW: Steam Deck readiness analysis
             }
 
         except Exception as e:

@@ -173,6 +173,8 @@ def main():
             # Phase 2.2: Step 4 - Gather Steam data
             with st.spinner("📊 Gathering Steam market data..."):
                 sales_data = steamdb_scraper.get_sales_data(game_data['app_id'])
+                # Get review velocity data
+                review_stats = steamdb_scraper.get_review_stats(game_data['app_id'])
             progress_bar.progress(65, text="📊 Analyzing competitor performance...")
 
             # Phase 2.2: Step 5 - Gather competitor Steam data
@@ -206,7 +208,8 @@ def main():
                     sales_data,
                     competitor_data,
                     steamdb_data=sales_data,
-                    report_type=report_type
+                    report_type=report_type,
+                    review_stats=review_stats
                 )
 
             progress_bar.progress(100, text="✅ Report generated successfully!")

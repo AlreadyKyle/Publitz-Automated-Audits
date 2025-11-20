@@ -38,13 +38,14 @@ class GameAnalyzer:
             'niche': 10000             # 10k+ = niche success
         }
 
-    def analyze_success_level(self, game_data: Dict[str, Any], sales_data: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_success_level(self, game_data: Dict[str, Any], sales_data: Dict[str, Any], review_stats: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Analyze game's success level based on multiple metrics
 
         Args:
             game_data: Game information from Steam
             sales_data: Sales and review data from SteamSpy
+            review_stats: Review statistics including velocity data
 
         Returns:
             Dictionary with success analysis including:
@@ -53,12 +54,18 @@ class GameAnalyzer:
             - quality_level: based on review score
             - market_performance: based on owners
             - success_score: numeric 0-100
+            - review_velocity: review momentum analysis
             - context_for_ai: string with analysis guidelines
         """
         # Extract metrics
         review_count = sales_data.get('reviews_total', 0)
         review_score = sales_data.get('review_score_raw', 0)
         owners_avg = sales_data.get('owners_avg', 0)
+
+        # Extract velocity data if available
+        velocity_score = review_stats.get('velocity_score', 0) if review_stats else 0
+        velocity_status = review_stats.get('velocity_status', 'Unknown') if review_stats else 'Unknown'
+        recent_reviews = review_stats.get('recent_reviews', 0) if review_stats else 0
 
         # Analyze each dimension
         engagement = self._analyze_engagement(review_count)
@@ -86,7 +93,11 @@ class GameAnalyzer:
             market,
             review_count,
             review_score,
-            owners_avg
+            owners_avg,
+            velocity_score,
+            velocity_status,
+            recent_reviews,
+            game_data
         )
 
         return {
@@ -98,6 +109,9 @@ class GameAnalyzer:
             'quality_description': quality['description'],
             'market_performance': market['level'],
             'market_description': market['description'],
+            'velocity_score': velocity_score,
+            'velocity_status': velocity_status,
+            'recent_reviews': recent_reviews,
             'context_for_ai': ai_context,
             'is_highly_successful': success_score >= 75,
             'is_successful': success_score >= 60,
@@ -279,7 +293,11 @@ class GameAnalyzer:
         market: Dict,
         review_count: int,
         review_score: float,
-        owners: int
+        owners: int,
+        velocity_score: float = 0,
+        velocity_status: str = 'Unknown',
+        recent_reviews: int = 0,
+        game_data: Dict = None
     ) -> str:
         """Generate context string for AI prompts"""
         context_parts = []
@@ -291,6 +309,33 @@ class GameAnalyzer:
                 f"Do NOT suggest major fixes or imply failure. Focus on OPTIMIZATION and "
                 f"maintaining success, not problem-solving."
             )
+
+        # Review velocity context (NEW)
+        if velocity_score > 0:
+            context_parts.append(
+                f"📊 Review Momentum: {velocity_status} "
+                f"({recent_reviews} reviews in last 30 days = {velocity_score*100:.1f}% of total). "
+                f"{'This shows ACTIVE GROWTH - game is gaining traction.' if velocity_score > 0.03 else ''}"
+                f"{'Game is in steady state - focus on retention and conversion.' if 0.01 < velocity_score <= 0.03 else ''}"
+                f"{'Review rate is declining - may need marketing push or content update.' if velocity_score <= 0.01 else ''}"
+            )
+
+        # Steam Deck readiness context (NEW)
+        if game_data and 'steam_deck_compatibility' in game_data:
+            deck_data = game_data['steam_deck_compatibility']
+            readiness_level = deck_data.get('readiness_level', 'Unknown')
+            readiness_score = deck_data.get('readiness_score', 0)
+
+            if readiness_score >= 60:
+                context_parts.append(
+                    f"🎮 Steam Deck: {readiness_level} compatibility ({readiness_score}/100). "
+                    f"{deck_data.get('summary', '')} This is POSITIVE for 2025 market reach."
+                )
+            else:
+                context_parts.append(
+                    f"⚠ Steam Deck: {readiness_level} compatibility ({readiness_score}/100). "
+                    f"{deck_data.get('summary', '')} Consider: {', '.join(deck_data.get('issues', [])[:2])}"
+                )
 
         # Engagement context
         if engagement['level'] in ['massive', 'very_high', 'high']:
