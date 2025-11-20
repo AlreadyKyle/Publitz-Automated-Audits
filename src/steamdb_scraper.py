@@ -7,6 +7,9 @@ class SteamDBScraper:
 
     def __init__(self):
         self.steamspy_api_base = "https://steamspy.com/api.php"
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
 
     def get_sales_data(self, app_id: Any) -> Dict[str, Any]:
         """
@@ -32,6 +35,7 @@ class SteamDBScraper:
             response = requests.get(
                 self.steamspy_api_base,
                 params={'request': 'appdetails', 'appid': app_id},
+                headers=self.headers,
                 timeout=10
             )
             response.raise_for_status()
@@ -259,6 +263,7 @@ class SteamDBScraper:
                     'num_per_page': 0,   # We just want the count
                     'language': 'all'
                 },
+                headers=self.headers,
                 timeout=10
             )
             response.raise_for_status()

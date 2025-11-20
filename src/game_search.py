@@ -10,6 +10,9 @@ class GameSearch:
     def __init__(self):
         self.steam_api_base = "https://store.steampowered.com/api"
         self.steamspy_api_base = "https://steamspy.com/api.php"
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
 
     def parse_steam_url(self, url: str) -> Optional[int]:
         """
@@ -191,6 +194,7 @@ class GameSearch:
             # First, try to get the game list and search
             response = requests.get(
                 "https://api.steampowered.com/ISteamApps/GetAppList/v2/",
+                headers=self.headers,
                 timeout=10
             )
             response.raise_for_status()
@@ -258,6 +262,7 @@ class GameSearch:
             response = requests.get(
                 f"{self.steam_api_base}/appdetails",
                 params={'appids': app_id},
+                headers=self.headers,
                 timeout=10
             )
             response.raise_for_status()
@@ -334,6 +339,7 @@ class GameSearch:
             response = requests.get(
                 self.steamspy_api_base,
                 params={'request': 'appdetails', 'appid': app_id},
+                headers=self.headers,
                 timeout=10
             )
             response.raise_for_status()
@@ -551,6 +557,7 @@ class GameSearch:
             response = requests.get(
                 self.steamspy_api_base,
                 params={'request': 'all', 'page': 0},
+                headers=self.headers,
                 timeout=15
             )
             response.raise_for_status()
@@ -591,6 +598,7 @@ class GameSearch:
             response = requests.get(
                 self.steamspy_api_base,
                 params={'request': 'tag', 'tag': tag},
+                headers=self.headers,
                 timeout=10
             )
             response.raise_for_status()
@@ -618,6 +626,7 @@ class GameSearch:
             response = requests.get(
                 self.steamspy_api_base,
                 params={'request': 'genre', 'genre': genre},
+                headers=self.headers,
                 timeout=10
             )
             response.raise_for_status()
@@ -648,6 +657,7 @@ class GameSearch:
             response = requests.get(
                 self.steamspy_api_base,
                 params={'request': 'all', 'page': 0},
+                headers=self.headers,
                 timeout=15
             )
             response.raise_for_status()
