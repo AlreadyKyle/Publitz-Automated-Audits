@@ -2,6 +2,7 @@ import requests
 from typing import Dict, List, Any, Optional
 import time
 from datetime import datetime
+import re
 
 class GameSearch:
     """Game search and competitor finding using Steam API and SteamSpy"""
@@ -9,6 +10,76 @@ class GameSearch:
     def __init__(self):
         self.steam_api_base = "https://store.steampowered.com/api"
         self.steamspy_api_base = "https://steamspy.com/api.php"
+
+    def parse_steam_url(self, url: str) -> Optional[int]:
+        """
+        Parse Steam URL to extract app_id
+
+        Args:
+            url: Steam store URL (e.g., https://store.steampowered.com/app/12345/Game_Name/)
+
+        Returns:
+            App ID as integer, or None if invalid URL
+        """
+        # Pattern: https://store.steampowered.com/app/{app_id}/...
+        pattern = r'store\.steampowered\.com/app/(\d+)'
+        match = re.search(pattern, url)
+
+        if match:
+            return int(match.group(1))
+
+        return None
+
+    def get_game_from_url(self, url: str) -> Optional[Dict[str, Any]]:
+        """
+        Get game data directly from Steam URL
+
+        Args:
+            url: Steam store URL
+
+        Returns:
+            Game data dictionary or None if invalid
+        """
+        app_id = self.parse_steam_url(url)
+
+        if not app_id:
+            return None
+
+        return self.get_game_details(app_id)
+
+    def detect_launch_status(self, game_data: Dict[str, Any]) -> str:
+        """
+        Detect if game is pre-launch or post-launch
+
+        Args:
+            game_data: Game information dictionary
+
+        Returns:
+            'Pre-Launch' or 'Post-Launch'
+        """
+        release_date = game_data.get('release_date', '')
+
+        # Check if release date indicates "Coming Soon" or future date
+        if not release_date or release_date == 'Unknown':
+            return 'Pre-Launch'
+
+        # Common pre-launch indicators
+        pre_launch_keywords = ['coming soon', 'to be announced', 'tba', 'unreleased']
+        if any(keyword in release_date.lower() for keyword in pre_launch_keywords):
+            return 'Pre-Launch'
+
+        # Check if it's a future date
+        try:
+            # Try to parse various date formats
+            from dateutil import parser
+            release_datetime = parser.parse(release_date)
+            if release_datetime > datetime.now():
+                return 'Pre-Launch'
+        except:
+            pass
+
+        # Default to post-launch if released
+        return 'Post-Launch'
 
     def search_game(self, game_name: str) -> Optional[Dict[str, Any]]:
         """
