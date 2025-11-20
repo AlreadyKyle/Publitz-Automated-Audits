@@ -87,12 +87,18 @@ def main():
     with col1:
         # Phase 2.1 & 2.4: Disable button during generation and show state
         button_text = "⏳ Generating Report..." if st.session_state.generating else "🚀 Generate Audit Report"
+
+        # Callback to set generating state immediately when button is clicked
+        def start_generation():
+            st.session_state.generating = True
+
         generate_button = st.button(
             button_text,
             type="primary",
             use_container_width=True,
             key="generate_btn",
-            disabled=st.session_state.generating
+            disabled=st.session_state.generating,
+            on_click=start_generation
         )
     with col2:
         if st.session_state.report_generated:
@@ -110,9 +116,7 @@ def main():
             st.error("❌ Please enter a Steam URL")
             st.stop()
 
-        # Phase 2.1: Set generating state
-        st.session_state.generating = True
-
+        # Phase 2.1: State is now set via button callback
         try:
             # Initialize components
             with st.spinner("Initializing components..."):
