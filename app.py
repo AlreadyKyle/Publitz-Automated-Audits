@@ -208,7 +208,7 @@ def main():
 
             progress_bar.progress(90, text="✨ Step 3/3: Generating enhanced final report...")
 
-            with st.spinner("✨ Step 3/3: Generating enhanced final report with corrections... (this may take 60-90 seconds)"):
+            with st.spinner("✨ Step 3/3: Multi-pass AI analysis with vision + corrections... (this may take 2-3 minutes)"):
                 # Use 3-pass system for all reports
                 report_data, audit_results = ai_generator.generate_report_with_audit(
                     game_data,
