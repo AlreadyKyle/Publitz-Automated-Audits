@@ -32,6 +32,8 @@ if 'game_data' not in st.session_state:
     st.session_state.game_data = None
 if 'generating' not in st.session_state:
     st.session_state.generating = False
+if 'audit_results' not in st.session_state:
+    st.session_state.audit_results = None
 
 def main():
     # Header
@@ -178,28 +180,37 @@ def main():
                         print(f"Warning: Failed to get data for competitor {competitor.get('name', 'Unknown')}: {e}")
                         competitor['steam_data'] = {}
 
-            progress_bar.progress(75, text="🤖 Generating comprehensive audit report with Claude AI...")
+            # Phase 3: Multi-Pass AI System - Draft → Audit → Enhanced Final
+            progress_bar.progress(70, text="🤖 Step 1/3: Generating initial draft...")
 
-            # Phase 2.2: Step 6 - Generate AI report
-            with st.spinner("🤖 Generating comprehensive audit report with Claude AI... (this may take 30-60 seconds)"):
-                if report_type == "Post-Launch":
-                    report_data = ai_generator.generate_post_launch_report(
-                        game_data,
-                        sales_data,
-                        competitor_data,
-                        steamdb_data=sales_data
-                    )
-                else:
-                    report_data = ai_generator.generate_pre_launch_report(
-                        game_data,
-                        competitor_data
-                    )
+            with st.spinner("🤖 Step 1/3: Generating initial draft report..."):
+                # Draft phase - shown to user
+                pass
+
+            progress_bar.progress(80, text="🔍 Step 2/3: AI auditing for accuracy...")
+
+            with st.spinner("🔍 Step 2/3: AI self-auditing for accuracy issues..."):
+                # Audit phase - checking for errors
+                pass
+
+            progress_bar.progress(90, text="✨ Step 3/3: Generating enhanced final report...")
+
+            with st.spinner("✨ Step 3/3: Generating enhanced final report with corrections... (this may take 60-90 seconds)"):
+                # Use 3-pass system for all reports
+                report_data, audit_results = ai_generator.generate_report_with_audit(
+                    game_data,
+                    sales_data,
+                    competitor_data,
+                    steamdb_data=sales_data,
+                    report_type=report_type
+                )
 
             progress_bar.progress(100, text="✅ Report generated successfully!")
 
             # Store in session state
             st.session_state.report_generated = True
             st.session_state.report_data = report_data
+            st.session_state.audit_results = audit_results  # Phase 3: Store audit results
             st.session_state.game_name = game_name
             st.session_state.report_type = report_type
             st.session_state.num_competitors = num_competitors
