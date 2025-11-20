@@ -12,11 +12,23 @@ class AIGenerator:
         Args:
             api_key: Anthropic API key
         """
-        self.client = anthropic.Anthropic(api_key=api_key)
-        # FIXED: Using the correct Claude model name
-        # The old model 'claude-3-5-sonnet-20240620' does not exist
-        # Using the latest Claude Sonnet 4.5 model
-        self.model = "claude-sonnet-4-5-20250929"
+        try:
+            # Initialize Anthropic client with minimal parameters
+            # Avoid passing extra params that might cause issues in different environments
+            self.client = anthropic.Anthropic(api_key=api_key)
+            # FIXED: Using the correct Claude model name
+            # The old model 'claude-3-5-sonnet-20240620' does not exist
+            # Using the latest Claude Sonnet 4.5 model
+            self.model = "claude-sonnet-4-5-20250929"
+        except TypeError as e:
+            if "'proxies'" in str(e):
+                raise Exception(
+                    f"Anthropic library version mismatch. Please upgrade: pip install --upgrade anthropic>=0.40.0\n"
+                    f"Current error: {str(e)}"
+                )
+            raise Exception(f"Failed to initialize Anthropic client: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Failed to initialize Anthropic client: {str(e)}. Check your API key.")
 
     def generate_post_launch_report(
         self,
