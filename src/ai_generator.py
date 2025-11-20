@@ -24,7 +24,7 @@ class AIReportGenerator:
             raise ValueError("ANTHROPIC_API_KEY not found in environment")
 
         self.client = anthropic.Anthropic(api_key=self.api_key)
-        self.model = "claude-3-5-sonnet-20241022"
+        self.model = "claude-3-5-sonnet-20240620"
 
     def generate_pre_launch_report(self, game_data: Dict[str, Any],
                                    competitor_data: List[Dict[str, Any]],
