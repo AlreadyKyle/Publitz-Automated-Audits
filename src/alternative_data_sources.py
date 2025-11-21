@@ -31,6 +31,8 @@ class AlternativeDataSource:
         self.igdb = None
         self.trends = None
         self.youtube = None
+        self.steam = None
+        self.hltb = None
         self.estimator = None
         self.use_smart_estimation = False
 
@@ -62,6 +64,20 @@ class AlternativeDataSource:
             print("✓ YouTube API initialized")
         except ImportError as e:
             print(f"⚠️ YouTube API unavailable: {e}")
+
+        try:
+            from src.steam_api import SteamWebApi
+            self.steam = SteamWebApi()
+            print("✓ Steam Web API initialized")
+        except ImportError as e:
+            print(f"⚠️ Steam Web API unavailable: {e}")
+
+        try:
+            from src.hltb_api import HLTBApi
+            self.hltb = HLTBApi()
+            print("✓ HowLongToBeat initialized")
+        except ImportError as e:
+            print(f"⚠️ HowLongToBeat unavailable: {e}")
 
         try:
             from src.smart_estimator import SmartEstimator
@@ -412,6 +428,8 @@ class AlternativeDataSource:
         igdb_data = None
         trends_data = None
         youtube_data = None
+        steam_data = None
+        hltb_data = None
 
         if self.igdb:
             igdb_data = self.igdb.get_multiple_signals(game_name)
@@ -428,13 +446,25 @@ class AlternativeDataSource:
             if youtube_data:
                 print(f"✓ Got YouTube data for {game_name}")
 
+        if self.steam:
+            steam_data = self.steam.get_comprehensive_metrics(app_id)
+            if steam_data:
+                print(f"✓ Got Steam Web API data for app {app_id}")
+
+        if self.hltb:
+            hltb_data = self.hltb.get_comprehensive_metrics(game_name)
+            if hltb_data:
+                print(f"✓ Got HowLongToBeat data for {game_name}")
+
         # Use smart estimator with ALL available signals
         ownership_data = self.estimator.estimate_ownership(
             {},
             rawg_data,
             igdb_data,
             trends_data,
-            youtube_data
+            youtube_data,
+            steam_data,
+            hltb_data
         )
 
         # Estimate reviews from RAWG ratings (rough conversion)
@@ -476,7 +506,7 @@ class AlternativeDataSource:
 
             # Metadata
             'quality_multiplier': ownership_data.get('total_multiplier', 1.0),
-            'data_source': self._build_data_source_string(rawg_data, igdb_data, trends_data, youtube_data),
+            'data_source': self._build_data_source_string(rawg_data, igdb_data, trends_data, youtube_data, steam_data, hltb_data),
             'signals_used': ownership_data.get('signals_used', []),
 
             # RAWG-specific enrichment
@@ -497,6 +527,13 @@ class AlternativeDataSource:
             # YouTube enrichment (if available)
             'youtube_views': youtube_data.get('total_views', 0) if youtube_data else 0,
             'youtube_videos': youtube_data.get('video_count', 0) if youtube_data else 0,
+
+            # Steam Web API enrichment (if available)
+            'steam_current_players': steam_data.get('current_players', 0) if steam_data else 0,
+
+            # HowLongToBeat enrichment (if available)
+            'hltb_main_story': hltb_data.get('main_story_hours', 0) if hltb_data else 0,
+            'hltb_completionist': hltb_data.get('completionist_hours', 0) if hltb_data else 0,
         }
 
         # Estimate revenue
@@ -520,7 +557,9 @@ class AlternativeDataSource:
         rawg_data: Optional[Dict[str, Any]],
         igdb_data: Optional[Dict[str, Any]],
         trends_data: Optional[Dict[str, Any]],
-        youtube_data: Optional[Dict[str, Any]]
+        youtube_data: Optional[Dict[str, Any]],
+        steam_data: Optional[Dict[str, Any]],
+        hltb_data: Optional[Dict[str, Any]]
     ) -> str:
         """Build a human-readable string showing which data sources were used"""
         sources = []
@@ -533,6 +572,10 @@ class AlternativeDataSource:
             sources.append("Google Trends")
         if youtube_data:
             sources.append("YouTube Data")
+        if steam_data:
+            sources.append("Steam Web API")
+        if hltb_data:
+            sources.append("HowLongToBeat")
 
         if len(sources) == 0:
             return "Generic Estimation"

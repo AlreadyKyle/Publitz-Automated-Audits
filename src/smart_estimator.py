@@ -44,7 +44,9 @@ class SmartEstimator:
         rawg_data: Optional[Dict[str, Any]] = None,
         igdb_data: Optional[Dict[str, Any]] = None,
         trends_data: Optional[Dict[str, Any]] = None,
-        youtube_data: Optional[Dict[str, Any]] = None
+        youtube_data: Optional[Dict[str, Any]] = None,
+        steam_data: Optional[Dict[str, Any]] = None,
+        hltb_data: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Estimate game ownership using multiple signals from all data sources
@@ -59,6 +61,8 @@ class SmartEstimator:
         7. Google Trends interest (marketing momentum)
         8. YouTube views/engagement (content creator activity)
         9. IGDB hypes (pre-release buzz)
+        10. Steam concurrent players (official popularity data)
+        11. HowLongToBeat completion time (engagement validation)
         """
 
         # Start with genre-based baseline
@@ -164,6 +168,27 @@ class SmartEstimator:
                 multiplier *= youtube_mult
                 signals_used.append(f'youtube_{total_views}_views')
                 print(f"  YouTube multiplier ({total_views:,} views, {video_count} videos): {youtube_mult}x")
+
+        # Signal 9: Steam concurrent players (official popularity data)
+        if steam_data:
+            current_players = steam_data.get('current_players', 0)
+
+            if current_players > 0:
+                steam_mult = self._steam_players_multiplier(current_players)
+                multiplier *= steam_mult
+                signals_used.append(f'steam_players_{current_players}')
+                print(f"  Steam concurrent players multiplier ({current_players:,} players): {steam_mult}x")
+
+        # Signal 10: HowLongToBeat completion time (engagement validation)
+        if hltb_data:
+            main_hours = hltb_data.get('main_story_hours', 0)
+            completionist_hours = hltb_data.get('completionist_hours', 0)
+
+            if main_hours > 0:
+                hltb_mult = self._hltb_multiplier(main_hours, completionist_hours)
+                multiplier *= hltb_mult
+                signals_used.append(f'hltb_{int(main_hours)}h')
+                print(f"  HLTB multiplier ({main_hours:.0f}h main story): {hltb_mult}x")
 
         # Calculate final estimate
         final_estimate = int(base_estimate * multiplier)
@@ -457,8 +482,51 @@ class SmartEstimator:
         else:
             return 1.0
 
+    def _steam_players_multiplier(self, current_players: int) -> float:
+        """
+        Multiplier based on Steam concurrent player count
+
+        Official Steam data - most accurate popularity indicator
+        Higher concurrent players = higher total ownership
+        """
+        if current_players > 100_000:
+            return 3.0  # Mega-hit (100K+ concurrent)
+        elif current_players > 50_000:
+            return 2.5  # Massive popularity
+        elif current_players > 10_000:
+            return 2.0  # Very popular
+        elif current_players > 5_000:
+            return 1.6  # Popular
+        elif current_players > 1_000:
+            return 1.3  # Good playerbase
+        elif current_players > 500:
+            return 1.2  # Moderate
+        elif current_players > 100:
+            return 1.1  # Small but active
+        else:
+            return 1.0
+
+    def _hltb_multiplier(self, main_hours: float, completionist_hours: float) -> float:
+        """
+        Multiplier based on HowLongToBeat completion time
+
+        Longer games tend to have higher perceived value and retention
+        Cross-validates RAWG playtime data
+        """
+        # Use main story hours as primary signal
+        if main_hours > 80:
+            return 1.4  # Epic-length game (80+ hours)
+        elif main_hours > 50:
+            return 1.3  # Very long game
+        elif main_hours > 30:
+            return 1.2  # Long game
+        elif main_hours > 15:
+            return 1.1  # Medium-length game
+        else:
+            return 1.0  # Standard length
+
     def _calculate_confidence(self, signals: list) -> str:
-        """Calculate confidence level based on number of signals (up to 9+)"""
+        """Calculate confidence level based on number of signals (up to 11+)"""
         signal_count = len(signals)
 
         if signal_count >= 8:
