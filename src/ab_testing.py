@@ -438,11 +438,20 @@ class ABTestingRecommender:
         for i, test in enumerate(prioritized_tests[:8], 1):  # Top 8 tests
             time_req = test.get('time_required', '14 days')
 
-            # Parse time requirement
-            if 'days' in time_req:
-                days = int(time_req.split('-')[0].replace('days', '').strip())
-            else:
-                days = 14  # Default
+            # Parse time requirement (handle various formats)
+            days = 14  # Default
+            if 'days' in time_req.lower():
+                # Extract first number from string
+                import re
+                numbers = re.findall(r'\d+', time_req)
+                if numbers:
+                    days = int(numbers[0])
+            elif 'week' in time_req.lower():
+                # Extract weeks and convert to days
+                import re
+                numbers = re.findall(r'\d+', time_req)
+                if numbers:
+                    days = int(numbers[0]) * 7
 
             weeks = max(1, days // 7)
 

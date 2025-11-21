@@ -125,10 +125,39 @@ class MarketViabilityAnalyzer:
         """
         logger.info("Analyzing market viability")
 
-        # Extract game info
-        genres = [g.get('description', '').lower() for g in game_data.get('genres', [])]
-        price = game_data.get('price_overview', {}).get('final', 1999) / 100
-        is_released = game_data.get('release_date', {}).get('coming_soon', True) == False
+        # Extract game info - handle both Steam API format and simple format
+        genres_raw = game_data.get('genres', [])
+        if isinstance(genres_raw, list) and genres_raw and isinstance(genres_raw[0], dict):
+            # Steam API format: list of dicts with 'description'
+            genres = [g.get('description', '').lower() for g in genres_raw]
+        elif isinstance(genres_raw, str):
+            # Simple format: comma-separated string
+            genres = [g.strip().lower() for g in genres_raw.split(',')]
+        else:
+            genres = []
+
+        # Handle price in multiple formats
+        if 'price_overview' in game_data:
+            # Steam API format: price in cents
+            price = game_data.get('price_overview', {}).get('final', 1999) / 100
+        elif 'price' in game_data:
+            # Simple format: price string like "$19.99"
+            price_str = game_data.get('price', '$0')
+            import re
+            price_clean = re.sub(r'[^0-9.]', '', price_str)
+            try:
+                price = float(price_clean) if price_clean else 0.0
+            except:
+                price = 0.0
+        else:
+            price = 0.0
+
+        # Handle release status
+        if 'release_date' in game_data:
+            is_released = game_data.get('release_date', {}).get('coming_soon', True) == False
+        else:
+            # Assume released if reviews exist
+            is_released = sales_data.get('reviews_total', 0) > 0 if sales_data else False
 
         # Get primary genre
         primary_genre = self._get_primary_genre(genres)
