@@ -349,10 +349,12 @@ class ExecutiveSummarySection(ReportSection):
                 sequence = "🟢 Do Later"
 
             # Format impact/effort
-            impact_icon = {"high": "⬆️", "medium": "➡️", "low": "⬇️"}.get(rec['impact'], "➡️")
-            effort_icon = {"low": "✅", "medium": "⚠️", "high": "🔴"}.get(rec['effort'], "⚠️")
+            impact = rec['impact'] or 'medium'
+            effort = rec['effort'] or 'medium'
+            impact_icon = {"high": "⬆️", "medium": "➡️", "low": "⬇️"}.get(impact, "➡️")
+            effort_icon = {"low": "✅", "medium": "⚠️", "high": "🔴"}.get(effort, "⚠️")
 
-            markdown += f"| {i} | {rec['title'][:40]}{'...' if len(rec['title']) > 40 else ''} | {rec['category']} | {impact_icon} {rec['impact'].title()} | {effort_icon} {rec['effort'].title()} | {rec['time']} | {sequence} |\n"
+            markdown += f"| {i} | {rec['title'][:40]}{'...' if len(rec['title']) > 40 else ''} | {rec['category']} | {impact_icon} {impact.title()} | {effort_icon} {effort.title()} | {rec['time']} | {sequence} |\n"
 
         markdown += "\n**Legend:**\n"
         markdown += "- **Impact**: ⬆️ High | ➡️ Medium | ⬇️ Low\n"
@@ -505,6 +507,7 @@ class CompetitorSection(ReportSection):
         comp_prices = [c.get('price_overview', {}).get('final', 0) / 100
                       for c in competitors if c.get('price_overview')]
 
+        price_diff_pct = 0  # Initialize default
         if comp_prices:
             avg_comp_price = sum(comp_prices) / len(comp_prices)
             price_diff_pct = abs(your_price - avg_comp_price) / avg_comp_price * 100 if avg_comp_price > 0 else 0
@@ -1132,7 +1135,7 @@ class ReportBuilder:
         self.add_section(marketing_section)
 
         # Create executive summary (references other sections)
-        self.executive_summary = ExecutiveSummarySection("Executive Summary", {
+        self.executive_summary = ExecutiveSummarySection({
             'game_data': self.game_data,
             'report_type': self.report_type
         }, all_sections=self.sections)

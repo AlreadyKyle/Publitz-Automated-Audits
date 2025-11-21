@@ -50,7 +50,10 @@ class ReportVisualizer:
 
         # Price comparison
         your_price = your_game.get('price_overview', {}).get('final', 0) / 100 if your_game.get('price_overview') else 0
-        price_status = "✅" if abs(your_price - avg_price) / avg_price < 0.15 else "⚠️"
+        if avg_price > 0:
+            price_status = "✅" if abs(your_price - avg_price) / avg_price < 0.15 else "⚠️"
+        else:
+            price_status = "➖"  # No price data available
         markdown += f"| Price | ${your_price:.2f} | ${avg_price:.2f} | {price_status} |\n"
 
         # Review count comparison
