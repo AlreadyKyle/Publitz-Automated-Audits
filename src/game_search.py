@@ -4,6 +4,17 @@ import time
 from datetime import datetime
 import re
 from src.alternative_data_sources import AlternativeDataSource
+from src.logger import get_logger
+from src.exceptions import (
+    InvalidSteamURLError,
+    SteamAPIError,
+    SteamSpyAPIError,
+    GameNotFoundError,
+    NoCompetitorsFoundError
+)
+from src.retry_utils import retry_with_backoff, steam_api_limiter
+
+logger = get_logger(__name__)
 
 class GameSearch:
     """Game search and competitor finding using Steam API and SteamSpy"""
@@ -25,9 +36,13 @@ class GameSearch:
 
         Returns:
             App ID as integer, or None if invalid URL
+
+        Raises:
+            InvalidSteamURLError: If URL format is invalid
         """
         if not url or not isinstance(url, str):
-            return None
+            logger.warning(f"Invalid URL type provided: {type(url)}")
+            raise InvalidSteamURLError(url if isinstance(url, str) else "None")
 
         # Clean up URL (remove whitespace)
         url = url.strip()
@@ -41,9 +56,11 @@ class GameSearch:
             app_id = int(match.group(1))
             # Validate app_id is reasonable (Steam app IDs are positive integers)
             if app_id > 0:
+                logger.debug(f"Successfully parsed App ID {app_id} from URL")
                 return app_id
 
-        return None
+        logger.error(f"Failed to parse Steam URL: {url}")
+        raise InvalidSteamURLError(url)
 
     def get_game_from_url(self, url: str) -> Optional[Dict[str, Any]]:
         """
@@ -53,14 +70,22 @@ class GameSearch:
             url: Steam store URL
 
         Returns:
-            Game data dictionary or None if invalid
+            Game data dictionary
+
+        Raises:
+            InvalidSteamURLError: If URL is invalid
+            GameNotFoundError: If game not found
+            SteamAPIError: If Steam API fails
         """
-        app_id = self.parse_steam_url(url)
-
-        if not app_id:
-            return None
-
-        return self.get_game_details(app_id)
+        try:
+            app_id = self.parse_steam_url(url)
+            logger.info(f"Fetching game data for App ID: {app_id}")
+            return self.get_game_details(app_id)
+        except InvalidSteamURLError:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to get game from URL: {url}", exc_info=True)
+            raise SteamAPIError(f"Failed to fetch game data: {str(e)}", app_id=None)
 
     def detect_launch_status(self, game_data: Dict[str, Any]) -> str:
         """
@@ -103,8 +128,7 @@ class GameSearch:
                 return 'Pre-Launch'
         except Exception as e:
             # If parsing fails, assume post-launch to be safe
-            print(f"Warning: Could not parse release date '{release_date}': {e}")
-            pass
+            logger.warning(f"Could not parse release date '{release_date}': {e}")
 
         # Default to post-launch if released
         return 'Post-Launch'
@@ -229,7 +253,7 @@ class GameSearch:
             return self.get_game_details(app_id)
 
         except Exception as e:
-            print(f"Error searching for game: {e}")
+            logger.error(f"Error searching for game: {e}", exc_info=True)
             # Fallback: create basic game data
             return {
                 'name': game_name,
@@ -268,11 +292,11 @@ class GameSearch:
             try:
                 alt_data = self.alternative_source.get_game_data_from_store_page(app_id)
                 if alt_data and alt_data.get('name'):
-                    print(f"✓ Got game details from alternative source for {app_id}")
+                    logger.info(f"Got game details from alternative source for App ID {app_id}")
                     # Format alternative data to match our structure
                     return self._format_alternative_game_data(alt_data, app_id)
             except Exception as e:
-                print(f"Alternative source failed for game details: {e}, trying Steam API...")
+                logger.warning(f"Alternative source failed for App ID {app_id}: {e}, trying Steam API...")
 
             # PRIORITY 2: Try Steam store API
             response = requests.get(
@@ -337,7 +361,7 @@ class GameSearch:
             }
 
         except Exception as e:
-            print(f"Error getting game details: {e}")
+            logger.error(f"Error getting game details for App ID {app_id}: {e}", exc_info=True)
             return {
                 'name': 'Unknown',
                 'app_id': app_id,
@@ -415,7 +439,7 @@ class GameSearch:
             }
 
         except Exception as e:
-            print(f"Error getting SteamSpy data: {e}")
+            logger.warning(f"Error getting SteamSpy data for App ID {app_id}: {e}")
             return {}
 
     def find_competitors(
@@ -499,7 +523,7 @@ class GameSearch:
             return result[:max_competitors]
 
         except Exception as e:
-            print(f"Error finding competitors: {e}")
+            logger.error(f"Error finding competitors: {e}", exc_info=True)
             # FAILSAFE: Return fallback competitors even on error
             return self._generate_fallback_competitors(game_data, min_competitors)
 
@@ -640,13 +664,13 @@ class GameSearch:
                         competitors.append(comp_details)
                         time.sleep(0.2)  # Rate limiting
                     except Exception as e:
-                        print(f"Error getting competitor details for {app_id}: {e}")
+                        logger.warning(f"Error getting competitor details for {app_id}: {e}")
                         continue
 
             return competitors[:min_competitors * 2]
 
         except Exception as e:
-            print(f"Error in broad competitor search: {e}")
+            logger.error(f"Error in broad competitor search: {e}", exc_info=True)
             return self._generate_fallback_competitors(game_data, min_competitors)
 
     def _find_by_tag(self, tag: str, limit: int) -> List[Dict[str, Any]]:
@@ -668,13 +692,13 @@ class GameSearch:
                     competitors.append(game)
                     time.sleep(0.2)  # Rate limiting
                 except Exception as e:
-                    print(f"Error getting game by tag {app_id}: {e}")
+                    logger.debug(f"Error getting game by tag {app_id}: {e}")
                     continue
 
             return competitors
 
         except Exception as e:
-            print(f"Error finding by tag: {e}")
+            logger.warning(f"Error finding by tag: {e}")
             return []
 
     def _find_by_genre(self, genre: str, limit: int) -> List[Dict[str, Any]]:
@@ -696,13 +720,13 @@ class GameSearch:
                     competitors.append(game)
                     time.sleep(0.2)  # Rate limiting
                 except Exception as e:
-                    print(f"Error getting game by genre {app_id}: {e}")
+                    logger.debug(f"Error getting game by genre {app_id}: {e}")
                     continue
 
             return competitors
 
         except Exception as e:
-            print(f"Error finding by genre: {e}")
+            logger.warning(f"Error finding by genre: {e}")
             return []
 
     def _find_by_broad_category(self, game_data: Dict[str, Any], limit: int) -> List[Dict[str, Any]]:
@@ -729,13 +753,13 @@ class GameSearch:
                     competitors.append(game)
                     time.sleep(0.2)
                 except Exception as e:
-                    print(f"Error getting game in broad search {app_id}: {e}")
+                    logger.debug(f"Error getting game in broad search {app_id}: {e}")
                     continue
 
             return competitors
 
         except Exception as e:
-            print(f"Error in broad category search: {e}")
+            logger.error(f"Error in broad category search: {e}", exc_info=True)
             return []
 
     def _generate_fallback_competitors(

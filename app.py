@@ -8,9 +8,25 @@ from src.ai_generator import AIGenerator
 from src.game_search import GameSearch
 from src.steamdb_scraper import SteamDBScraper
 from src.pdf_generator import create_downloadable_pdf
+from src.logger import get_logger, setup_logger
+from src.exceptions import (
+    PublitzError,
+    InvalidSteamURLError,
+    GameNotFoundError,
+    SteamAPIError,
+    AuthenticationError,
+    AIGenerationError,
+    RateLimitError,
+    TimeoutError,
+    PDFGenerationError
+)
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Initialize logger
+setup_logger(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = get_logger(__name__)
 
 # Page config - MUST be first Streamlit command
 st.set_page_config(
@@ -69,6 +85,7 @@ def main():
             )
 
             if not api_key:
+                logger.info("User prompted for API key")
                 st.warning("⚠️ Please enter your Anthropic API Key to continue")
                 st.info("💡 **Tip**: Set ANTHROPIC_API_KEY environment variable to skip this step")
                 st.stop()
@@ -77,7 +94,9 @@ def main():
     if api_key:
         api_key = api_key.strip()
         if len(api_key) < 20:
+            logger.warning("Invalid API key format provided")
             st.error("❌ Invalid API key format. Please check your API key.")
+            st.info("💡 API keys start with 'sk-ant-' and are much longer")
             st.stop()
 
     # Main input - Steam URL
@@ -151,15 +170,18 @@ def main():
             progress_bar = st.progress(0, text="Starting...")
 
             # Phase 2.2: Step 1 - Parse URL and get game data
+            logger.info(f"Starting report generation for URL: {steam_url}")
             progress_bar.progress(10, text="🔍 Fetching game data from Steam...")
             with st.spinner("🔍 Fetching game data from Steam..."):
                 game_data = game_search.get_game_from_url(steam_url)
 
             if not game_data:
+                logger.error("Game data not returned from URL")
                 st.error("❌ Invalid Steam URL or game not found. Please check the URL and try again.")
                 st.stop()
 
             game_name = game_data.get('name', 'Unknown Game')
+            logger.info(f"Successfully fetched game: {game_name}")
             st.success(f"✅ Found game: **{game_name}**")
             progress_bar.progress(20, text="🔎 Detecting launch status...")
 
@@ -248,6 +270,7 @@ def main():
             progress_bar.progress(100, text="✅ Report generated successfully!")
 
             # Store in session state
+            logger.info(f"Report generation completed successfully for {game_name}")
             st.session_state.report_generated = True
             st.session_state.report_data = report_data
             st.session_state.audit_results = audit_results  # Phase 3: Store audit results
@@ -267,13 +290,103 @@ def main():
             # Force rerun to display results
             st.rerun()
 
-        except Exception as e:
-            # Phase 2.1: Reset generating state on error
+        except InvalidSteamURLError as e:
+            # Reset generating state on error
             st.session_state.generating = False
-            st.error(f"❌ An error occurred: {str(e)}")
+            logger.warning(f"Invalid Steam URL provided: {steam_url}")
+            st.error(f"❌ {e.user_message}")
+            st.info("💡 **Valid URL format**: `https://store.steampowered.com/app/12345/Game_Name/`")
+            with st.expander("📝 Example URLs"):
+                st.code("https://store.steampowered.com/app/292030/The_Witcher_3_Wild_Hunt/")
+                st.code("https://store.steampowered.com/app/730/CounterStrike_2/")
+            st.stop()
+
+        except GameNotFoundError as e:
+            st.session_state.generating = False
+            logger.error(f"Game not found: {e.app_id}")
+            st.error(f"❌ {e.user_message}")
+            st.warning("🔍 **Possible reasons:**")
+            st.markdown("""
+            - The game is private or delisted
+            - The URL contains an incorrect App ID
+            - The game is region-locked
+            """)
+            st.stop()
+
+        except AuthenticationError as e:
+            st.session_state.generating = False
+            logger.error(f"Authentication failed for {e.service}")
+            st.error(f"❌ {e.user_message}")
+            st.info(f"💡 **Solution**: Check your {e.service} API key in the configuration or .env file")
+            st.stop()
+
+        except AIGenerationError as e:
+            st.session_state.generating = False
+            logger.error(f"AI generation failed: {e.message}", exc_info=True)
+            st.error(f"❌ {e.user_message}")
+            st.warning("🔄 **Try these solutions:**")
+            st.markdown("""
+            - Verify your Anthropic API key is valid
+            - Check your API usage limits at console.anthropic.com
+            - Wait a moment and try again
+            """)
+            if e.recoverable:
+                if st.button("🔄 Retry Generation"):
+                    st.rerun()
+            st.stop()
+
+        except RateLimitError as e:
+            st.session_state.generating = False
+            logger.warning(f"Rate limit exceeded for {e.service}")
+            st.warning(f"⏱️ {e.user_message}")
+            if e.retry_after:
+                st.info(f"💡 Please wait {e.retry_after} seconds before trying again")
+            else:
+                st.info("💡 Please wait a few moments before trying again")
+            st.stop()
+
+        except TimeoutError as e:
+            st.session_state.generating = False
+            logger.error(f"Timeout during {e.operation}")
+            st.error(f"⏱️ {e.user_message}")
+            st.info("💡 This may be due to slow network connection or Steam servers being busy")
+            if st.button("🔄 Try Again"):
+                st.rerun()
+            st.stop()
+
+        except SteamAPIError as e:
+            st.session_state.generating = False
+            logger.error(f"Steam API error: {e.message}", exc_info=True)
+            st.error(f"❌ {e.user_message}")
+            st.warning("🔄 **Try these solutions:**")
+            st.markdown("""
+            - Check if the Steam URL is correct
+            - Try again in a few moments (Steam API may be temporarily unavailable)
+            - Verify the game is publicly accessible
+            """)
+            st.stop()
+
+        except PublitzError as e:
+            # Catch all other custom errors
+            st.session_state.generating = False
+            logger.error(f"Publitz error: {e.message}", exc_info=True)
+            st.error(f"❌ {e.user_message}")
+            if e.recoverable:
+                if st.button("🔄 Try Again"):
+                    st.rerun()
+            with st.expander("🔍 Technical Details"):
+                st.code(e.message)
+            st.stop()
+
+        except Exception as e:
+            # Catch-all for unexpected errors
+            st.session_state.generating = False
+            logger.critical(f"Unexpected error: {str(e)}", exc_info=True)
+            st.error("❌ An unexpected error occurred")
+            st.warning("🛠️ **Please report this error:**")
             with st.expander("🔍 Error Details"):
                 st.exception(e)
-            st.info("💡 **Tip**: Make sure the Steam URL is correct and the game is publicly available.")
+            st.info("💡 Try refreshing the page or contact support if the issue persists")
             st.stop()
 
     # Display results if report has been generated
@@ -323,8 +436,12 @@ def main():
                     use_container_width=True,
                     key="download_pdf_top"
                 )
+            except PDFGenerationError as e:
+                logger.error(f"PDF generation failed: {e.message}")
+                st.error(f"📄 {e.user_message}")
             except Exception as e:
-                st.error(f"PDF generation unavailable: {str(e)}")
+                logger.error(f"Unexpected PDF error: {e}", exc_info=True)
+                st.warning("📄 PDF generation unavailable. You can still download the Markdown version.")
 
         with dl_col2:
             # Markdown Download
@@ -376,8 +493,12 @@ def main():
                     use_container_width=True,
                     key="download_pdf_bottom"
                 )
+            except PDFGenerationError as e:
+                logger.error(f"PDF generation failed (bottom): {e.message}")
+                st.error(f"📄 {e.user_message}")
             except Exception as e:
-                st.error(f"PDF generation unavailable: {str(e)}")
+                logger.error(f"Unexpected PDF error (bottom): {e}", exc_info=True)
+                st.warning("📄 PDF generation unavailable. You can still download the Markdown version.")
 
         with dl_col2_bottom:
             # Markdown Download
