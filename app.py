@@ -16,6 +16,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Load Streamlit secrets into environment variables for compatibility
+# This allows os.getenv() to work with both .env files and Streamlit Cloud secrets
+if hasattr(st, 'secrets'):
+    try:
+        for key, value in st.secrets.items():
+            if key not in os.environ:
+                os.environ[key] = str(value)
+    except Exception:
+        pass  # Secrets may not be configured yet
+
 # Initialize session state
 if 'report_generated' not in st.session_state:
     st.session_state.report_generated = False
