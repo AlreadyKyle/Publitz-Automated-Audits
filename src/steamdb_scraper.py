@@ -54,7 +54,7 @@ class SteamDBScraper:
                 self.steamspy_api_base,
                 params={'request': 'appdetails', 'appid': app_id},
                 headers=self.headers,
-                timeout=5  # Reduced timeout for faster fallback
+                timeout=3  # Fast failure for blocked IPs
             )
             response.raise_for_status()
 

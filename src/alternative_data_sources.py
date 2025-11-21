@@ -54,7 +54,7 @@ class AlternativeDataSource:
             }
 
             print(f"Fetching Steam store page for app {app_id}...")
-            response = self.session.get(url, cookies=cookies, timeout=8)  # Reduced timeout
+            response = self.session.get(url, cookies=cookies, timeout=3)  # Fast failure for blocked IPs
             response.raise_for_status()
 
             print(f"Parsing HTML (length: {len(response.text)} chars)...")
@@ -195,7 +195,7 @@ class AlternativeDataSource:
         try:
             print(f"Fetching reviews for app {app_id}...")
             url = f"https://store.steampowered.com/appreviews/{app_id}?json=1&num_per_page=0"
-            response = self.session.get(url, timeout=5)  # Shorter timeout
+            response = self.session.get(url, timeout=3)  # Fast failure for blocked IPs
             response.raise_for_status()
 
             data = response.json()

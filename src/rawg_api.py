@@ -45,7 +45,7 @@ class RAWGApi:
             response = self.session.get(
                 f"{self.base_url}/games",
                 params=params,
-                timeout=5
+                timeout=3
             )
             response.raise_for_status()
 
@@ -84,7 +84,7 @@ class RAWGApi:
             response = self.session.get(
                 f"{self.base_url}/games/{rawg_id}",
                 params={'key': self.api_key},
-                timeout=5
+                timeout=3
             )
             response.raise_for_status()
             return self._format_game_data(response.json())

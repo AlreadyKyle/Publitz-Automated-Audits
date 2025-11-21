@@ -169,7 +169,7 @@ def main():
 
             # Phase 2.2: Step 3 - Find competitor games
             with st.spinner("🔍 Finding competitor games..."):
-                competitor_data = game_search.find_competitors(game_data, min_competitors=3, max_competitors=10)
+                competitor_data = game_search.find_competitors(game_data, min_competitors=3, max_competitors=5)  # Reduced from 10 to 5
             num_competitors = len(competitor_data)
 
             if num_competitors == 0:
