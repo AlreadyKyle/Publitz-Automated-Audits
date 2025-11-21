@@ -1638,6 +1638,431 @@ class GrowthStrategySection(ReportSection):
         return markdown
 
 
+class TagInsightsSection(ReportSection):
+    """Tag effectiveness with impression estimates"""
+
+    def __init__(self, section_name: str, data: Dict[str, Any]):
+        super().__init__(section_name, data)
+        self.tag_analysis = None
+
+    def analyze(self) -> Dict[str, Any]:
+        """Analyze tags with impression estimates"""
+        from src.tag_insights import TagInsightsAnalyzer
+
+        game_data = self.data.get('game_data', {})
+        sales_data = self.data.get('sales_data', {})
+
+        analyzer = TagInsightsAnalyzer()
+        self.tag_analysis = analyzer.analyze_tags(game_data, sales_data)
+
+        # Score based on optimization potential
+        self.score = self.tag_analysis.get('optimization_score', 50)
+
+        if self.score >= 80:
+            self.rating = 'excellent'
+        elif self.score >= 65:
+            self.rating = 'good'
+        elif self.score >= 50:
+            self.rating = 'fair'
+        else:
+            self.rating = 'poor'
+
+        self.analyzed = True
+
+        return {
+            'score': self.score,
+            'rating': self.rating,
+            'tag_analysis': self.tag_analysis
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate markdown for tag insights"""
+        if not self.analyzed:
+            self.analyze()
+
+        markdown = f"## {self.section_name}\n\n"
+        markdown += f"**Tag Optimization Score:** {self.score}/100 ({self.rating.upper()})\n\n"
+
+        # Current tags analysis
+        markdown += "### Current Tags Performance\n\n"
+        markdown += f"**Total Tags:** {self.tag_analysis['tag_count']}/20 (Steam allows up to 20 tags)\n\n"
+
+        current_analysis = self.tag_analysis.get('current_analysis', [])
+        if current_analysis:
+            markdown += "| Tag | Tier | Traffic/Day | Your Impressions/Day | Status |\n"
+            markdown += "|-----|------|-------------|---------------------|--------|\n"
+
+            for tag_data in current_analysis[:15]:  # Top 15 tags
+                tag = tag_data.get('tag', '')
+                tier = tag_data.get('tier', 'unknown').upper()
+                total_traffic = tag_data.get('total_daily_traffic', 0)
+                your_impressions = tag_data.get('your_daily_impressions', 0)
+                status = tag_data.get('status', 'unknown')
+
+                status_emoji = {
+                    'optimal': '🟢 Optimal',
+                    'good': '🟡 Good',
+                    'too_broad': '🔴 Too Broad',
+                    'unknown': '⚪ Unknown'
+                }.get(status, status)
+
+                markdown += f"| {tag} | {tier} | {total_traffic:,} | {your_impressions:,} | {status_emoji} |\n"
+
+            markdown += "\n"
+
+        # Current impression totals
+        impression_impact = self.tag_analysis.get('impression_impact', {})
+        current_daily = impression_impact.get('current_daily_impressions', 0)
+        current_monthly = impression_impact.get('current_monthly_impressions', 0)
+
+        markdown += f"**Current Tag Impressions:**\n"
+        markdown += f"- Daily: {current_daily:,} impressions\n"
+        markdown += f"- Monthly: {current_monthly:,} impressions\n\n"
+
+        # Suggested tag additions
+        suggested_additions = self.tag_analysis.get('suggested_additions', [])
+        if suggested_additions:
+            markdown += "### Recommended Tags to Add\n\n"
+            markdown += "| Tag | Priority | Tier | Reason | +Impressions/Day | +Impressions/Month |\n"
+            markdown += "|-----|----------|------|--------|------------------|--------------------|\n"
+
+            for suggestion in suggested_additions:
+                tag = suggestion.get('tag', '')
+                priority = suggestion.get('priority', 'MEDIUM')
+                tier = suggestion.get('tier', 'unknown').upper()
+                reason = suggestion.get('reason', '')
+                daily = suggestion.get('estimated_additional_impressions_daily', 0)
+                monthly = suggestion.get('estimated_additional_impressions_monthly', 0)
+
+                priority_emoji = '🔴 HIGH' if priority == 'HIGH' else '🟡 MEDIUM'
+
+                markdown += f"| {tag} | {priority_emoji} | {tier} | {reason} | +{daily:,} | +{monthly:,} |\n"
+
+            markdown += "\n"
+
+        # Suggested tag removals
+        suggested_removals = self.tag_analysis.get('suggested_removals', [])
+        if suggested_removals:
+            markdown += "### Tags to Remove/Replace\n\n"
+            markdown += "| Tag | Reason | Replacement Suggestion |\n"
+            markdown += "|-----|--------|------------------------|\n"
+
+            for removal in suggested_removals:
+                tag = removal.get('tag', '')
+                reason = removal.get('reason', '')
+                replacement = removal.get('replacement_suggestion', '')
+
+                markdown += f"| {tag} | {reason} | {replacement} |\n"
+
+            markdown += "\n"
+
+        # Impression impact summary
+        if impression_impact:
+            net_daily = impression_impact.get('net_daily_change', 0)
+            net_monthly = impression_impact.get('net_monthly_change', 0)
+            optimized_daily = impression_impact.get('optimized_daily_impressions', 0)
+            optimized_monthly = impression_impact.get('optimized_monthly_impressions', 0)
+            percent_improvement = impression_impact.get('percent_improvement', 0)
+
+            markdown += "### Optimization Impact\n\n"
+            markdown += f"**If you implement all tag recommendations:**\n\n"
+            markdown += f"- **Current Daily Impressions:** {current_daily:,}\n"
+            markdown += f"- **Optimized Daily Impressions:** {optimized_daily:,}\n"
+            markdown += f"- **Net Change:** {'+' if net_daily >= 0 else ''}{net_daily:,}/day ({'+' if percent_improvement >= 0 else ''}{percent_improvement:.1f}%)\n\n"
+            markdown += f"- **Current Monthly Impressions:** {current_monthly:,}\n"
+            markdown += f"- **Optimized Monthly Impressions:** {optimized_monthly:,}\n"
+            markdown += f"- **Net Change:** {'+' if net_monthly >= 0 else ''}{net_monthly:,}/month\n\n"
+
+        # Key insights
+        markdown += "### Tag Strategy Insights\n\n"
+
+        if self.score >= 80:
+            markdown += "✅ **Excellent tag optimization!** Your tags are well-chosen with strong specificity and traffic potential.\n\n"
+        elif self.score >= 65:
+            markdown += "✅ **Good tag optimization.** You have a solid tag foundation with room for minor improvements.\n\n"
+        elif self.score >= 50:
+            markdown += "⚠️ **Fair tag optimization.** Your tags are functional but missing some high-value opportunities.\n\n"
+        else:
+            markdown += "❌ **Poor tag optimization.** Significant improvements needed to maximize discovery potential.\n\n"
+
+        markdown += "**Tag Selection Best Practices:**\n"
+        markdown += "1. **Use 15-20 tags** - Steam allows up to 20, use them all\n"
+        markdown += "2. **Balance broad and specific** - Mix high-traffic genre tags with niche mechanic tags\n"
+        markdown += "3. **Prioritize high-specificity tags** - Detective > Adventure, Roguelike > Action\n"
+        markdown += "4. **Include player count** - Singleplayer or Multiplayer (essential filter tag)\n"
+        markdown += "5. **Add art style tag** - Pixel Art, 3D, Hand-Drawn, etc. (common search filter)\n"
+        markdown += "6. **Remove unknown tags** - Misspelled or non-standard tags get zero traffic\n\n"
+
+        return markdown
+
+
+class ReviewVulnerabilitySection(ReportSection):
+    """Review vulnerability and risk assessment"""
+
+    def __init__(self, section_name: str, data: Dict[str, Any]):
+        super().__init__(section_name, data)
+        self.vulnerability_analysis = None
+
+    def analyze(self) -> Dict[str, Any]:
+        """Analyze review vulnerabilities"""
+        from src.review_vulnerability import ReviewVulnerabilityAnalyzer
+
+        game_data = self.data.get('game_data', {})
+        sales_data = self.data.get('sales_data', {})
+        competitor_data = self.data.get('competitor_data', [])
+
+        analyzer = ReviewVulnerabilityAnalyzer()
+        self.vulnerability_analysis = analyzer.analyze_vulnerabilities(
+            game_data, sales_data, competitor_data
+        )
+
+        # Score based on risk (inverted: lower risk = higher score)
+        risk_score = self.vulnerability_analysis.get('risk_score', 50)
+        self.score = 100 - risk_score  # Invert so high score = low risk
+
+        if self.score >= 75:
+            self.rating = 'excellent'  # Minimal risk
+        elif self.score >= 55:
+            self.rating = 'good'  # Low risk
+        elif self.score >= 35:
+            self.rating = 'fair'  # Medium risk
+        else:
+            self.rating = 'poor'  # High risk
+
+        self.analyzed = True
+
+        return {
+            'score': self.score,
+            'rating': self.rating,
+            'vulnerability_analysis': self.vulnerability_analysis
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate markdown for review vulnerability analysis"""
+        if not self.analyzed:
+            self.analyze()
+
+        markdown = f"## {self.section_name}\n\n"
+
+        risk_score = self.vulnerability_analysis.get('risk_score', 0)
+        risk_tier = self.vulnerability_analysis.get('risk_tier', 'Unknown')
+
+        # Risk overview
+        markdown += f"**Risk Assessment Score:** {self.score}/100 ({risk_tier.upper()})\n\n"
+
+        risk_emoji = {
+            'Minimal Risk': '🟢',
+            'Low Risk': '🟡',
+            'Medium Risk': '🟠',
+            'High Risk': '🔴'
+        }.get(risk_tier, '⚪')
+
+        markdown += f"{risk_emoji} **Status:** {risk_tier}\n"
+        markdown += f"- **Your Risk Score:** {risk_score}/100 (lower is better)\n"
+        markdown += f"- **Safety Score:** {self.score}/100 (higher is better)\n\n"
+
+        # Predicted risks
+        predicted_risks = self.vulnerability_analysis.get('predicted_risks', [])
+        if predicted_risks:
+            markdown += "### Top Predicted Vulnerabilities\n\n"
+            markdown += "*Based on genre, pricing, and competitor negative review analysis*\n\n"
+            markdown += "| Risk | Severity | Probability | Key Factors |\n"
+            markdown += "|------|----------|-------------|-------------|\n"
+
+            for risk in predicted_risks[:8]:  # Top 8 risks
+                description = risk.get('description', '')
+                severity = risk.get('severity', 'UNKNOWN')
+                priority = risk.get('priority', 'UNKNOWN')
+                probability = risk.get('probability', 0)
+                risk_factors = risk.get('risk_factors', [])
+
+                severity_emoji = {
+                    'CRITICAL': '🔴 CRITICAL',
+                    'HIGH': '🟠 HIGH',
+                    'MEDIUM': '🟡 MEDIUM',
+                    'LOW': '🟢 LOW'
+                }.get(priority, priority)
+
+                factors_text = risk_factors[0] if risk_factors else 'N/A'
+                if len(risk_factors) > 1:
+                    factors_text += f" (+{len(risk_factors)-1} more)"
+
+                markdown += f"| {description} | {severity_emoji} | {probability:.0f}% | {factors_text} |\n"
+
+            markdown += "\n"
+
+        # Competitor review themes
+        competitor_themes = self.vulnerability_analysis.get('competitor_themes', {})
+        common_themes = competitor_themes.get('common_themes', {})
+
+        if common_themes:
+            markdown += "### Competitor Negative Review Themes\n\n"
+            total_analyzed = competitor_themes.get('total_negative_reviews_analyzed', 0)
+            markdown += f"*Analyzed {total_analyzed} competitors with negative reviews*\n\n"
+
+            markdown += "| Theme | Prevalence | Severity | Description |\n"
+            markdown += "|-------|------------|----------|-------------|\n"
+
+            for theme_name, theme_data in sorted(common_themes.items(), key=lambda x: x[1]['percentage'], reverse=True):
+                percentage = theme_data.get('percentage', 0)
+                severity = theme_data.get('severity', 'UNKNOWN')
+                description = theme_data.get('description', '')
+
+                severity_emoji = {
+                    'CRITICAL': '🔴',
+                    'HIGH': '🟠',
+                    'MEDIUM': '🟡',
+                    'LOW': '🟢'
+                }.get(severity, '⚪')
+
+                markdown += f"| {theme_name.replace('_', ' ').title()} | {percentage:.0f}% | {severity_emoji} {severity} | {description} |\n"
+
+            markdown += "\n"
+
+        # Mitigation strategies
+        mitigation_strategies = self.vulnerability_analysis.get('mitigation_strategies', [])
+        if mitigation_strategies:
+            markdown += "### Risk Mitigation Strategies\n\n"
+            markdown += "*Specific tactics to prevent these issues in your game*\n\n"
+
+            for i, strategy in enumerate(mitigation_strategies[:5], 1):  # Top 5
+                risk_desc = strategy.get('risk', '')
+                priority = strategy.get('priority', 'UNKNOWN')
+                probability = strategy.get('probability', 0)
+                tactics = strategy.get('tactics', [])
+
+                priority_emoji = {
+                    'CRITICAL': '🔴',
+                    'HIGH': '🟠',
+                    'MEDIUM': '🟡',
+                    'LOW': '🟢'
+                }.get(priority, '⚪')
+
+                markdown += f"#### {i}. {risk_desc} {priority_emoji}\n"
+                markdown += f"*{priority} priority | {probability:.0f}% probability*\n\n"
+
+                markdown += "**Recommended Tactics:**\n"
+                for tactic in tactics:
+                    markdown += f"- {tactic}\n"
+                markdown += "\n"
+
+        # Early warning signs
+        early_warnings = self.vulnerability_analysis.get('early_warning_signs', [])
+        if early_warnings:
+            markdown += "### Early Warning Signs to Monitor\n\n"
+            markdown += "*Watch for these red flags in your first reviews:*\n\n"
+
+            for warning in early_warnings:
+                markdown += f"- {warning}\n"
+            markdown += "\n"
+
+            markdown += "**Action Plan:**\n"
+            markdown += "1. **First 24 hours:** Read ALL reviews, respond to critical bugs immediately\n"
+            markdown += "2. **First week:** Track review themes, prioritize fixes for most-mentioned issues\n"
+            markdown += "3. **First month:** Analyze negative review patterns, plan content updates\n"
+            markdown += "4. **Ongoing:** Maintain <72h response time to critical issues\n\n"
+
+        # Key insights
+        markdown += "### Risk Assessment Insights\n\n"
+
+        if self.score >= 75:
+            markdown += "✅ **Minimal Risk** - Your game has low vulnerability to common negative review themes. Maintain quality standards.\n\n"
+        elif self.score >= 55:
+            markdown += "✅ **Low Risk** - Your game has manageable risk exposure. Focus on the high-priority mitigations above.\n\n"
+        elif self.score >= 35:
+            markdown += "⚠️ **Medium Risk** - Several vulnerabilities detected. Implement mitigation strategies before launch.\n\n"
+        else:
+            markdown += "❌ **High Risk** - Critical vulnerabilities detected. Delay launch if needed to address CRITICAL priority issues.\n\n"
+
+        markdown += "**Best Practices for Risk Prevention:**\n"
+        markdown += "1. **Beta Test Extensively** - 50+ testers before launch, focus on bug hunting\n"
+        markdown += "2. **Set Expectations Clearly** - Communicate playtime, content, features on store page\n"
+        markdown += "3. **Price Competitively** - Research competitor pricing, consider launch discount\n"
+        markdown += "4. **Monitor Reviews Daily** - First month is critical for reputation\n"
+        markdown += "5. **Respond Quickly** - Patch critical bugs within 48h of discovery\n"
+        markdown += "6. **Be Transparent** - Communicate roadmap, updates, and fixes publicly\n\n"
+
+        return markdown
+
+
+class CustomDashboardSection(ReportSection):
+    """Custom tracking dashboard and tools"""
+
+    def __init__(self, section_name: str, data: Dict[str, Any]):
+        super().__init__(section_name, data)
+        self.dashboard_data = None
+
+    def analyze(self) -> Dict[str, Any]:
+        """Generate custom dashboard"""
+        from src.dashboard_generator import DashboardGenerator
+
+        game_data = self.data.get('game_data', {})
+        sales_data = self.data.get('sales_data', {})
+        competitor_data = self.data.get('competitor_data', [])
+
+        generator = DashboardGenerator()
+        self.dashboard_data = generator.generate_dashboard(
+            game_data, sales_data, competitor_data
+        )
+
+        # Dashboard always scores 100 (it's a tool, not evaluated)
+        self.score = 100
+        self.rating = 'excellent'
+        self.analyzed = True
+
+        return {
+            'score': self.score,
+            'rating': self.rating,
+            'dashboard_data': self.dashboard_data
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate markdown for custom dashboard"""
+        if not self.analyzed:
+            self.analyze()
+
+        markdown = f"## {self.section_name}\n\n"
+        markdown += "**Copy these tracking templates to Google Sheets or Excel for daily monitoring.**\n\n"
+
+        # Instructions
+        instructions = self.dashboard_data.get('instructions', '')
+        if instructions:
+            markdown += instructions
+            markdown += "\n---\n\n"
+
+        # KPI Tracker
+        kpi_tracker = self.dashboard_data.get('kpi_tracker', '')
+        if kpi_tracker:
+            markdown += kpi_tracker
+            markdown += "\n---\n\n"
+
+        # Conversion Calculator
+        conversion_calc = self.dashboard_data.get('conversion_calculator', '')
+        if conversion_calc:
+            markdown += conversion_calc
+            markdown += "\n---\n\n"
+
+        # Launch Timeline
+        launch_timeline = self.dashboard_data.get('launch_timeline', '')
+        if launch_timeline:
+            markdown += launch_timeline
+            markdown += "\n---\n\n"
+
+        # Competitor Tracker
+        competitor_tracker = self.dashboard_data.get('competitor_tracker', '')
+        if competitor_tracker:
+            markdown += competitor_tracker
+            markdown += "\n---\n\n"
+
+        # Marketing Tracker
+        marketing_tracker = self.dashboard_data.get('marketing_tracker', '')
+        if marketing_tracker:
+            markdown += marketing_tracker
+            markdown += "\n"
+
+        return markdown
+
+
 class ReportBuilder:
     """Orchestrates report generation from multiple sections"""
 
@@ -1695,6 +2120,21 @@ class ReportBuilder:
         })
         self.add_section(growth_section)
 
+        # Create tag insights section FIFTH (tag effectiveness with impression estimates)
+        tag_section = TagInsightsSection("Tag Insights", {
+            'game_data': self.game_data,
+            'sales_data': self.sales_data
+        })
+        self.add_section(tag_section)
+
+        # Create review vulnerability section SIXTH (risk assessment from competitor reviews)
+        vulnerability_section = ReviewVulnerabilitySection("Review Vulnerability & Risk Assessment", {
+            'game_data': self.game_data,
+            'sales_data': self.sales_data,
+            'competitor_data': self.competitor_data
+        })
+        self.add_section(vulnerability_section)
+
         # Create standard sections
         competitor_section = CompetitorSection("Competitors", {
             'competitors': self.competitor_data,
@@ -1720,6 +2160,14 @@ class ReportBuilder:
             'report_type': self.report_type
         })
         self.add_section(marketing_section)
+
+        # Create custom dashboard section LAST (tracking tools)
+        dashboard_section = CustomDashboardSection("Custom Tracking Dashboard", {
+            'game_data': self.game_data,
+            'sales_data': self.sales_data,
+            'competitor_data': self.competitor_data
+        })
+        self.add_section(dashboard_section)
 
         # Create executive summary (references other sections)
         self.executive_summary = ExecutiveSummarySection({
