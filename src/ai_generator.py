@@ -778,7 +778,11 @@ Generate a comprehensive, professional report with these sections:
    - Revenue analysis (use confidence ranges: {sales_data.get('revenue_range', 'N/A')})
    - Sales trends and trajectory
    - Pricing effectiveness
-   - Consider estimation method: {sales_data.get('estimation_method', 'N/A')}
+   - Data quality context:
+     * Estimation method: {sales_data.get('estimation_method', 'N/A')}
+     * Confidence level: {sales_data.get('confidence', 'N/A')}
+     * Data source: {sales_data.get('data_source', 'N/A')}
+     * Signals used: {', '.join(sales_data.get('signals_used', [])) if sales_data.get('signals_used') else 'N/A'}
 
 4. **MARKETING EFFECTIVENESS**
    - Pre-launch and launch marketing assessment
@@ -916,18 +920,46 @@ Recommendations:
         competitor_data: List[Dict[str, Any]]
     ) -> List[str]:
         """
-        Detect if fallback/placeholder data is being used
+        Detect if fallback/placeholder data is being used and provide transparency
 
         Returns:
-            List of warning messages for each type of fallback data detected
+            List of warning/info messages about data sources and quality
         """
         warnings = []
 
-        # Check if sales data is fallback
-        if (sales_data.get('app_id') == 'unknown' or
-            str(sales_data.get('app_id', '')).startswith('fallback') or
-            sales_data.get('estimation_method') == 'fallback'):
-            warnings.append("Sales and revenue data is using estimated fallback values (API data unavailable)")
+        # Get data source information
+        estimation_method = sales_data.get('estimation_method', 'unknown')
+        data_source = sales_data.get('data_source', 'Unknown')
+        confidence = sales_data.get('confidence', 'unknown')
+
+        # Check different data sources and add appropriate transparency messages
+        if estimation_method == 'rawg_smart_estimation':
+            # RAWG + Smart Estimation - This is good data, just estimated
+            signals = sales_data.get('signals_used', [])
+            signals_str = ', '.join(signals) if signals else 'multiple indicators'
+
+            info_msg = f"📊 **Data Source:** RAWG API + Smart Estimation (Confidence: {confidence.upper()})"
+            info_msg += f"\n   - Ownership and revenue estimates based on {signals_str}"
+            info_msg += "\n   - More accurate than generic fallback, but not official Steam data"
+            warnings.append(info_msg)
+
+        elif estimation_method == 'alternative_source':
+            # Steam scraping worked - this is good data
+            info_msg = "✓ **Data Source:** Steam Store Scraping (Real Data)"
+            info_msg += "\n   - Ownership estimates based on review count analysis"
+            warnings.append(info_msg)
+
+        elif (sales_data.get('app_id') == 'unknown' or
+              str(sales_data.get('app_id', '')).startswith('fallback') or
+              estimation_method == 'fallback' or
+              estimation_method == 'minimal'):
+            # Generic fallback - low quality
+            warnings.append("⚠️ Sales and revenue data is using generic fallback values (all APIs unavailable)")
+
+        else:
+            # Unknown method - show what we have
+            if estimation_method and estimation_method != 'unknown':
+                warnings.append(f"📊 **Data Source:** {data_source} (Method: {estimation_method}, Confidence: {confidence})")
 
         # Check if competitors are fallback
         fallback_competitor_count = sum(
@@ -937,34 +969,64 @@ Recommendations:
 
         if fallback_competitor_count > 0:
             if fallback_competitor_count == len(competitor_data):
-                warnings.append("All competitor data is using placeholder values (no real competitors found)")
+                warnings.append("⚠️ All competitor data is using placeholder values (no real competitors found)")
             else:
-                warnings.append(f"{fallback_competitor_count} of {len(competitor_data)} competitors are placeholder values")
+                warnings.append(f"⚠️ {fallback_competitor_count} of {len(competitor_data)} competitors are placeholder values")
 
         return warnings
 
     def _add_fallback_warnings(self, report: str, warnings: List[str]) -> str:
         """
-        Add prominent warnings to the report when fallback data is detected
+        Add data source transparency and warnings to the report
 
         Args:
             report: The generated report markdown
-            warnings: List of warning messages
+            warnings: List of warning/info messages about data sources
 
         Returns:
-            Modified report with warnings at the top
+            Modified report with transparency information at the top
         """
-        warning_section = "---\n\n## ⚠️ DATA QUALITY WARNING\n\n"
-        warning_section += "**This report contains incomplete data. Please review carefully:**\n\n"
+        # Separate warnings from info messages
+        has_serious_warnings = any('⚠️' in w and 'fallback' in w.lower() for w in warnings)
+        has_estimation = any('RAWG' in w or 'Smart Estimation' in w for w in warnings)
 
-        for warning in warnings:
-            warning_section += f"- ⚠️ {warning}\n"
+        if has_serious_warnings:
+            # Serious data quality issues
+            warning_section = "---\n\n## ⚠️ DATA QUALITY WARNING\n\n"
+            warning_section += "**This report contains incomplete data. Please review carefully:**\n\n"
 
-        warning_section += "\n**Impact:** The analysis below may not accurately reflect actual performance. "
-        warning_section += "Real-time API data could not be retrieved. Please verify critical metrics independently.\n\n"
-        warning_section += "**Recommendation:** Try regenerating the report, or check if the game exists on Steam. "
-        warning_section += "If the issue persists, some Steam API endpoints may be temporarily unavailable.\n\n"
-        warning_section += "---\n\n"
+            for warning in warnings:
+                # Don't add extra ⚠️ if message already has one
+                if warning.startswith('⚠️') or warning.startswith('✓') or warning.startswith('📊'):
+                    warning_section += f"{warning}\n\n"
+                else:
+                    warning_section += f"- ⚠️ {warning}\n"
+
+            warning_section += "\n**Impact:** The analysis below may not accurately reflect actual performance. "
+            warning_section += "Real-time API data could not be retrieved. Please verify critical metrics independently.\n\n"
+            warning_section += "**Recommendation:** Try regenerating the report, or check if the game exists on Steam. "
+            warning_section += "If the issue persists, some Steam API endpoints may be temporarily unavailable.\n\n"
+            warning_section += "---\n\n"
+
+        elif has_estimation:
+            # RAWG estimation - info rather than warning
+            warning_section = "---\n\n## 📊 Data Source Information\n\n"
+
+            for warning in warnings:
+                warning_section += f"{warning}\n\n"
+
+            warning_section += "**Note:** While these estimates are based on multiple quality signals, they may not perfectly "
+            warning_section += "reflect actual Steam performance. Use as directional guidance rather than exact figures.\n\n"
+            warning_section += "---\n\n"
+
+        else:
+            # Best case - real data or minimal issues
+            warning_section = "---\n\n## ℹ️ Data Source\n\n"
+
+            for warning in warnings:
+                warning_section += f"{warning}\n\n"
+
+            warning_section += "---\n\n"
 
         # Insert warnings after the first heading (title)
         lines = report.split('\n')
