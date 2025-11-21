@@ -1075,6 +1075,188 @@ class MarketViabilitySection(ReportSection):
             return "🚨 **Insight**: Highly competitive market. Strong differentiation and marketing budget essential."
 
 
+class ConversionFunnelSection(ReportSection):
+    """Conversion funnel analysis with benchmarks and projections"""
+
+    def analyze(self) -> Dict[str, Any]:
+        """Analyze conversion funnel"""
+        logger.info("Analyzing conversion funnel")
+
+        from src.conversion_funnel import ConversionFunnelAnalyzer
+
+        game_data = self.data.get('game_data', {})
+        sales_data = self.data.get('sales_data', {})
+        capsule_analysis = self.data.get('capsule_analysis')
+
+        analyzer = ConversionFunnelAnalyzer()
+        self.funnel_data = analyzer.analyze_funnel(game_data, sales_data, capsule_analysis)
+
+        # Score based on overall efficiency
+        self.score = self.funnel_data['overall_efficiency']['score']
+        self.rating = self.get_rating()
+        self.analyzed = True
+
+        return {
+            'score': self.score,
+            'rating': self.rating
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate conversion funnel markdown"""
+        if not self.analyzed:
+            self.analyze()
+
+        funnel = self.funnel_data
+        stages = funnel['funnel_stages']
+        benchmarks = funnel['genre_benchmarks']
+        projections = funnel['projections']
+        optimizations = funnel['optimizations']
+        efficiency = funnel['overall_efficiency']
+
+        rating_emoji = {'excellent': '✅', 'good': '🟢', 'fair': '🟡', 'poor': '🔴'}
+        emoji = rating_emoji.get(self.rating, '⚪')
+
+        vs_emoji = {'above': '✅', 'at': '➡️', 'below': '⚠️'}
+
+        markdown = f"""## Conversion Funnel Analysis
+
+**Overall Efficiency: {efficiency['score']}/100** {emoji} {efficiency['tier']}
+
+Understanding your conversion funnel reveals where you're losing potential customers and where optimization efforts will have the biggest impact.
+
+---
+
+### Your Estimated Conversion Funnel
+
+**Genre**: {funnel['genre'].title()} (benchmarks adjusted for genre performance)
+
+| Stage | Your Rate | Genre Avg | Performance |
+|-------|-----------|-----------|-------------|
+| **Capsule CTR** (Impression → Visit) | {stages['capsule_ctr']['percentage']}% | {stages['capsule_ctr']['benchmark_percentage']}% | {vs_emoji.get(stages['capsule_ctr']['vs_benchmark'], '➡️')} {stages['capsule_ctr']['vs_benchmark'].upper()} |
+| **Wishlist Conv** (Visit → Wishlist) | {stages['wishlist_conversion']['percentage']}% | {stages['wishlist_conversion']['benchmark_percentage']}% | {vs_emoji.get(stages['wishlist_conversion']['vs_benchmark'], '➡️')} {stages['wishlist_conversion']['vs_benchmark'].upper()} |
+| **Purchase Conv** (Wishlist → Purchase) | {stages['purchase_conversion']['percentage']}% | {stages['purchase_conversion']['benchmark_percentage']}% | {vs_emoji.get(stages['purchase_conversion']['vs_benchmark'], '➡️')} {stages['purchase_conversion']['vs_benchmark'].upper()} |
+| **Review Ratio** (Purchase → Review) | {stages['review_ratio']['percentage']}% | {stages['review_ratio']['benchmark_percentage']}% | {vs_emoji.get(stages['review_ratio']['vs_benchmark'], '➡️')} {stages['review_ratio']['vs_benchmark'].upper()} |
+
+---
+
+### Performance Projections
+
+Here's what your current funnel efficiency projects at different traffic levels:
+
+"""
+
+        # Add projections table
+        proj_100k = projections.get('100k_impressions', {})
+        proj_250k = projections.get('250k_impressions', {})
+        proj_500k = projections.get('500k_impressions', {})
+
+        markdown += f"""| Impressions | Visits | Wishlists | Purchases | Reviews | Revenue |
+|-------------|--------|-----------|-----------|---------|---------|
+| 100,000 | {proj_100k.get('visits', 0):,} | {proj_100k.get('wishlists', 0):,} | {proj_100k.get('purchases', 0):,} | {proj_100k.get('reviews', 0)} | ${proj_100k.get('revenue', 0):,.0f} |
+| 250,000 | {proj_250k.get('visits', 0):,} | {proj_250k.get('wishlists', 0):,} | {proj_250k.get('purchases', 0):,} | {proj_250k.get('reviews', 0)} | ${proj_250k.get('revenue', 0):,.0f} |
+| 500,000 | {proj_500k.get('visits', 0):,} | {proj_500k.get('wishlists', 0):,} | {proj_500k.get('purchases', 0):,} | {proj_500k.get('reviews', 0)} | ${proj_500k.get('revenue', 0):,.0f} |
+
+**Example**: With 100,000 impressions, your current funnel efficiency projects:
+- **{proj_100k.get('visits', 0):,}** store page visits ({stages['capsule_ctr']['percentage']}% CTR)
+- **{proj_100k.get('wishlists', 0):,}** wishlist adds ({stages['wishlist_conversion']['percentage']}% conversion)
+- **{proj_100k.get('purchases', 0):,}** purchases ({stages['purchase_conversion']['percentage']}% conversion)
+- **${proj_100k.get('revenue', 0):,.0f}** in revenue
+
+---
+
+### Optimization Opportunities
+
+"""
+
+        if optimizations:
+            markdown += "Based on your current funnel vs. genre benchmarks, here are the highest-impact optimization opportunities:\n\n"
+
+            for i, opp in enumerate(optimizations, 1):
+                priority_emoji = {'HIGH': '🔴', 'MEDIUM': '🟡', 'LOW': '🟢'}
+                emoji = priority_emoji.get(opp['priority'], '⚪')
+
+                markdown += f"""#### {i}. {opp['stage']} Optimization {emoji} {opp['priority']} PRIORITY
+
+**Current Performance**: {opp['current']}%
+**Target (Genre Average)**: {opp['target']}%
+**Gap**: +{opp['improvement_points']} percentage points
+
+**Projected Impact** (at 100K impressions):
+"""
+                impact = opp['impact']
+                if 'additional_wishlists' in impact:
+                    markdown += f"- **+{impact['additional_wishlists']:,} wishlists**\n"
+                if 'additional_purchases' in impact:
+                    markdown += f"- **+{impact['additional_purchases']:,} purchases**\n"
+                if 'additional_revenue' in impact:
+                    markdown += f"- **+${impact['additional_revenue']:,.0f} revenue**\n"
+
+                markdown += f"\n**Recommended Tactics**:\n"
+                for tactic in opp.get('tactics', []):
+                    markdown += f"- {tactic}\n"
+
+                markdown += "\n"
+        else:
+            markdown += "✅ **Excellent!** Your funnel is performing at or above genre benchmarks across all stages. Focus on scaling traffic.\n\n"
+
+        markdown += """---
+
+### Stage-Specific Insights
+
+"""
+
+        # Capsule CTR insights
+        ctr = stages['capsule_ctr']
+        markdown += f"""**1. Capsule CTR ({ctr['percentage']}%)**
+- Tier: {ctr['tier'].title()}
+- Key factors: Capsule quality ({ctr['factors']['capsule_quality']:.2f}x), Genre fit ({ctr['factors']['genre_fit']:.2f}x), Tag effectiveness ({ctr['factors']['tag_effectiveness']:.2f}x)
+"""
+        if ctr['vs_benchmark'] == 'below':
+            markdown += f"- ⚠️ Below genre average - capsule redesign should be top priority\n"
+        elif ctr['vs_benchmark'] == 'above':
+            markdown += f"- ✅ Above genre average - capsule is performing well\n"
+
+        # Wishlist conversion insights
+        wish = stages['wishlist_conversion']
+        markdown += f"""
+**2. Wishlist Conversion ({wish['percentage']}%)**
+- Tier: {wish['tier'].title()}
+- Key factors: Review quality ({wish['factors']['review_quality']:.2f}x), Price positioning ({wish['factors']['price_positioning']:.2f}x), Genre fit ({wish['factors']['genre_fit']:.2f}x)
+"""
+        if wish['vs_benchmark'] == 'below':
+            markdown += f"- ⚠️ Below genre average - improve trailer, screenshots, or store description\n"
+        elif wish['vs_benchmark'] == 'above':
+            markdown += f"- ✅ Above genre average - store page is converting well\n"
+
+        # Purchase conversion insights
+        purch = stages['purchase_conversion']
+        markdown += f"""
+**3. Purchase Conversion ({purch['percentage']}%)**
+- Tier: {purch['tier'].title()}
+- Key factors: Review quality ({purch['factors']['review_quality']:.2f}x), Price point ({purch['factors']['price_point']:.2f}x), Genre fit ({purch['factors']['genre_fit']:.2f}x)
+"""
+        if purch['vs_benchmark'] == 'below':
+            markdown += f"- ⚠️ Below genre average - focus on launch quality, pricing, or building hype\n"
+        elif purch['vs_benchmark'] == 'above':
+            markdown += f"- ✅ Above genre average - strong value proposition and trust signals\n"
+
+        # Review ratio insights
+        review = stages['review_ratio']
+        markdown += f"""
+**4. Review Ratio ({review['percentage']}%)**
+- Tier: {review['tier'].title()}
+- Key factors: Engagement level ({review['factors']['engagement_level']:.2f}x), Genre fit ({review['factors']['genre_fit']:.2f}x)
+"""
+        if review['vs_benchmark'] == 'below':
+            markdown += f"- ⚠️ Below genre average - consider engagement hooks or review prompts\n"
+        elif review['vs_benchmark'] == 'above':
+            markdown += f"- ✅ Above genre average - strong player engagement\n"
+
+        markdown += "\n---\n\n"
+
+        return markdown
+
+
 class ReportBuilder:
     """Orchestrates report generation from multiple sections"""
 
@@ -1107,6 +1289,14 @@ class ReportBuilder:
             'sales_data': self.sales_data
         })
         self.add_section(viability_section)
+
+        # Create conversion funnel section SECOND (hard data for projections)
+        funnel_section = ConversionFunnelSection("Conversion Funnel", {
+            'game_data': self.game_data,
+            'sales_data': self.sales_data,
+            'capsule_analysis': getattr(self, 'capsule_analysis', None)
+        })
+        self.add_section(funnel_section)
 
         # Create standard sections
         competitor_section = CompetitorSection("Competitors", {
