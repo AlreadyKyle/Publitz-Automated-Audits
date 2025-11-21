@@ -149,6 +149,16 @@ class SteamDBScraper:
             else:
                 revenue_range = f"${confidence_low/1000000:,.1f}M - ${confidence_high/1000000:,.1f}M"
 
+            # Determine confidence level based on data quality
+            if total_reviews > 5000:
+                confidence_level = 'high'
+            elif total_reviews > 1000:
+                confidence_level = 'medium-high'
+            elif total_reviews > 100:
+                confidence_level = 'medium'
+            else:
+                confidence_level = 'low-medium'
+
             return {
                 'app_id': app_id,
                 'owners_min': owners_range['min'],
@@ -161,6 +171,9 @@ class SteamDBScraper:
                 'revenue_confidence_low': confidence_low,  # NEW: Low estimate
                 'revenue_confidence_high': confidence_high,  # NEW: High estimate
                 'estimation_method': 'review-based' if review_based_revenue > steamspy_revenue else 'ownership-based',  # NEW: Which method used
+                'confidence': confidence_level,
+                'data_source': 'SteamSpy API',
+                'signals_used': ['ownership_data', 'review_count', 'review_score'],
                 'quality_multiplier': quality_multiplier,  # NEW: Applied multiplier
                 'price': f"${price:.2f}",
                 'price_raw': price,
@@ -195,6 +208,9 @@ class SteamDBScraper:
             'revenue_confidence_low': alt_data.get('revenue_confidence_low', 0),
             'revenue_confidence_high': alt_data.get('revenue_confidence_high', 0),
             'estimation_method': alt_data.get('estimation_method', 'alternative_source'),
+            'confidence': alt_data.get('confidence', 'medium'),
+            'data_source': alt_data.get('data_source', 'Alternative Sources'),
+            'signals_used': alt_data.get('signals_used', []),
             'quality_multiplier': alt_data.get('quality_multiplier', 1.0),
             'price': alt_data.get('price', '$0.00'),
             'price_raw': alt_data.get('price_raw', 0),
@@ -236,6 +252,9 @@ class SteamDBScraper:
             'revenue_confidence_low': 90000,
             'revenue_confidence_high': 270000,
             'estimation_method': 'fallback',
+            'confidence': 'low',
+            'data_source': 'Generic Estimation (No API Data Available)',
+            'signals_used': [],
             'quality_multiplier': 1.0,
             'price': '$14.99',
             'price_raw': 14.99,

@@ -102,13 +102,13 @@ def generate_pdf_report(
         pdf.set_font('Arial', 'B', 10)
         if not needs_correction and quality_score >= 80:
             pdf.set_text_color(39, 174, 96)  # Green
-            badge_text = f'✓ High Quality Report (Score: {quality_score}/100)'
+            badge_text = f'[YES] High Quality Report (Score: {quality_score}/100)'
         elif quality_score >= 60:
             pdf.set_text_color(243, 156, 18)  # Orange
-            badge_text = f'✓ Verified Report (Score: {quality_score}/100)'
+            badge_text = f'[YES] Verified Report (Score: {quality_score}/100)'
         else:
             pdf.set_text_color(52, 152, 219)  # Blue
-            badge_text = f'✓ Analyzed Report (Score: {quality_score}/100)'
+            badge_text = f'[YES] Analyzed Report (Score: {quality_score}/100)'
 
         pdf.cell(0, 8, badge_text, 0, 1, 'C')
 
@@ -128,8 +128,53 @@ def generate_pdf_report(
     return bytes(pdf.output())
 
 
+def _clean_unicode_for_pdf(text: str) -> str:
+    """Replace Unicode characters with ASCII equivalents for PDF compatibility"""
+    # Replace checkmarks and symbols
+    replacements = {
+        '✓': '[YES]',
+        '✗': '[NO]',
+        '→': '->',
+        '←': '<-',
+        '↑': '^',
+        '↓': 'v',
+        '•': '*',
+        '…': '...',
+        '"': '"',
+        '"': '"',
+        ''': "'",
+        ''': "'",
+        '—': '-',
+        '–': '-',
+        '×': 'x',
+        '÷': '/',
+        '≈': '~',
+        '≥': '>=',
+        '≤': '<=',
+        '≠': '!=',
+        '°': ' degrees',
+        '©': '(c)',
+        '®': '(R)',
+        '™': '(TM)',
+        '€': 'EUR',
+        '£': 'GBP',
+        '¥': 'JPY',
+    }
+
+    for unicode_char, ascii_replacement in replacements.items():
+        text = text.replace(unicode_char, ascii_replacement)
+
+    # Remove any remaining non-ASCII characters
+    text = text.encode('ascii', 'ignore').decode('ascii')
+
+    return text
+
+
 def _parse_markdown_to_pdf(pdf: PDFReportGenerator, markdown_text: str):
     """Parse markdown and add to PDF with proper formatting"""
+
+    # Clean Unicode characters before parsing
+    markdown_text = _clean_unicode_for_pdf(markdown_text)
 
     lines = markdown_text.split('\n')
 
