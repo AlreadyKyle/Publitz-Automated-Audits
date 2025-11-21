@@ -1257,6 +1257,209 @@ Here's what your current funnel efficiency projects at different traffic levels:
         return markdown
 
 
+class VisibilityForecastSection(ReportSection):
+    """Steam algorithm visibility forecast and discovery queue predictions"""
+
+    def analyze(self) -> Dict[str, Any]:
+        """Analyze visibility forecast"""
+        logger.info("Analyzing visibility forecast")
+
+        from src.visibility_forecast import VisibilityForecastAnalyzer
+
+        game_data = self.data.get('game_data', {})
+        sales_data = self.data.get('sales_data', {})
+        capsule_analysis = self.data.get('capsule_analysis')
+
+        analyzer = VisibilityForecastAnalyzer()
+        self.visibility_data = analyzer.analyze_visibility(game_data, sales_data, capsule_analysis)
+
+        # Score based on overall visibility score
+        self.score = int(self.visibility_data['overall_score'])
+        self.rating = self.get_rating()
+        self.analyzed = True
+
+        return {
+            'score': self.score,
+            'rating': self.rating
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate visibility forecast markdown"""
+        if not self.analyzed:
+            self.analyze()
+
+        vis = self.visibility_data
+        tier = vis['current_tier']
+        score = vis['overall_score']
+        components = vis['component_scores']
+        discovery = vis['discovery_predictions']
+        features = vis['feature_eligibility']
+        improvement = vis['improvement_path']
+
+        rating_emoji = {'excellent': '✅', 'good': '🟢', 'fair': '🟡', 'poor': '🔴'}
+        emoji = rating_emoji.get(self.rating, '⚪')
+
+        tier_emoji = {1: '👑', 2: '⭐', 3: '📊', 4: '📉'}
+        t_emoji = tier_emoji.get(tier, '📊')
+
+        markdown = f"""## Steam Algorithm Visibility Forecast
+
+**Visibility Score: {score}/100** {emoji} {self.rating.title()}
+**Current Tier: Tier {tier}** {t_emoji}
+
+{vis['tier_description']}
+
+---
+
+### Component Scores
+
+Your visibility score is calculated from four key factors:
+
+| Component | Score | Weight | Impact |
+|-----------|-------|--------|--------|
+| **Wishlist Velocity** | {components['wishlist_velocity']}/100 | 40% | {'🔴 Critical' if components['wishlist_velocity'] < 60 else '🟡 Moderate' if components['wishlist_velocity'] < 75 else '🟢 Strong'} |
+| **Tag Effectiveness** | {components['tag_effectiveness']}/100 | 25% | {'🔴 Weak' if components['tag_effectiveness'] < 60 else '🟡 Average' if components['tag_effectiveness'] < 75 else '🟢 Good'} |
+| **Engagement Level** | {components['engagement']}/100 | 20% | {'🔴 Low' if components['engagement'] < 60 else '🟡 Medium' if components['engagement'] < 75 else '🟢 High'} |
+| **Quality Signals** | {components['quality']}/100 | 15% | {'🔴 Poor' if components['quality'] < 60 else '🟡 Fair' if components['quality'] < 75 else '🟢 Excellent'} |
+
+---
+
+### Discovery Queue Predictions
+
+Based on your Tier {tier} status, here's your estimated algorithmic distribution:
+
+**Daily Impression Estimates:**
+- Main Discovery Queue: ~{discovery['daily_impressions']['main']:,} impressions/day
+- Genre-Specific Queues: ~{discovery['daily_impressions']['genre']:,} impressions/day
+"""
+
+        if discovery['daily_impressions']['featured'] > 0:
+            markdown += f"- Featured Placements: ~{discovery['daily_impressions']['featured']:,} impressions/day\n"
+
+        markdown += f"""
+**Total: ~{discovery['total_daily_impressions']:,} impressions/day**
+- Weekly: ~{discovery['weekly_impressions']:,} impressions
+- Monthly: ~{discovery['monthly_impressions']:,} impressions
+
+**Queue Types You're Likely Appearing In:**
+"""
+
+        for queue_type in discovery['queue_types']:
+            markdown += f"- {queue_type}\n"
+
+        markdown += "\n---\n\n### Steam Feature Eligibility\n\n"
+
+        # Popular Upcoming
+        pu = features['popular_upcoming']
+        pu_status = "✅ ELIGIBLE" if pu['eligible'] else f"❌ NOT ELIGIBLE (need +{pu['gap']:.1f} points)"
+        markdown += f"""**Popular Upcoming (Pre-Launch Feature)**
+- Status: {pu_status}
+- Probability: {pu['probability']:.0f}%
+- Requirement: {pu['score_requirement']}+ visibility score
+- Your Score: {pu['your_score']}
+
+"""
+
+        # Featured Placement
+        feat = features['featured_placement']
+        feat_status = "✅ ELIGIBLE" if feat['eligible'] else f"❌ NOT ELIGIBLE"
+        if not feat['eligible']:
+            reasons = []
+            if feat['your_score'] < feat['score_requirement']:
+                reasons.append(f"Score gap: +{feat['gap']:.1f} points needed")
+            if feat['your_reviews'] < feat['review_requirement']:
+                reasons.append(f"Need {feat['review_requirement'] - feat['your_reviews']} more reviews")
+            feat_status += f" ({', '.join(reasons)})"
+
+        markdown += f"""**Featured Placement**
+- Status: {feat_status}
+- Probability: {feat['probability']:.0f}%
+- Requirements: {feat['score_requirement']}+ score, {feat['review_requirement']}+ reviews
+- Your Metrics: {feat['your_score']} score, {feat['your_reviews']} reviews
+
+"""
+
+        # Daily Deal
+        dd = features['daily_deal']
+        dd_status = "✅ ELIGIBLE" if dd['eligible'] else "❌ NOT ELIGIBLE"
+        markdown += f"""**Daily Deal**
+- Status: {dd_status}
+- Probability: {dd['probability']:.0f}%
+- Requirements: {dd['requirements']['score']}+ score, {dd['requirements']['reviews']}+ reviews, {dd['requirements']['review_score']}%+ rating
+- Your Metrics: {dd['your_metrics']['score']} score, {dd['your_metrics']['reviews']} reviews, {dd['your_metrics']['review_score']}% rating
+
+"""
+
+        # New & Trending
+        nt = features['new_and_trending']
+        nt_status = "✅ ELIGIBLE" if nt['eligible'] else f"❌ NOT ELIGIBLE (need +{max(0, nt['score_requirement'] - nt['your_score']):.1f} points)"
+        markdown += f"""**New & Trending**
+- Status: {nt_status}
+- Probability: {nt['probability']:.0f}%
+- Requirements: {nt['score_requirement']}+ score, {nt['review_requirement']}+ reviews
+- Your Metrics: {nt['your_score']} score, {nt['your_reviews']} reviews
+
+"""
+
+        markdown += "---\n\n### Path to "
+
+        if improvement['current_tier'] == 1:
+            markdown += "Maintaining Elite Status\n\n"
+            markdown += f"🎉 **Congratulations!** You're in Tier 1 (Top 1%).\n\n"
+            markdown += f"**Focus**: Maintain your {improvement['current_score']}/100 score and scale traffic to this high-performing visibility tier.\n\n"
+        else:
+            markdown += f"Tier {improvement['next_tier']}\n\n"
+            markdown += f"**Target**: {improvement['target_score']} points (you need **+{improvement['points_needed']} points**)\n\n"
+
+            if improvement['points_needed'] > 0:
+                markdown += f"**Weakest Areas** (biggest improvement opportunities):\n"
+                for area in improvement['weakest_areas'][:3]:
+                    area_name = area.replace('_', ' ').title()
+                    markdown += f"- {area_name}\n"
+                markdown += "\n"
+
+        markdown += "**Prioritized Improvement Recommendations:**\n\n"
+
+        for i, rec in enumerate(improvement['recommendations'], 1):
+            priority_emoji = {'HIGH': '🔴', 'MEDIUM': '🟡', 'LOW': '🟢'}
+            p_emoji = priority_emoji.get(rec['priority'], '⚪')
+
+            markdown += f"""#### {i}. {rec['area']} {p_emoji} {rec['priority']} PRIORITY
+
+**Current Score**: {rec['current_score']:.1f}/100
+**Potential Impact**: {rec['impact']}
+
+**Action Items**:
+"""
+            for action in rec['actions']:
+                markdown += f"- {action}\n"
+
+            markdown += "\n"
+
+        # Projected outcome
+        proj = improvement['projected_outcome']
+        markdown += f"""---
+
+### Projected Impact of Improvements
+
+If you implement the top 2-3 recommendations above:
+
+**Score Improvement**: {improvement['current_score']:.1f} → {proj['score_after_improvements']:.1f} (+{proj['score_after_improvements'] - improvement['current_score']:.1f} points)
+**Tier Change**: Tier {improvement['current_tier']} → Tier {proj['tier_after_improvements']}
+**Impression Increase**: +{proj['impression_increase_daily']:,} impressions/day (+{proj['impression_increase_monthly']:,}/month)
+
+"""
+
+        if proj['tier_after_improvements'] < improvement['current_tier']:
+            markdown += f"🎯 **This would move you from Tier {improvement['current_tier']} to Tier {proj['tier_after_improvements']}** - significantly increasing your algorithmic distribution!\n\n"
+        elif proj['score_after_improvements'] > improvement['current_score'] + 5:
+            markdown += f"📈 **This would strengthen your position in Tier {improvement['current_tier']}** and move you closer to the next tier!\n\n"
+
+        markdown += "---\n\n"
+
+        return markdown
+
+
 class ReportBuilder:
     """Orchestrates report generation from multiple sections"""
 
@@ -1297,6 +1500,14 @@ class ReportBuilder:
             'capsule_analysis': getattr(self, 'capsule_analysis', None)
         })
         self.add_section(funnel_section)
+
+        # Create visibility forecast section THIRD (algorithm predictions)
+        visibility_section = VisibilityForecastSection("Visibility Forecast", {
+            'game_data': self.game_data,
+            'sales_data': self.sales_data,
+            'capsule_analysis': getattr(self, 'capsule_analysis', None)
+        })
+        self.add_section(visibility_section)
 
         # Create standard sections
         competitor_section = CompetitorSection("Competitors", {
