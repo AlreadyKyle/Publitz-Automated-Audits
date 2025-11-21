@@ -259,15 +259,135 @@ class ExecutiveSummarySection(ReportSection):
                 emoji_icon = priority_emoji.get(priority_val, '⚪')
 
                 markdown += f"### {i}. {emoji_icon} {action.title}\n\n"
-                markdown += f"**Priority:** {priority_val.title()} | **Impact:** {impact_label}\n\n"
+                markdown += f"**Priority:** {priority_val.title()} | **Impact:** {impact_label}"
+
+                # Add effort and cost if available
+                if hasattr(action, 'effort') and action.effort:
+                    effort_val = action.effort.value if hasattr(action.effort, 'value') else action.effort
+                    markdown += f" | **Effort:** {effort_val.title()}"
+                if hasattr(action, 'estimated_cost') and action.estimated_cost:
+                    markdown += f" | **Cost:** {action.estimated_cost}"
+                if hasattr(action, 'time_estimate') and action.time_estimate:
+                    markdown += f" | **Time:** {action.time_estimate}"
+
+                markdown += "\n\n"
                 markdown += f"{action.description}\n\n"
 
-                if hasattr(action, 'time_estimate') and action.time_estimate:
-                    markdown += f"*Estimated time: {action.time_estimate}*\n\n"
+                # Add implementation steps if available
+                if hasattr(action, 'implementation_steps') and action.implementation_steps:
+                    markdown += "**How to implement:**\n"
+                    for step_num, step in enumerate(action.implementation_steps, 1):
+                        markdown += f"{step_num}. {step}\n"
+                    markdown += "\n"
+
+                # Add expected result if available
+                if hasattr(action, 'expected_result') and action.expected_result:
+                    markdown += f"**Expected result:** {action.expected_result}\n\n"
 
             markdown += "---\n\n"
 
+        # Impact vs Effort Matrix
+        if self.priority_actions:
+            markdown += self._generate_impact_effort_matrix()
+
         return markdown
+
+    def _generate_impact_effort_matrix(self) -> str:
+        """Generate impact vs effort matrix for all recommendations"""
+        markdown = "## 📊 Impact vs. Effort Matrix\n\n"
+        markdown += "*All recommendations organized by implementation priority*\n\n"
+
+        # Collect all recommendations from all sections
+        all_recs = []
+        for section in self.all_sections:
+            if hasattr(section, 'recommendations'):
+                for rec in section.recommendations:
+                    # Get values
+                    priority = rec.priority.value if hasattr(rec.priority, 'value') else rec.priority
+                    impact = rec.impact.value if hasattr(rec.impact, 'value') else rec.impact
+                    effort = getattr(rec, 'effort', self._estimate_effort(rec))
+                    time_est = getattr(rec, 'time_estimate', self._estimate_time(rec))
+
+                    all_recs.append({
+                        'title': rec.title,
+                        'category': rec.category if hasattr(rec, 'category') else 'General',
+                        'priority': priority,
+                        'impact': impact,
+                        'effort': effort,
+                        'time': time_est,
+                        'description': rec.description if hasattr(rec, 'description') else ''
+                    })
+
+        if not all_recs:
+            return ""
+
+        # Sort: High Impact/Low Effort first
+        priority_order = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
+        impact_order = {'high': 3, 'medium': 2, 'low': 1}
+        effort_order = {'low': 3, 'medium': 2, 'high': 1}  # Inverted - low effort is better
+
+        all_recs.sort(
+            key=lambda x: (
+                impact_order.get(x['impact'], 0),
+                effort_order.get(x['effort'], 0),
+                priority_order.get(x['priority'], 0)
+            ),
+            reverse=True
+        )
+
+        # Build matrix table
+        markdown += "| # | Recommendation | Category | Impact | Effort | Est. Time | Sequence |\n"
+        markdown += "|---|----------------|----------|--------|--------|-----------|----------|\n"
+
+        for i, rec in enumerate(all_recs[:15], 1):  # Limit to top 15
+            # Determine sequence suggestion
+            if i <= 3:
+                sequence = "🔴 Do First"
+            elif i <= 8:
+                sequence = "🟡 Do Next"
+            else:
+                sequence = "🟢 Do Later"
+
+            # Format impact/effort
+            impact_icon = {"high": "⬆️", "medium": "➡️", "low": "⬇️"}.get(rec['impact'], "➡️")
+            effort_icon = {"low": "✅", "medium": "⚠️", "high": "🔴"}.get(rec['effort'], "⚠️")
+
+            markdown += f"| {i} | {rec['title'][:40]}{'...' if len(rec['title']) > 40 else ''} | {rec['category']} | {impact_icon} {rec['impact'].title()} | {effort_icon} {rec['effort'].title()} | {rec['time']} | {sequence} |\n"
+
+        markdown += "\n**Legend:**\n"
+        markdown += "- **Impact**: ⬆️ High | ➡️ Medium | ⬇️ Low\n"
+        markdown += "- **Effort**: ✅ Low (quick win) | ⚠️ Medium | 🔴 High (major work)\n"
+        markdown += "- **Sequence**: 🔴 Critical path | 🟡 High value | 🟢 Future optimization\n\n"
+
+        markdown += "💡 **Strategy**: Focus on HIGH impact + LOW/MEDIUM effort items first (quick wins), then tackle HIGH effort items only if impact justifies investment.\n\n"
+
+        markdown += "---\n\n"
+
+        return markdown
+
+    def _estimate_effort(self, rec) -> str:
+        """Estimate effort level from recommendation if not provided"""
+        title_lower = rec.title.lower() if hasattr(rec, 'title') else ''
+
+        # High effort keywords
+        if any(word in title_lower for word in ['rebuild', 'overhaul', 'complete', 'full', 'extensive']):
+            return 'high'
+        # Low effort keywords
+        elif any(word in title_lower for word in ['add', 'update', 'adjust', 'tweak', 'optimize']):
+            return 'low'
+        else:
+            return 'medium'
+
+    def _estimate_time(self, rec) -> str:
+        """Estimate time from recommendation if not provided"""
+        effort = self._estimate_effort(rec)
+
+        if effort == 'high':
+            return '1-2 weeks'
+        elif effort == 'low':
+            return '1-4 hours'
+        else:
+            return '1-3 days'
 
 
 class StorePageSection(ReportSection):
@@ -827,6 +947,131 @@ class GlobalReachSection(ReportSection):
         return markdown
 
 
+class MarketViabilitySection(ReportSection):
+    """Market viability and TAM analysis"""
+
+    def analyze(self) -> Dict[str, Any]:
+        """Analyze market viability"""
+        logger.info("Analyzing market viability")
+
+        from src.market_viability import analyze_market_viability
+
+        game_data = self.data.get('game_data', {})
+        competitor_data = self.data.get('competitors', [])
+        sales_data = self.data.get('sales_data')
+
+        analysis = analyze_market_viability(game_data, competitor_data, sales_data)
+
+        # Score based on viability score
+        self.score = analysis['viability_score']
+        self.rating = self.get_rating()
+        self.analyzed = True
+
+        self.viability_data = analysis
+
+        return {
+            'score': self.score,
+            'rating': self.rating
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate market viability markdown"""
+        if not self.analyzed:
+            self.analyze()
+
+        viability = self.viability_data
+        tam = viability['tam_analysis']
+        saturation = viability['saturation_analysis']
+        demand = viability['demand_analysis']
+        success = viability['success_probability']
+
+        rating_emoji = {'excellent': '✅', 'good': '🟢', 'fair': '🟡', 'poor': '🔴'}
+        emoji = rating_emoji.get(self.rating, '⚪')
+
+        markdown = f"""## Market Viability & Opportunity
+
+**Score: {self.score}/100** {emoji} {self.rating.title()}
+
+{viability['recommendation']}
+
+---
+
+### Total Addressable Market (TAM)
+
+**Genre**: {tam['primary_genre']}
+**Annual Market Size**: ${tam['annual_market_revenue']:,}
+**Market Classification**: {tam['market_size']} market
+**Growth Trend**: {tam['growth_trend']} ({tam['annual_growth_rate']} annual growth)
+
+**Market Metrics**:
+- Total games in genre: {tam['total_games_in_genre']:,}
+- New releases per year: {tam['new_releases_per_year']:,}
+- Average revenue per game: ${tam['avg_revenue_per_game']:,}
+- Median game revenue: ${tam['median_game_revenue']:,}
+- Top performer revenue: ${tam['top_game_revenue']:,}
+
+**Opportunity Level**: {tam['opportunity_level']}
+
+---
+
+### Competitive Saturation
+
+**Saturation Level**: {saturation['saturation_level']}
+**Competition Risk**: {saturation['risk_level']}
+**Market Density**: {saturation['competitive_density']}
+
+**Saturation Analysis**:
+- Current games in genre: {saturation['total_games_in_genre']:,}
+- Annual new releases: {saturation['new_releases_per_year']:,}
+- Saturation ratio: {saturation['saturation_ratio']}
+- Direct competitors analyzed: {saturation['direct_competitors_analyzed']}
+- Estimated revenue dilution: {saturation['revenue_dilution_estimate']}
+
+{self._get_saturation_insight(saturation)}
+
+---
+
+### Success Probability
+
+**Estimated Success Rate**: {success['success_probability']} (for games earning >$100K)
+**Outlook**: {success['outlook']}
+**Confidence**: {success['confidence_level']}
+
+**Projected Revenue Range**:
+- Conservative: ${success['projected_revenue_range']['low']:,}
+- Median: ${success['projected_revenue_range']['median']:,}
+- Optimistic: ${success['projected_revenue_range']['high']:,}
+
+**Key Success Factors**:
+"""
+        for factor in success['key_success_factors']:
+            markdown += f"- {factor}\n"
+
+        markdown += "\n---\n\n### Demand Signals\n\n"
+
+        markdown += f"**Demand Level**: {demand['demand_level']}  \n"
+        markdown += f"**Validation Score**: {demand['demand_score']}/100\n\n"
+
+        markdown += "**Current Validation Signals**:\n"
+        for signal in demand['validation_signals']:
+            markdown += f"- {signal}\n"
+
+        markdown += f"\n**Benchmark Comparison**: {demand['benchmark_comparison']}\n\n"
+
+        markdown += "---\n\n"
+
+        return markdown
+
+    def _get_saturation_insight(self, saturation: Dict) -> str:
+        """Generate insight text based on saturation level"""
+        if saturation['saturation_score'] > 75:
+            return "💡 **Insight**: Market has room for new entrants. Focus on quality differentiation."
+        elif saturation['saturation_score'] > 55:
+            return "⚠️ **Insight**: Moderate competition. Clear unique selling proposition required."
+        else:
+            return "🚨 **Insight**: Highly competitive market. Strong differentiation and marketing budget essential."
+
+
 class ReportBuilder:
     """Orchestrates report generation from multiple sections"""
 
@@ -852,17 +1097,26 @@ class ReportBuilder:
         """Build all standard sections"""
         logger.info("Building report sections")
 
-        # Create standard sections
-        store_section = StorePageSection("Store Page", {
-            'game_data': self.game_data
+        # Create market viability section FIRST (most important for decision-making)
+        viability_section = MarketViabilitySection("Market Viability", {
+            'game_data': self.game_data,
+            'competitors': self.competitor_data,
+            'sales_data': self.sales_data
         })
-        self.add_section(store_section)
+        self.add_section(viability_section)
 
+        # Create standard sections
         competitor_section = CompetitorSection("Competitors", {
             'competitors': self.competitor_data,
             'game_data': self.game_data
         })
         self.add_section(competitor_section)
+
+        store_section = StorePageSection("Store Page", {
+            'game_data': self.game_data,
+            'competitors': self.competitor_data
+        })
+        self.add_section(store_section)
 
         pricing_section = PricingSection("Pricing", {
             'game_data': self.game_data,
@@ -949,21 +1203,54 @@ class ReportBuilder:
 
     def _generate_footer(self) -> str:
         """Generate report footer"""
+        game_name = self.game_data.get('name', 'Unknown Game')
+
         return f"""---
 
-## About This Report
+## Data Sources & Methodology
 
-This audit report was generated by Publitz Automated Audits on {datetime.now().strftime('%Y-%m-%d at %I:%M %p')}.
+This report aggregates data from multiple authoritative sources to provide comprehensive market intelligence:
 
-**Report Version:** 2.0 (Enhanced)
+### Primary Data Sources
+- **Steam Store API**: Game metadata, pricing, store page elements, supported languages
+- **Steam Community**: Review data, community features, discussion activity
+- **SteamSpy**: Sales estimates, player statistics, market performance data
+- **SteamDB**: Historical pricing, concurrent players, regional availability
+
+### Market Intelligence Sources
+- **Reddit API**: Community size, engagement metrics, self-promotion policies (r/indiegaming, r/gamedev, etc.)
+- **Genre Market Data**: TAM estimates, growth trends, competitive saturation metrics
+- **Regional Economic Data**: PPP (Purchasing Power Parity) multipliers, currency conversions
+- **Localization Benchmarks**: Industry-standard translation costs, market reach percentages
+
+### Influencer & Outreach Data
+- **Twitch**: Streamer databases, viewership benchmarks, genre-specific engagement rates
+- **YouTube**: Content creator discovery, subscriber metrics, engagement analysis
+- **Steam Curators**: Curator databases, follower counts, review focus areas, response patterns
+
+### Analysis Methodology
+- **Competitive Analysis**: Genre-based similarity matching, price positioning analysis
+- **AI Vision Analysis**: Claude 4.5 Sonnet capsule image evaluation across 10 dimensions
+- **Market Viability**: TAM sizing, competitive saturation modeling, success probability calculations
+- **ROI Modeling**: Regional pricing optimization, localization cost-benefit analysis
+
+**Data Freshness**: All data collected on {datetime.now().strftime('%Y-%m-%d at %I:%M %p')}
+**Report Version:** 2.1 (Enhanced with Market Viability + Impact Matrix)
 **Analysis Type:** {self.report_type}
 **Overall Score:** {self.overall_score}/100
 
-For questions or support, contact: support@publitz.com
+---
+
+## About Publitz Automated Audits
+
+Professional game market intelligence powered by AI and real-time data aggregation.
+
+For questions or support: support@publitz.com
 
 ---
 
-*This report is confidential and intended for the recipient only.*
+*This report contains confidential market intelligence and is intended solely for {game_name}.
+Data accuracy is dependent on third-party API availability and may contain estimates where actual data is unavailable.*
 """
 
     def get_structured_data(self) -> Dict[str, Any]:

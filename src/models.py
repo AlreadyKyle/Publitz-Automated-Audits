@@ -32,6 +32,13 @@ class ReportType(Enum):
     POST_LAUNCH = "Post-Launch"
 
 
+class EffortLevel(Enum):
+    """Effort required for recommendations"""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 @dataclass
 class Recommendation:
     """Structured recommendation with actionable details"""
@@ -41,9 +48,13 @@ class Recommendation:
     impact: ImpactLevel
     category: str  # "store_page", "pricing", "marketing", etc.
 
-    # Optional fields
+    # Optional fields for enhanced recommendations
+    effort: Optional[EffortLevel] = None
     effort_description: Optional[str] = None
     time_estimate: Optional[str] = None  # "1-2 weeks", "1 day", etc.
+    implementation_steps: Optional[List[str]] = None  # Step-by-step how-to
+    estimated_cost: Optional[str] = None  # "$0", "$50-100", "Free", etc.
+    expected_result: Optional[str] = None  # What outcome to expect
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -53,21 +64,32 @@ class Recommendation:
             'priority': self.priority.value if isinstance(self.priority, Priority) else self.priority,
             'impact': self.impact.value if isinstance(self.impact, ImpactLevel) else self.impact,
             'category': self.category,
+            'effort': self.effort.value if isinstance(self.effort, EffortLevel) and self.effort else None,
             'effort_description': self.effort_description,
-            'time_estimate': self.time_estimate
+            'time_estimate': self.time_estimate,
+            'implementation_steps': self.implementation_steps,
+            'estimated_cost': self.estimated_cost,
+            'expected_result': self.expected_result
         }
 
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> 'Recommendation':
         """Create from dictionary"""
+        effort_val = data.get('effort')
+        effort = EffortLevel(effort_val) if effort_val and isinstance(effort_val, str) else effort_val
+
         return Recommendation(
             title=data['title'],
             description=data['description'],
             priority=Priority(data['priority']) if isinstance(data['priority'], str) else data['priority'],
             impact=ImpactLevel(data['impact']) if isinstance(data['impact'], str) else data['impact'],
             category=data['category'],
+            effort=effort,
             effort_description=data.get('effort_description'),
-            time_estimate=data.get('time_estimate')
+            time_estimate=data.get('time_estimate'),
+            implementation_steps=data.get('implementation_steps'),
+            estimated_cost=data.get('estimated_cost'),
+            expected_result=data.get('expected_result')
         )
 
 
