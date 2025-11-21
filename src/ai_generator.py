@@ -74,7 +74,13 @@ For each dimension:
 - Provide a score 0-10
 - List specific strengths
 - List specific issues
-- Suggest concrete improvements
+- Suggest CONCRETE, ACTIONABLE improvements
+
+Additionally provide:
+- **Redesign Brief**: If overall score < 7, provide specific design direction (colors to change, layout adjustments, text modifications)
+- **A/B Test Suggestions**: What variations to test (e.g., "Test version without text overlay", "Test warmer color palette")
+- **Competitive Context**: Describe how this compares to typical successful capsules in this genre
+- **Size-Specific Issues**: Note any problems that appear at small thumbnail sizes vs larger displays
 
 Return ONLY valid JSON with this structure:
 {{
@@ -84,9 +90,12 @@ Return ONLY valid JSON with this structure:
   "focal_point_score": 0-10,
   "genre_clarity_score": 0-10,
   "overall_ctr_score": 0-10,
-  "strengths": ["strength1", "strength2"],
-  "issues": ["issue1", "issue2"],
-  "recommendations": ["rec1", "rec2"],
+  "strengths": ["specific strength 1", "specific strength 2"],
+  "issues": ["specific issue 1 with what to fix", "specific issue 2"],
+  "recommendations": ["concrete rec 1 with measurements/specifics", "concrete rec 2"],
+  "redesign_brief": "Detailed design direction if score < 7, or 'N/A - capsule is performing well' if score >= 7",
+  "ab_test_suggestions": ["test variation 1", "test variation 2", "test variation 3"],
+  "competitive_context": "How this compares to genre standards",
   "summary": "One sentence overall assessment"
 }}"""
 
@@ -141,10 +150,22 @@ Return ONLY valid JSON with this structure:
             "focal_point_score": 5,
             "genre_clarity_score": 5,
             "overall_ctr_score": 5,
-            "strengths": ["Unable to analyze image"],
-            "issues": ["Capsule analysis unavailable"],
-            "recommendations": ["Manually review capsule for clarity, contrast, and text readability"],
-            "summary": "Capsule image analysis could not be completed"
+            "strengths": ["Unable to analyze image - analysis unavailable"],
+            "issues": ["Capsule analysis could not be completed"],
+            "recommendations": [
+                "Manually review capsule for visual clarity at thumbnail size",
+                "Check contrast against white and dark backgrounds",
+                "Verify text is readable at 184x69px size",
+                "Compare to top-performing games in your genre"
+            ],
+            "redesign_brief": "Manual capsule review recommended - automated analysis unavailable",
+            "ab_test_suggestions": [
+                "Test with and without text overlay",
+                "Test different focal points",
+                "Test color variations"
+            ],
+            "competitive_context": "Unable to determine - manual competitor comparison recommended",
+            "summary": "Capsule image analysis could not be completed - manual review recommended"
         }
 
     def generate_post_launch_report(
@@ -829,10 +850,31 @@ Generate a comprehensive, professional report with these sections:
 
 7. **VISIBILITY & DISCOVERABILITY**
    - Tag effectiveness (remember: high engagement = tags working!)
+   - **Tag Opportunity Analysis**: Specific tags to ADD or REMOVE
    - Steam search and visibility
    - Discoverability assessment
 
-8. **STORE PAGE MESSAGING ANALYSIS (Boxleiter Framework)**
+8. **CAPSULE & STORE ASSET OPTIMIZATION**
+   Based on capsule analysis scores and competitor comparison:
+
+   **Capsule Redesign Brief:**
+   - If overall CTR score < 7/10, provide SPECIFIC design direction:
+     * What to change (colors, composition, text, etc.)
+     * Competitor comparison: How does it compare visually to top performers?
+     * A/B testing suggestions: What variations to test first
+     * Platform-specific considerations: Steam store vs wishlist vs library sizes
+
+   **Screenshot Sequence Optimization:**
+   - Are screenshots in optimal order? (Hero shot first, features second, etc.)
+   - Which screenshots to replace or reorder (be specific: "Move screenshot 3 to position 1")
+   - Missing screenshot types (gameplay, UI, features, social proof)
+
+   **Trailer Hook Analysis:**
+   - First 10 seconds effectiveness
+   - Hook timing and retention recommendations
+   - CTA (Call-to-Action) placement and clarity
+
+9. **STORE PAGE MESSAGING ANALYSIS (Boxleiter Framework)**
    Evaluate the game's store page copy and messaging for conversion effectiveness:
 
    - **Value Proposition Clarity**: Does the description immediately communicate what makes this game unique?
@@ -845,34 +887,63 @@ Generate a comprehensive, professional report with these sections:
 
    Rate each dimension (1-10) and provide specific improvements for weak areas.
 
-9. **STRATEGIC RECOMMENDATIONS**
-   - Immediate action items (0-30 days)
-   - Short-term improvements (1-3 months)
-   - Long-term strategy (3-6 months)
-   - Be realistic based on success level
+10. **ACTION PLAN & PRIORITIZATION**
+    Create a prioritized roadmap with SPECIFIC action items:
 
-10. **PRICING STRATEGY**
+    **30-Day Action Plan (Immediate Wins):**
+    - List 3-5 specific tasks with owners (e.g., "Marketing: Update capsule by May 15")
+    - Expected impact and effort level for each
+
+    **60-Day Action Plan (Short-term):**
+    - List 3-5 medium-effort initiatives
+    - Resource requirements (time, budget, skills needed)
+
+    **90-Day Action Plan (Strategic):**
+    - List 3-5 longer-term strategies
+    - Success metrics for each initiative
+
+    **Prioritization Matrix:**
+    Create a 2x2 grid categorizing recommendations:
+    - Quick Wins (High Impact, Low Effort)
+    - Major Projects (High Impact, High Effort)
+    - Fill-ins (Low Impact, Low Effort)
+    - Time Sinks (Low Impact, High Effort) - avoid these
+
+11. **PRICING & MONETIZATION OPTIMIZATION**
     - Current pricing analysis
-    - Regional pricing recommendations
-    - Discount strategy suggestions
+    - **Regional Pricing Calculator**: Specific $ amounts for top 10 markets
+    - **Discount Calendar**: Exact dates and %off for next 6 months
+      * When to run sales (Summer Sale, Winter Sale, etc.)
+      * Recommended discount depths (10%, 20%, 30%)
+      * Bundle opportunities with specific partner games
+    - DLC opportunity analysis with specific ideas and price points
 
-11. **GROWTH OPPORTUNITIES**
-    - Content update recommendations
-    - Community building strategies
-    - Platform expansion possibilities
+12. **GROWTH OPPORTUNITIES**
+    - Content update recommendations (specific features/modes to add)
+    - Community building strategies (Discord, Reddit, etc.)
+    - Platform expansion possibilities (Console viability score 0-10)
+    - Influencer target list (specific creators to contact)
 
 **CRITICAL GUIDELINES:**
 - Use the SUCCESS CONTEXT to calibrate your tone and recommendations
 - For highly successful games (score {success_analysis['success_score']}/100), focus on OPTIMIZATION not PROBLEMS
 - Tag effectiveness: {sales_data.get('reviews_total')} reviews = strong discoverability
-- Be specific with metrics and data points
+- Be EXTREMELY SPECIFIC with all recommendations:
+  * Instead of "improve capsule", say "increase contrast by 20%, move logo to top-left, reduce text size"
+  * Instead of "optimize tags", say "add 'Roguelike' and 'Pixel Art', remove 'Adventure'"
+  * Instead of "consider discounts", say "20% off during Steam Summer Sale (June 27-July 11, 2024)"
+- Include CONCRETE numbers, dates, and specific action items
+- Assign tasks to teams/roles where applicable (Marketing, Development, Community)
+- Provide success metrics for each recommendation (e.g., "Expected +15% wishlist conversion")
 - Recommendations should match the game's actual performance level
-- Format in professional markdown with clear sections and bullet points
+- Format in professional markdown with clear sections, bullet points, and tables
 - DO NOT list competitors at the beginning of the report
 - DO NOT create a "Top 10 Competitors" or "Competitors Analyzed" section at the start
 - Competitor analysis should ONLY appear in Section 5 (COMPETITOR COMPARISON)
+- ALWAYS create the prioritization matrix (2x2 grid: Impact vs Effort)
+- ALWAYS provide the 30/60/90 day action plan with specific tasks
 
-Generate a comprehensive, accurate, and actionable report.
+Generate a comprehensive, accurate, and ACTIONABLE report with specific, measurable recommendations.
 """
 
         try:
@@ -941,8 +1012,21 @@ Strengths:
 Issues to Address:
 {chr(10).join('- ' + i for i in capsule_analysis.get('issues', []))}
 
-Recommendations:
+Actionable Recommendations:
 {chr(10).join('- ' + r for r in capsule_analysis.get('recommendations', []))}
+
+Redesign Brief:
+{capsule_analysis.get('redesign_brief', 'N/A')}
+
+A/B Testing Suggestions:
+{chr(10).join('- ' + t for t in capsule_analysis.get('ab_test_suggestions', []))}
+
+Competitive Context:
+{capsule_analysis.get('competitive_context', 'N/A')}
+
+**IMPORTANT**: Use this capsule analysis data in Section 8 (CAPSULE & STORE ASSET OPTIMIZATION).
+If overall CTR score < 7/10, provide detailed redesign guidance based on the brief above.
+Include the A/B test suggestions as actionable next steps.
 """
 
     def _detect_fallback_data(
