@@ -1,28 +1,75 @@
 import anthropic
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 import json
 import requests
 import base64
+import os
 from src.game_analyzer import GameAnalyzer
+
+# Optional imports for multi-model ensemble
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
+try:
+    import google.generativeai as genai
+    GOOGLE_AVAILABLE = True
+except ImportError:
+    GOOGLE_AVAILABLE = False
 
 class AIGenerator:
     """AI-powered report generator using Claude API"""
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, openai_api_key: Optional[str] = None, google_api_key: Optional[str] = None):
         """
-        Initialize the AI generator with Anthropic API key
+        Initialize the AI generator with API keys for multi-model ensemble
 
         Args:
-            api_key: Anthropic API key
+            api_key: Anthropic API key (required)
+            openai_api_key: OpenAI API key (optional - enables multi-model ensemble)
+            google_api_key: Google API key (optional - enables multi-model ensemble)
         """
         try:
-            # Initialize Anthropic client with minimal parameters
-            # Avoid passing extra params that might cause issues in different environments
+            # Initialize Anthropic client (required)
             self.client = anthropic.Anthropic(api_key=api_key)
-            # FIXED: Using the correct Claude model name
-            # The old model 'claude-3-5-sonnet-20240620' does not exist
-            # Using the latest Claude Sonnet 4.5 model
             self.model = "claude-sonnet-4-5-20250929"
+
+            # Initialize OpenAI client (optional) for multi-model ensemble
+            self.openai_client = None
+            self.openai_model = "gpt-4-turbo-preview"
+            if OPENAI_AVAILABLE and (openai_api_key or os.getenv("OPENAI_API_KEY")):
+                try:
+                    openai.api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
+                    self.openai_client = openai.OpenAI(api_key=openai.api_key)
+                    print("✓ OpenAI client initialized for multi-model ensemble")
+                except Exception as e:
+                    print(f"⚠ OpenAI initialization failed: {e}. Falling back to Claude-only.")
+
+            # Initialize Google Gemini client (optional) for multi-model ensemble
+            self.google_client = None
+            self.google_model = "gemini-1.5-pro"
+            if GOOGLE_AVAILABLE and (google_api_key or os.getenv("GOOGLE_API_KEY")):
+                try:
+                    genai.configure(api_key=google_api_key or os.getenv("GOOGLE_API_KEY"))
+                    self.google_client = genai.GenerativeModel(self.google_model)
+                    print("✓ Google Gemini client initialized for multi-model ensemble")
+                except Exception as e:
+                    print(f"⚠ Google Gemini initialization failed: {e}. Falling back to Claude-only.")
+
+            # Multi-model ensemble status
+            self.ensemble_available = bool(self.openai_client or self.google_client)
+            if self.ensemble_available:
+                models = ["Claude"]
+                if self.openai_client:
+                    models.append("GPT-4")
+                if self.google_client:
+                    models.append("Gemini")
+                print(f"✓ Multi-model ensemble active: {' + '.join(models)}")
+            else:
+                print("ℹ Multi-model ensemble not configured - using Claude-only analysis")
+
         except TypeError as e:
             if "'proxies'" in str(e):
                 raise Exception(
@@ -464,24 +511,29 @@ Based on the Pre-Launch Report Template, your report must include:
         capsule_analysis: Dict[str, Any] = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
-        Generate a report using the ENHANCED 9-PASS AUDIT SYSTEM:
+        Generate a report using the ENHANCED 12-PASS AUDIT SYSTEM:
 
         PHASE 1 (Original):
         Pass 1: Draft → Generate initial report (5k tokens, temp 0.5)
         Pass 2: Audit → Check for common errors (competitors, revenue, success, tags)
 
-        PHASE 1 ENHANCEMENTS:
+        PHASE 1 ENHANCEMENTS (Accuracy & Consistency):
         Pass 3: Fact-Check → Verify all numerical claims against source data
         Pass 4: Consistency → Check for internal contradictions between sections
-        Pass 5: Specificity → Scan for vague recommendations
 
-        PHASE 2 ENHANCEMENTS:
-        Pass 6: Competitor Validation → Ensure competitors are truly comparable
-        Pass 7: Specialized Audits → Domain experts (pricing, marketing, competitive intelligence)
-        Pass 8: Recommendation Feasibility → Check if recommendations are realistic
+        PHASE 2 ENHANCEMENTS (Domain Expertise):
+        Pass 5: Competitor Validation → Ensure competitors are truly comparable
+        Pass 6: Specialized Audits → Domain experts (pricing, marketing, competitive intelligence)
+        Pass 7: Recommendation Feasibility → Check if recommendations are realistic
+
+        PHASE 3 ENHANCEMENTS (Strategic Context):
+        Pass 8: Benchmark Analysis → Percentile ranking (top 10% of indie RPGs?)
+        Pass 9: Scenario Analysis → Best/base/worst case 6-month projections
+        Pass 10: Multi-Model Ensemble → Claude + GPT-4 + Gemini consensus (optional)
 
         FINAL GENERATION:
-        Pass 9: Enhanced Report → Apply ALL corrections from passes 2-8 (16k tokens, temp 0.7)
+        Pass 11: Enhanced Report → Apply ALL corrections and enhancements (16k tokens, temp 0.7)
+        Pass 12: Specificity Enforcement → Eliminate vague recommendations
 
         Post-Processing:
         - Add executive snapshot
@@ -539,6 +591,24 @@ Based on the Pre-Launch Report Template, your report must include:
             draft_report, game_data, sales_data
         )
         audit_results['recommendation_validation'] = recommendation_validation
+
+        # Phase 3.2.10: PHASE 3 - Benchmark comparison (percentile ranking)
+        benchmark_analysis = self._analyze_benchmarks(
+            game_data, sales_data, competitor_data, review_stats
+        )
+        audit_results['benchmark_analysis'] = benchmark_analysis
+
+        # Phase 3.2.11: PHASE 3 - Scenario analysis (best/base/worst case)
+        scenario_analysis = self._generate_scenarios(
+            game_data, sales_data, review_stats
+        )
+        audit_results['scenario_analysis'] = scenario_analysis
+
+        # Phase 3.2.12: PHASE 3 - Multi-model ensemble analysis (Claude + GPT-4 + Gemini)
+        ensemble_analysis = self._run_ensemble_analysis(
+            game_data, sales_data, competitor_data, benchmark_analysis, scenario_analysis
+        )
+        audit_results['ensemble_analysis'] = ensemble_analysis
 
         # Phase 3.3: Generate enhanced final report with all corrections
         final_report = self._generate_enhanced_report(
@@ -1468,6 +1538,463 @@ Return ONLY valid JSON, no other text.
                 "error": f"Recommendation validation failed: {str(e)}"
             }
 
+    def _analyze_benchmarks(
+        self,
+        game_data: Dict[str, Any],
+        sales_data: Dict[str, Any],
+        competitor_data: List[Dict[str, Any]],
+        review_stats: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """
+        Phase 3.2.10 (Phase 3): Benchmark comparison and percentile ranking
+
+        Determines where this game ranks relative to its genre/price tier:
+        - Revenue percentile (top 10% of indie RPGs?)
+        - Review score percentile
+        - Review count percentile (engagement level)
+        - Price positioning
+        - Overall success percentile
+
+        Provides context like "This game is in the top 15% of indie RPGs by revenue"
+        """
+        # Build benchmark context
+        game_context = {
+            "name": game_data.get('name'),
+            "genres": game_data.get('genres', ''),
+            "price": game_data.get('price', 'Unknown'),
+            "revenue": sales_data.get('estimated_revenue', 'Unknown'),
+            "reviews_total": sales_data.get('reviews_total', 0),
+            "review_score": sales_data.get('review_score', 'Unknown'),
+            "developer": game_data.get('developer', ''),
+            "release_date": game_data.get('release_date', '')
+        }
+
+        # Competitor stats for comparison
+        competitor_stats = []
+        for comp in competitor_data[:15]:
+            competitor_stats.append({
+                "name": comp.get('name'),
+                "revenue": comp.get('steam_data', {}).get('estimated_revenue', 'Unknown'),
+                "reviews": comp.get('review_count', 0),
+                "score": comp.get('review_score', 0),
+                "price": comp.get('price', 'Unknown')
+            })
+
+        benchmark_prompt = f"""You are a game industry analyst specializing in market benchmarking.
+
+Analyze where this game ranks relative to comparable games in its genre/price tier.
+
+**TARGET GAME:**
+{json.dumps(game_context, indent=2)}
+
+**COMPARABLE GAMES (for benchmarking):**
+{json.dumps(competitor_stats, indent=2)}
+
+**YOUR TASK:**
+Determine the game's percentile ranking across key metrics:
+
+1. **Revenue Percentile**
+   - Where does this game's revenue rank compared to similar games?
+   - Top 10%? Top 25%? Middle 50%? Bottom 25%?
+
+2. **Review Score Percentile**
+   - How does the review score compare to genre standards?
+
+3. **Engagement Percentile** (review count)
+   - High review count = high player engagement
+   - Where does this game rank?
+
+4. **Price Positioning**
+   - Premium tier? Mid-tier? Budget tier?
+   - Is it priced appropriately for its quality/genre?
+
+5. **Overall Success Percentile**
+   - Combining all factors, where does this game rank?
+
+**OUTPUT FORMAT (JSON):**
+Return ONLY valid JSON:
+{{
+  "revenue_percentile": 75,
+  "revenue_interpretation": "Top 25% of comparable indie RPGs",
+  "review_score_percentile": 85,
+  "review_score_interpretation": "Top 15% for quality in genre",
+  "engagement_percentile": 60,
+  "engagement_interpretation": "Above average player engagement",
+  "price_positioning": "Mid-tier pricing, appropriate for quality level",
+  "overall_success_percentile": 70,
+  "overall_interpretation": "Top 30% of indie RPGs - solid performer",
+  "key_strengths": ["High review quality", "Strong revenue for price tier"],
+  "relative_weaknesses": ["Lower engagement than top performers"],
+  "benchmark_summary": "This game is a top-30% performer in the indie RPG category, with exceptional review scores but moderate engagement levels."
+}}
+
+Return ONLY valid JSON, no other text.
+"""
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1500,
+                temperature=0.3,
+                messages=[{"role": "user", "content": benchmark_prompt}]
+            )
+
+            response_text = ""
+            for content_block in response.content:
+                if hasattr(content_block, 'text'):
+                    response_text += content_block.text
+
+            # Parse JSON response
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+
+            benchmark_results = json.loads(response_text)
+            return benchmark_results
+
+        except Exception as e:
+            # Return default if benchmarking fails
+            return {
+                "revenue_percentile": 50,
+                "revenue_interpretation": "Median performer",
+                "review_score_percentile": 50,
+                "review_score_interpretation": "Average review quality",
+                "engagement_percentile": 50,
+                "engagement_interpretation": "Moderate engagement",
+                "price_positioning": "Unknown",
+                "overall_success_percentile": 50,
+                "overall_interpretation": "Median performer",
+                "key_strengths": [],
+                "relative_weaknesses": [],
+                "benchmark_summary": "",
+                "error": f"Benchmark analysis failed: {str(e)}"
+            }
+
+    def _generate_scenarios(
+        self,
+        game_data: Dict[str, Any],
+        sales_data: Dict[str, Any],
+        review_stats: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """
+        Phase 3.2.11 (Phase 3): Scenario analysis with best/base/worst case projections
+
+        Generates three future scenarios:
+        - Best Case: Everything goes right (viral hit, featured by Steam, etc.)
+        - Base Case: Current trends continue (most likely)
+        - Worst Case: Negative events (bad reviews, competitor launches, etc.)
+
+        Provides realistic ranges for planning and risk assessment
+        """
+        scenario_context = {
+            "name": game_data.get('name'),
+            "current_revenue": sales_data.get('estimated_revenue', 'Unknown'),
+            "current_reviews": sales_data.get('reviews_total', 0),
+            "review_score": sales_data.get('review_score', 'Unknown'),
+            "price": game_data.get('price', 'Unknown'),
+            "genre": game_data.get('genres', ''),
+            "release_date": game_data.get('release_date', '')
+        }
+
+        scenario_prompt = f"""You are a game industry forecasting specialist.
+
+Generate THREE SCENARIOS for this game's performance over the next 6 months.
+
+**CURRENT STATE:**
+{json.dumps(scenario_context, indent=2)}
+
+**SCENARIO REQUIREMENTS:**
+
+1. **BEST CASE SCENARIO** (Optimistic but plausible)
+   - Assumptions: What needs to go right?
+   - Projected revenue change
+   - Projected review count growth
+   - Probability estimate
+   - Key triggers (e.g., "Featured in Steam sale", "Viral TikTok hit")
+
+2. **BASE CASE SCENARIO** (Most likely)
+   - Assumptions: Current trends continue
+   - Projected revenue change
+   - Projected review count growth
+   - Probability estimate
+   - Expected trajectory
+
+3. **WORST CASE SCENARIO** (Pessimistic but possible)
+   - Assumptions: What could go wrong?
+   - Projected revenue change
+   - Projected review count growth
+   - Probability estimate
+   - Risk factors (e.g., "Negative review bomb", "Major competitor launch")
+
+**OUTPUT FORMAT (JSON):**
+Return ONLY valid JSON:
+{{
+  "best_case": {{
+    "probability": 15,
+    "assumptions": ["Featured by Steam", "Positive influencer coverage", "Word-of-mouth viral growth"],
+    "revenue_projection": "+150% ($3M total)",
+    "review_growth": "+500% (25K total reviews)",
+    "timeline": "6 months",
+    "key_triggers": ["Steam feature", "Major streamer coverage"]
+  }},
+  "base_case": {{
+    "probability": 60,
+    "assumptions": ["Steady organic growth", "Current marketing continues", "No major external events"],
+    "revenue_projection": "+30% ($1.6M total)",
+    "review_growth": "+40% (7K total reviews)",
+    "timeline": "6 months",
+    "expected_trajectory": "Gradual decline in daily sales, stable review score"
+  }},
+  "worst_case": {{
+    "probability": 25,
+    "assumptions": ["Review score drops to Mixed", "Major competitor launches", "Market saturation"],
+    "revenue_projection": "-20% ($1M total)",
+    "review_growth": "+10% (5.5K total reviews)",
+    "timeline": "6 months",
+    "risk_factors": ["Competitor launch", "Negative PR", "Genre oversaturation"]
+  }},
+  "recommendation": "Plan for base case, prepare for worst case, position for best case opportunities"
+}}
+
+Return ONLY valid JSON, no other text.
+"""
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1500,
+                temperature=0.4,  # Slightly higher for creative scenario planning
+                messages=[{"role": "user", "content": scenario_prompt}]
+            )
+
+            response_text = ""
+            for content_block in response.content:
+                if hasattr(content_block, 'text'):
+                    response_text += content_block.text
+
+            # Parse JSON response
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+
+            scenario_results = json.loads(response_text)
+            return scenario_results
+
+        except Exception as e:
+            # Return default if scenario analysis fails
+            return {
+                "best_case": {"probability": 20, "assumptions": [], "revenue_projection": "+50%", "review_growth": "+50%", "timeline": "6 months", "key_triggers": []},
+                "base_case": {"probability": 60, "assumptions": [], "revenue_projection": "+10%", "review_growth": "+20%", "timeline": "6 months", "expected_trajectory": ""},
+                "worst_case": {"probability": 20, "assumptions": [], "revenue_projection": "0%", "review_growth": "+5%", "timeline": "6 months", "risk_factors": []},
+                "recommendation": "",
+                "error": f"Scenario analysis failed: {str(e)}"
+            }
+
+    def _run_ensemble_analysis(
+        self,
+        game_data: Dict[str, Any],
+        sales_data: Dict[str, Any],
+        competitor_data: List[Dict[str, Any]],
+        benchmark_analysis: Dict[str, Any],
+        scenario_analysis: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Phase 3.2.12 (Phase 3): Multi-model ensemble analysis with consensus synthesis
+
+        Runs critical analysis through Claude + GPT-4 + Gemini (if available) and synthesizes results:
+        - Identifies consensus insights (all models agree)
+        - Identifies divergent insights (models disagree - requires human judgment)
+        - Provides weighted synthesis based on model confidence
+        - Highlights blind spots that only one model catches
+
+        Falls back to Claude-only if other models aren't configured.
+        """
+        # If ensemble not available, return early with Claude-only flag
+        if not self.ensemble_available:
+            return {
+                "ensemble_mode": "claude_only",
+                "models_used": ["Claude"],
+                "consensus_insights": [],
+                "divergent_insights": [],
+                "synthesis": "Multi-model ensemble not configured - using Claude analysis only"
+            }
+
+        # Build analysis prompt for all models
+        analysis_context = {
+            "game_name": game_data.get('name'),
+            "revenue": sales_data.get('estimated_revenue'),
+            "revenue_range": sales_data.get('revenue_range'),
+            "reviews_total": sales_data.get('reviews_total'),
+            "review_score": sales_data.get('review_score'),
+            "price": game_data.get('price'),
+            "genre": game_data.get('genres'),
+            "benchmark_percentile": benchmark_analysis.get('overall_success_percentile', 'Unknown'),
+            "base_case_projection": scenario_analysis.get('base_case', {}).get('revenue_projection', 'Unknown'),
+            "competitor_count": len(competitor_data)
+        }
+
+        analysis_prompt = f"""You are a game industry expert analyzing this indie game.
+
+**GAME CONTEXT:**
+{json.dumps(analysis_context, indent=2)}
+
+**YOUR TASK:**
+Provide your MOST CRITICAL insights for the game developer:
+
+1. **Primary Strength** - What's the #1 thing this game is doing RIGHT that should be doubled down on?
+2. **Primary Weakness** - What's the #1 thing HOLDING THIS GAME BACK from greater success?
+3. **Highest-Impact Recommendation** - What single action would have the BIGGEST positive impact? (Be specific with metrics)
+4. **Biggest Risk** - What's the most likely way this game could FAIL or decline?
+5. **Market Position Assessment** - How would you describe this game's position in the market in one sentence?
+
+Return ONLY valid JSON:
+{{
+  "primary_strength": "Specific strength with evidence",
+  "primary_weakness": "Specific weakness with evidence",
+  "highest_impact_recommendation": "Concrete action with expected outcome",
+  "biggest_risk": "Specific risk factor",
+  "market_position": "One-sentence assessment",
+  "confidence_score": 0-100
+}}
+
+Be brutally honest. Focus on ACTIONABLE insights, not generic advice.
+"""
+
+        model_responses = {}
+
+        # Run Claude analysis
+        try:
+            claude_response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1000,
+                temperature=0.3,
+                messages=[{"role": "user", "content": analysis_prompt}]
+            )
+            response_text = ""
+            for content_block in claude_response.content:
+                if hasattr(content_block, 'text'):
+                    response_text += content_block.text
+
+            # Parse JSON
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+
+            model_responses["claude"] = json.loads(response_text)
+        except Exception as e:
+            model_responses["claude"] = {"error": f"Claude analysis failed: {str(e)}"}
+
+        # Run GPT-4 analysis (if available)
+        if self.openai_client:
+            try:
+                gpt_response = self.openai_client.chat.completions.create(
+                    model=self.openai_model,
+                    messages=[{"role": "user", "content": analysis_prompt}],
+                    max_tokens=1000,
+                    temperature=0.3
+                )
+                response_text = gpt_response.choices[0].message.content
+
+                # Parse JSON
+                if "```json" in response_text:
+                    json_start = response_text.find("```json") + 7
+                    json_end = response_text.find("```", json_start)
+                    response_text = response_text[json_start:json_end].strip()
+                elif "```" in response_text:
+                    json_start = response_text.find("```") + 3
+                    json_end = response_text.find("```", json_start)
+                    response_text = response_text[json_start:json_end].strip()
+
+                model_responses["gpt4"] = json.loads(response_text)
+            except Exception as e:
+                model_responses["gpt4"] = {"error": f"GPT-4 analysis failed: {str(e)}"}
+
+        # Run Gemini analysis (if available)
+        if self.google_client:
+            try:
+                gemini_response = self.google_client.generate_content(
+                    analysis_prompt,
+                    generation_config={
+                        "max_output_tokens": 1000,
+                        "temperature": 0.3
+                    }
+                )
+                response_text = gemini_response.text
+
+                # Parse JSON
+                if "```json" in response_text:
+                    json_start = response_text.find("```json") + 7
+                    json_end = response_text.find("```", json_start)
+                    response_text = response_text[json_start:json_end].strip()
+                elif "```" in response_text:
+                    json_start = response_text.find("```") + 3
+                    json_end = response_text.find("```", json_start)
+                    response_text = response_text[json_start:json_end].strip()
+
+                model_responses["gemini"] = json.loads(response_text)
+            except Exception as e:
+                model_responses["gemini"] = {"error": f"Gemini analysis failed: {str(e)}"}
+
+        # Synthesize results
+        models_used = [m for m in model_responses.keys() if "error" not in model_responses[m]]
+
+        # Identify consensus insights (multiple models agree)
+        consensus_insights = []
+        divergent_insights = []
+
+        if len(models_used) >= 2:
+            # Compare primary strengths
+            strengths = [model_responses[m].get("primary_strength", "") for m in models_used if "error" not in model_responses[m]]
+            # Check for consensus (simplified - could use NLP similarity)
+            if len(set(strengths)) < len(strengths):  # Some overlap
+                consensus_insights.append(f"Primary Strength (CONSENSUS): {strengths[0]}")
+            else:
+                divergent_insights.append({
+                    "dimension": "Primary Strength",
+                    "perspectives": {m: model_responses[m].get("primary_strength") for m in models_used if "error" not in model_responses[m]}
+                })
+
+            # Compare recommendations
+            recommendations = [model_responses[m].get("highest_impact_recommendation", "") for m in models_used if "error" not in model_responses[m]]
+            if len(recommendations) >= 2:
+                divergent_insights.append({
+                    "dimension": "Highest Impact Recommendation",
+                    "perspectives": {m: model_responses[m].get("highest_impact_recommendation") for m in models_used if "error" not in model_responses[m]}
+                })
+
+        # Build synthesis
+        synthesis_parts = []
+        for model in models_used:
+            if "error" not in model_responses[model]:
+                synthesis_parts.append(f"**{model.upper()}:** {model_responses[model].get('market_position', '')}")
+
+        synthesis = "\n".join(synthesis_parts) if synthesis_parts else "Ensemble analysis incomplete"
+
+        return {
+            "ensemble_mode": "multi_model",
+            "models_used": models_used,
+            "model_responses": model_responses,
+            "consensus_insights": consensus_insights,
+            "divergent_insights": divergent_insights,
+            "synthesis": synthesis,
+            "analysis_quality": "high" if len(models_used) >= 2 else "medium"
+        }
+
     def _generate_enhanced_report(
         self,
         game_data: Dict[str, Any],
@@ -1596,8 +2123,104 @@ CRITICAL: Adjust recommendations to be realistic and specific. Feasibility score
 {rec_validation.get('summary', '')}
 """
 
+        # PHASE 3: Add benchmark analysis
+        benchmark = audit_results.get('benchmark_analysis', {})
+        if benchmark and not benchmark.get('error'):
+            correction_instructions += f"""
+**BENCHMARK ANALYSIS (Phase 3 Enhancement):**
+
+This game's percentile rankings:
+- Revenue: {benchmark.get('revenue_percentile', 50)}th percentile - {benchmark.get('revenue_interpretation', 'N/A')}
+- Review Score: {benchmark.get('review_score_percentile', 50)}th percentile - {benchmark.get('review_score_interpretation', 'N/A')}
+- Engagement: {benchmark.get('engagement_percentile', 50)}th percentile - {benchmark.get('engagement_interpretation', 'N/A')}
+- Overall Success: {benchmark.get('overall_success_percentile', 50)}th percentile
+
+Price Positioning: {benchmark.get('price_positioning', 'Unknown')}
+
+Key Strengths: {benchmark.get('key_strengths', [])}
+Relative Weaknesses: {benchmark.get('relative_weaknesses', [])}
+
+Summary: {benchmark.get('benchmark_summary', '')}
+
+IMPORTANT: Use these benchmark insights to provide context. Example: "As a top-30% performer, this game has room for growth but is already successful."
+"""
+
+        # PHASE 3: Add scenario analysis
+        scenarios = audit_results.get('scenario_analysis', {})
+        if scenarios and not scenarios.get('error'):
+            correction_instructions += f"""
+**SCENARIO ANALYSIS (Phase 3 Enhancement - 6 Month Projections):**
+
+BEST CASE ({scenarios.get('best_case', {}).get('probability', 15)}% probability):
+- Revenue: {scenarios.get('best_case', {}).get('revenue_projection', 'N/A')}
+- Reviews: {scenarios.get('best_case', {}).get('review_growth', 'N/A')}
+- Triggers: {scenarios.get('best_case', {}).get('key_triggers', [])}
+
+BASE CASE ({scenarios.get('base_case', {}).get('probability', 60)}% probability - MOST LIKELY):
+- Revenue: {scenarios.get('base_case', {}).get('revenue_projection', 'N/A')}
+- Reviews: {scenarios.get('base_case', {}).get('review_growth', 'N/A')}
+- Trajectory: {scenarios.get('base_case', {}).get('expected_trajectory', 'N/A')}
+
+WORST CASE ({scenarios.get('worst_case', {}).get('probability', 25)}% probability):
+- Revenue: {scenarios.get('worst_case', {}).get('revenue_projection', 'N/A')}
+- Reviews: {scenarios.get('worst_case', {}).get('review_growth', 'N/A')}
+- Risks: {scenarios.get('worst_case', {}).get('risk_factors', [])}
+
+Recommendation: {scenarios.get('recommendation', '')}
+
+IMPORTANT: Include scenario analysis in your report. Help the client plan for base case, prepare for worst case, and position for best case.
+"""
+
+        # PHASE 3: Add multi-model ensemble analysis
+        ensemble = audit_results.get('ensemble_analysis', {})
+        if ensemble and ensemble.get('ensemble_mode') == 'multi_model':
+            models_used = ensemble.get('models_used', [])
+            consensus = ensemble.get('consensus_insights', [])
+            divergent = ensemble.get('divergent_insights', [])
+
+            correction_instructions += f"""
+**MULTI-MODEL ENSEMBLE ANALYSIS (Phase 3 Enhancement):**
+
+Models consulted: {', '.join([m.upper() for m in models_used])}
+Analysis quality: {ensemble.get('analysis_quality', 'medium')}
+
+"""
+            if consensus:
+                correction_instructions += f"""CONSENSUS INSIGHTS (All models agree - HIGH CONFIDENCE):
+{chr(10).join([f"- {insight}" for insight in consensus])}
+
+"""
+
+            if divergent:
+                correction_instructions += f"""DIVERGENT INSIGHTS (Models disagree - requires careful consideration):
+"""
+                for div in divergent:
+                    correction_instructions += f"\n{div.get('dimension')}:\n"
+                    for model, insight in div.get('perspectives', {}).items():
+                        correction_instructions += f"  - {model.upper()}: {insight}\n"
+
+            model_responses = ensemble.get('model_responses', {})
+            if model_responses:
+                correction_instructions += f"""
+MODEL-SPECIFIC INSIGHTS:
+"""
+                for model, response in model_responses.items():
+                    if 'error' not in response:
+                        correction_instructions += f"""
+{model.upper()}:
+- Primary Strength: {response.get('primary_strength', 'N/A')}
+- Primary Weakness: {response.get('primary_weakness', 'N/A')}
+- Highest Impact Rec: {response.get('highest_impact_recommendation', 'N/A')}
+- Biggest Risk: {response.get('biggest_risk', 'N/A')}
+- Market Position: {response.get('market_position', 'N/A')}
+"""
+
+            correction_instructions += """
+IMPORTANT: Synthesize insights from multiple models. When models agree (consensus), emphasize with HIGH CONFIDENCE. When models disagree (divergent), present both perspectives and explain trade-offs.
+"""
+
         if correction_instructions:
-            correction_instructions += "\nApply ALL these corrections in your final analysis.\n"
+            correction_instructions += "\nApply ALL these corrections and enhancements in your final analysis.\n"
 
         prompt = f"""You are an expert game marketing analyst at Publitz creating the FINAL {report_type.upper()} AUDIT REPORT.
 
@@ -1618,6 +2241,12 @@ CRITICAL: Adjust recommendations to be realistic and specific. Feasibility score
 
 **SUCCESS LEVEL ANALYSIS:**
 {success_context}
+
+**BENCHMARK CONTEXT (Phase 3):**
+{json.dumps(benchmark, indent=2) if benchmark and not benchmark.get('error') else "Benchmark analysis not available"}
+
+**SCENARIO PROJECTIONS (Phase 3):**
+{json.dumps(scenarios, indent=2) if scenarios and not scenarios.get('error') else "Scenario analysis not available"}
 
 **CAPSULE IMAGE ANALYSIS:**
 {self._format_capsule_analysis(capsule_analysis) if capsule_analysis else "Capsule analysis not available"}

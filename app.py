@@ -133,7 +133,15 @@ def main():
             with st.spinner("Initializing components..."):
                 game_search = GameSearch()
                 steamdb_scraper = SteamDBScraper()
-                ai_generator = AIGenerator(api_key)
+
+                # Initialize AI generator with optional multi-model ensemble support
+                openai_key = os.getenv("OPENAI_API_KEY")
+                google_key = os.getenv("GOOGLE_API_KEY")
+                ai_generator = AIGenerator(
+                    api_key,
+                    openai_api_key=openai_key,
+                    google_api_key=google_key
+                )
 
             # Progress tracking
             progress_bar = st.progress(0, text="Starting...")
