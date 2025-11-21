@@ -1460,6 +1460,184 @@ If you implement the top 2-3 recommendations above:
         return markdown
 
 
+class GrowthStrategySection(ReportSection):
+    """Growth strategy with launch timing, social proof roadmap, and creator hit list"""
+
+    def analyze(self) -> Dict[str, Any]:
+        """Analyze growth strategy"""
+        logger.info("Analyzing growth strategy")
+
+        from src.growth_strategy import GrowthStrategyAnalyzer
+
+        game_data = self.data.get('game_data', {})
+        sales_data = self.data.get('sales_data', {})
+        target_launch_date = self.data.get('target_launch_date')
+
+        analyzer = GrowthStrategyAnalyzer()
+        self.growth_data = analyzer.analyze_growth_strategy(game_data, sales_data, target_launch_date)
+
+        # Score based on actionability (always high value)
+        self.score = 85
+        self.rating = self.get_rating()
+        self.analyzed = True
+
+        return {
+            'score': self.score,
+            'rating': self.rating
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate growth strategy markdown"""
+        if not self.analyzed:
+            self.analyze()
+
+        growth = self.growth_data
+        is_pre_launch = growth['is_pre_launch']
+
+        markdown = f"""## Growth Strategy & Traffic Tactics
+
+"""
+
+        if is_pre_launch and growth['launch_timing']:
+            timing = growth['launch_timing']
+            markdown += f"""### Launch Timing Intelligence
+
+**Optimal Launch Windows:**
+
+"""
+            for i, window in enumerate(timing['optimal_windows'][:3], 1):
+                rating_emoji = {'OPTIMAL': '🎯', 'GOOD': '✅', 'ACCEPTABLE': '🟡'}.get(window['rating'], '⚪')
+                markdown += f"""**{i}. {window['window']}** {rating_emoji} {window['rating']}
+- Dates: {window['dates']}
+- Competition: {window['competition']}
+- Reason: {window['reason']}
+
+"""
+
+            markdown += f"""**Windows to Avoid:**
+
+"""
+            for avoid in timing['avoid_windows']:
+                markdown += f"""**{avoid['window']}** ❌ {avoid['rating']}
+- Reason: {avoid['reason']}
+
+"""
+
+            markdown += f"""**Upcoming Steam Events:**
+
+"""
+            for event in timing['upcoming_steam_events']:
+                markdown += f"""- **{event['name']}**: {event['dates']} ({event['type'].title()}, {event['traffic_multiplier']}x traffic)
+"""
+
+            markdown += f"""
+**Recommended Strategy:** {timing['recommendation']['window']}
+- {timing['recommendation']['reason']}
+
+---
+
+"""
+
+        # Social Proof Roadmap
+        social = growth['social_proof_roadmap']
+        markdown += f"""### Social Proof Roadmap
+
+**Current Status:**
+- Steam Followers: {social['current']['steam_followers']:,}
+- Discord Members: {social['current']['discord_members']:,}
+- Reddit Subscribers: {social['current']['reddit_subscribers']:,}
+
+"""
+
+        if is_pre_launch:
+            markdown += f"""**Tier 2 Visibility Targets** (90 days to launch):
+- Steam Followers: {social['tier_2_targets']['steam_followers']:,} (need +{social['gaps']['steam_followers']:,})
+- Discord Members: {social['tier_2_targets']['discord_members']:,} (need +{social['gaps']['discord_members']:,})
+- Reddit Subscribers: {social['tier_2_targets']['reddit_subscribers']:,} (need +{social['gaps']['reddit_subscribers']:,})
+
+**Daily Growth Needed:**
+- Steam: +{social['daily_growth_needed']['steam_followers']:.1f} followers/day
+- Discord: +{social['daily_growth_needed']['discord_members']:.1f} members/day
+- Reddit: +{social['daily_growth_needed']['reddit_subscribers']:.1f} subscribers/day
+
+**Milestones:**
+
+"""
+            for milestone in social['milestones']:
+                markdown += f"""**Day {milestone['day']}:**
+- Target Followers: {milestone['target_followers']:,}
+- Target Discord: {milestone['target_discord']:,}
+- Tactics: {', '.join(milestone['tactics'])}
+
+"""
+        else:
+            markdown += f"""**Growth Targets** (Post-Launch):
+
+"""
+            for milestone in social['milestones']:
+                markdown += f"""**Month {milestone['month']}:**
+- Target Followers: {milestone['target_followers']:,}
+- Target Discord: {milestone['target_discord']:,}
+- Tactics: {', '.join(milestone['tactics'])}
+
+"""
+
+        markdown += "---\n\n### Creator & Influencer Hit List\n\n"
+
+        creators = growth['creator_hit_list']
+        budget = creators['budget_recommendation']
+
+        markdown += f"""**Outreach Budget Recommendation:**
+- Free Keys: {budget['free_keys']} creators
+- Sponsored Coverage: {budget['sponsored_coverage']} creators
+- Estimated Cost: {budget['estimated_cost']}
+- Estimated Total Wishlists: {budget['estimated_total_wishlists']:,}
+- Estimated Revenue Impact: ${budget['estimated_revenue_impact']:,}
+
+**Outreach Timeline:**
+"""
+        for phase, desc in creators['outreach_timeline'].items():
+            phase_name = phase.replace('_', ' ').title()
+            markdown += f"- **{phase_name}**: {desc}\n"
+
+        markdown += "\n**Tier 1 Priority Creators** (Highest Impact):\n\n"
+
+        for i, creator in enumerate(creators['tier_1_priority'], 1):
+            markdown += f"""**{i}. {creator['name']}** ({creator['subscribers']:,} subscribers)
+- Average Views: {creator['avg_views']:,}
+- Coverage Rate: {creator['coverage_rate']}%
+- Estimated Wishlists: {creator['estimated_wishlists']}
+- Offer: {creator['offer_type']} ({creator['cost_range']})
+- Genre Fit: {creator['genre_fit'].title()}
+- Revenue Impact: ${creator['estimated_revenue_impact']:,}
+
+"""
+
+        if creators['tier_2_priority']:
+            markdown += f"\n**Tier 2 Priority Creators** (Medium Impact, {len(creators['tier_2_priority'])} total):\n\n"
+            for i, creator in enumerate(creators['tier_2_priority'][:5], 1):
+                markdown += f"{i}. **{creator['name']}** ({creator['subscribers']:,} subs) - {creator['estimated_wishlists']} wishlists\n"
+
+        markdown += "\n---\n\n### Community Building Tactics\n\n"
+
+        for i, tactic in enumerate(growth['community_tactics'], 1):
+            markdown += f"""**{i}. {tactic['tactic']}**
+- **Timeline**: {tactic['timeline']}
+- **Expected Impact**: {tactic['expected_impact']}
+- **Effort**: {tactic['effort']}
+
+**Action Items:**
+"""
+            for action in tactic['actions']:
+                markdown += f"- {action}\n"
+
+            markdown += "\n"
+
+        markdown += "---\n\n"
+
+        return markdown
+
+
 class ReportBuilder:
     """Orchestrates report generation from multiple sections"""
 
@@ -1508,6 +1686,14 @@ class ReportBuilder:
             'capsule_analysis': getattr(self, 'capsule_analysis', None)
         })
         self.add_section(visibility_section)
+
+        # Create growth strategy section FOURTH (launch timing, creators, tactics)
+        growth_section = GrowthStrategySection("Growth Strategy", {
+            'game_data': self.game_data,
+            'sales_data': self.sales_data,
+            'target_launch_date': None  # Can be passed from app if known
+        })
+        self.add_section(growth_section)
 
         # Create standard sections
         competitor_section = CompetitorSection("Competitors", {
