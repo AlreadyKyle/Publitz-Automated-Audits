@@ -170,6 +170,26 @@ def _clean_unicode_for_pdf(text: str) -> str:
     return text
 
 
+def _remove_markdown_formatting(text: str) -> str:
+    """Remove all markdown formatting from text"""
+    # Remove bold and italic markers (order matters!)
+    text = re.sub(r'\*\*\*(.*?)\*\*\*', r'\1', text)  # Bold+Italic
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # Bold
+    text = re.sub(r'\*(.*?)\*', r'\1', text)  # Italic
+    text = re.sub(r'___(.*?)___', r'\1', text)  # Bold+Italic (underscore)
+    text = re.sub(r'__(.*?)__', r'\1', text)  # Bold (underscore)
+    text = re.sub(r'_(.*?)_', r'\1', text)  # Italic (underscore)
+    text = re.sub(r'`(.*?)`', r'\1', text)  # Inline code
+    text = re.sub(r'~~(.*?)~~', r'\1', text)  # Strikethrough
+
+    # Remove any stray asterisks or underscores that might be left
+    # (in case of malformed markdown)
+    text = re.sub(r'(?<!\w)\*+(?!\w)', '', text)  # Lone asterisks
+    text = re.sub(r'(?<!\w)_+(?!\w)', '', text)  # Lone underscores
+
+    return text
+
+
 def _parse_markdown_to_pdf(pdf: PDFReportGenerator, markdown_text: str):
     """Parse markdown and add to PDF with proper formatting"""
 
@@ -188,45 +208,42 @@ def _parse_markdown_to_pdf(pdf: PDFReportGenerator, markdown_text: str):
         # H1 headers (# )
         if line.startswith('# '):
             title = line[2:].strip()
+            title = _remove_markdown_formatting(title)
             pdf.chapter_title(title, level=1)
 
         # H2 headers (## )
         elif line.startswith('## '):
             title = line[3:].strip()
+            title = _remove_markdown_formatting(title)
             pdf.chapter_title(title, level=2)
 
         # H3 headers (### )
         elif line.startswith('### '):
             title = line[4:].strip()
+            title = _remove_markdown_formatting(title)
             pdf.chapter_title(title, level=3)
 
         # Bullet points (- or *)
         elif line.startswith('- ') or line.startswith('* '):
             text = line[2:].strip()
-            # Remove markdown bold/italic markers
-            text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-            text = re.sub(r'\*(.*?)\*', r'\1', text)
+            text = _remove_markdown_formatting(text)
             pdf.set_font('Arial', '', 10)
-            pdf.cell(10, 6, '•', 0, 0)
+            pdf.cell(10, 6, '*', 0, 0)
             pdf.multi_cell(0, 6, text)
 
         # Numbered lists
         elif re.match(r'^\d+\.', line):
             text = re.sub(r'^\d+\.\s*', '', line)
-            text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-            text = re.sub(r'\*(.*?)\*', r'\1', text)
+            text = _remove_markdown_formatting(text)
             pdf.set_font('Arial', '', 10)
             pdf.multi_cell(0, 6, f'  {text}')
 
         # Regular paragraph
         else:
-            # Remove markdown formatting
-            text = re.sub(r'\*\*(.*?)\*\*', r'\1', line)  # Bold
-            text = re.sub(r'\*(.*?)\*', r'\1', text)  # Italic
-            text = re.sub(r'`(.*?)`', r'\1', text)  # Code
+            text = _remove_markdown_formatting(line)
 
             # Skip horizontal rules
-            if text.strip() in ['---', '___', '***']:
+            if text.strip() in ['---', '___', '***', '']:
                 pdf.ln(5)
                 continue
 
