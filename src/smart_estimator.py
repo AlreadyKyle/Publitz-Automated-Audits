@@ -41,18 +41,24 @@ class SmartEstimator:
     def estimate_ownership(
         self,
         game_data: Dict[str, Any],
-        rawg_data: Optional[Dict[str, Any]] = None
+        rawg_data: Optional[Dict[str, Any]] = None,
+        igdb_data: Optional[Dict[str, Any]] = None,
+        trends_data: Optional[Dict[str, Any]] = None,
+        youtube_data: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Estimate game ownership using multiple signals
+        Estimate game ownership using multiple signals from all data sources
 
         Signals used:
         1. Genre (benchmark ranges)
-        2. Metacritic score (quality multiplier)
-        3. RAWG ratings count (popularity proxy)
+        2. Metacritic/IGDB score (quality multiplier)
+        3. RAWG/IGDB ratings count (popularity proxy)
         4. Release date (age factor)
         5. Playtime (engagement multiplier)
-        6. RAWG "added" count (library adds)
+        6. RAWG "added" count / IGDB follows (library adds)
+        7. Google Trends interest (marketing momentum)
+        8. YouTube views/engagement (content creator activity)
+        9. IGDB hypes (pre-release buzz)
         """
 
         # Start with genre-based baseline
@@ -110,6 +116,54 @@ class SmartEstimator:
             multiplier *= library_mult
             signals_used.append(f'library_adds_{added}')
             print(f"  Library adds multiplier ({added:,} adds): {library_mult}x")
+
+        # Signal 6: IGDB follows/rating count (community engagement)
+        if igdb_data:
+            # IGDB follows (similar to library adds)
+            if igdb_data.get('follows', 0) > 0:
+                follows = igdb_data['follows']
+                follows_mult = self._igdb_follows_multiplier(follows)
+                multiplier *= follows_mult
+                signals_used.append(f'igdb_follows_{follows}')
+                print(f"  IGDB follows multiplier ({follows:,} follows): {follows_mult}x")
+
+            # IGDB rating count (cross-validate with RAWG)
+            if igdb_data.get('rating_count', 0) > 0:
+                rating_count = igdb_data['rating_count']
+                igdb_rating_mult = self._igdb_rating_multiplier(rating_count)
+                multiplier *= igdb_rating_mult
+                signals_used.append(f'igdb_ratings_{rating_count}')
+                print(f"  IGDB rating count multiplier ({rating_count:,} ratings): {igdb_rating_mult}x")
+
+            # IGDB critic score (cross-validate with Metacritic)
+            if igdb_data.get('critic_rating', 0) > 0:
+                critic = int(igdb_data['critic_rating'])
+                critic_mult = self._metacritic_multiplier(critic)  # Use same scale
+                multiplier *= critic_mult
+                signals_used.append(f'igdb_critic_{critic}')
+                print(f"  IGDB critic multiplier ({critic}/100): {critic_mult}x")
+
+        # Signal 7: Google Trends interest (marketing momentum)
+        if trends_data:
+            current_interest = trends_data.get('current_interest', 0)
+            trend_direction = trends_data.get('trend_direction', 'unknown')
+
+            if current_interest > 0:
+                trends_mult = self._trends_multiplier(current_interest, trend_direction)
+                multiplier *= trends_mult
+                signals_used.append(f'trends_{current_interest}_{trend_direction}')
+                print(f"  Google Trends multiplier (interest: {current_interest}, {trend_direction}): {trends_mult}x")
+
+        # Signal 8: YouTube engagement (content creator activity)
+        if youtube_data:
+            total_views = youtube_data.get('total_views', 0)
+            video_count = youtube_data.get('video_count', 0)
+
+            if total_views > 0:
+                youtube_mult = self._youtube_multiplier(total_views, video_count)
+                multiplier *= youtube_mult
+                signals_used.append(f'youtube_{total_views}_views')
+                print(f"  YouTube multiplier ({total_views:,} views, {video_count} videos): {youtube_mult}x")
 
         # Calculate final estimate
         final_estimate = int(base_estimate * multiplier)
@@ -325,11 +379,90 @@ class SmartEstimator:
         else:
             return 1.0
 
+    def _igdb_follows_multiplier(self, follows: int) -> float:
+        """Multiplier based on IGDB follows (community interest)"""
+        if follows > 100000:
+            return 2.5  # Massive following
+        elif follows > 50000:
+            return 2.0
+        elif follows > 20000:
+            return 1.6
+        elif follows > 10000:
+            return 1.3
+        elif follows > 1000:
+            return 1.1
+        else:
+            return 1.0
+
+    def _igdb_rating_multiplier(self, rating_count: int) -> float:
+        """Multiplier based on IGDB rating count (cross-validation with RAWG)"""
+        # IGDB tends to have lower counts than RAWG, so adjust thresholds
+        if rating_count > 10000:
+            return 1.8
+        elif rating_count > 5000:
+            return 1.5
+        elif rating_count > 1000:
+            return 1.3
+        elif rating_count > 500:
+            return 1.1
+        else:
+            return 1.0
+
+    def _trends_multiplier(self, current_interest: int, trend_direction: str) -> float:
+        """
+        Multiplier based on Google Trends search interest
+
+        Args:
+            current_interest: 0-100 scale
+            trend_direction: 'rising', 'falling', 'stable', 'unknown'
+        """
+        # Base multiplier from current interest
+        if current_interest >= 80:
+            base = 2.0  # Viral/trending
+        elif current_interest >= 50:
+            base = 1.5  # High interest
+        elif current_interest >= 25:
+            base = 1.2  # Moderate interest
+        elif current_interest >= 10:
+            base = 1.0  # Some interest
+        else:
+            base = 0.9  # Low interest
+
+        # Adjust based on trend direction
+        if trend_direction == 'rising':
+            return base * 1.2  # Growing momentum
+        elif trend_direction == 'falling':
+            return base * 0.9  # Declining interest
+        else:
+            return base
+
+    def _youtube_multiplier(self, total_views: int, video_count: int) -> float:
+        """
+        Multiplier based on YouTube engagement
+
+        High view counts indicate strong content creator interest and
+        marketing reach, which correlates with sales
+        """
+        if total_views > 50_000_000:
+            return 2.5  # Massive YouTube presence
+        elif total_views > 10_000_000:
+            return 2.0  # Very strong
+        elif total_views > 5_000_000:
+            return 1.6  # Strong
+        elif total_views > 1_000_000:
+            return 1.3  # Good
+        elif total_views > 100_000:
+            return 1.1  # Moderate
+        else:
+            return 1.0
+
     def _calculate_confidence(self, signals: list) -> str:
-        """Calculate confidence level based on number of signals"""
+        """Calculate confidence level based on number of signals (up to 9+)"""
         signal_count = len(signals)
 
-        if signal_count >= 6:
+        if signal_count >= 8:
+            return 'very-high'  # Multiple sources cross-validating
+        elif signal_count >= 6:
             return 'high'
         elif signal_count >= 4:
             return 'medium-high'

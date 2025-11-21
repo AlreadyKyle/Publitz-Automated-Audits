@@ -26,16 +26,27 @@ class AlternativeDataSource:
         self.session = requests.Session()
         self.session.headers.update(self.headers)
 
-        # Import RAWG and Smart Estimator
+        # Import all data source APIs
         try:
             from src.rawg_api import RAWGApi
+            from src.igdb_api import IGDBApi
+            from src.trends_api import TrendsApi
+            from src.youtube_api import YouTubeApi
             from src.smart_estimator import SmartEstimator
+
             self.rawg = RAWGApi()
+            self.igdb = IGDBApi()
+            self.trends = TrendsApi()
+            self.youtube = YouTubeApi()
             self.estimator = SmartEstimator()
             self.use_smart_estimation = True
+            print("✓ Initialized all data source APIs (RAWG, IGDB, Trends, YouTube)")
         except ImportError as e:
-            print(f"Warning: Could not import RAWG/Estimator: {e}")
+            print(f"Warning: Could not import data source APIs: {e}")
             self.rawg = None
+            self.igdb = None
+            self.trends = None
+            self.youtube = None
             self.estimator = None
             self.use_smart_estimation = False
 
@@ -367,12 +378,41 @@ class AlternativeDataSource:
 
     def _build_from_rawg(self, app_id: int, rawg_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Build game data from RAWG API data + smart estimation
+        Build game data from ALL data sources + smart estimation
 
+        Fetches from: RAWG, IGDB, Google Trends, YouTube
         Uses multi-signal analysis to estimate ownership and revenue
         """
-        # Use smart estimator for ownership
-        ownership_data = self.estimator.estimate_ownership({}, rawg_data)
+        game_name = rawg_data.get('name', 'Unknown')
+
+        # Fetch from additional sources for cross-validation
+        igdb_data = None
+        trends_data = None
+        youtube_data = None
+
+        if self.igdb:
+            igdb_data = self.igdb.get_multiple_signals(game_name)
+            if igdb_data:
+                print(f"✓ Got IGDB data for {game_name}")
+
+        if self.trends:
+            trends_data = self.trends.get_comprehensive_metrics(game_name)
+            if trends_data:
+                print(f"✓ Got Google Trends data for {game_name}")
+
+        if self.youtube:
+            youtube_data = self.youtube.get_comprehensive_metrics(game_name)
+            if youtube_data:
+                print(f"✓ Got YouTube data for {game_name}")
+
+        # Use smart estimator with ALL available signals
+        ownership_data = self.estimator.estimate_ownership(
+            {},
+            rawg_data,
+            igdb_data,
+            trends_data,
+            youtube_data
+        )
 
         # Estimate reviews from RAWG ratings (rough conversion)
         # RAWG ratings ≈ 10-20% of Steam reviews typically
@@ -413,7 +453,7 @@ class AlternativeDataSource:
 
             # Metadata
             'quality_multiplier': ownership_data.get('total_multiplier', 1.0),
-            'data_source': 'RAWG API + Smart Estimation',
+            'data_source': self._build_data_source_string(rawg_data, igdb_data, trends_data, youtube_data),
             'signals_used': ownership_data.get('signals_used', []),
 
             # RAWG-specific enrichment
@@ -421,6 +461,19 @@ class AlternativeDataSource:
             'average_playtime': rawg_data.get('playtime', 0),
             'rawg_rating': rawg_data.get('rating', 0),
             'rawg_ratings_count': rawg_data.get('ratings_count', 0),
+
+            # IGDB enrichment (if available)
+            'igdb_follows': igdb_data.get('follows', 0) if igdb_data else 0,
+            'igdb_rating': igdb_data.get('user_rating', 0) if igdb_data else 0,
+            'igdb_critic_score': igdb_data.get('critic_rating', 0) if igdb_data else 0,
+
+            # Google Trends enrichment (if available)
+            'trends_interest': trends_data.get('current_interest', 0) if trends_data else 0,
+            'trends_direction': trends_data.get('trend_direction', 'unknown') if trends_data else 'unknown',
+
+            # YouTube enrichment (if available)
+            'youtube_views': youtube_data.get('total_views', 0) if youtube_data else 0,
+            'youtube_videos': youtube_data.get('video_count', 0) if youtube_data else 0,
         }
 
         # Estimate revenue
@@ -431,12 +484,39 @@ class AlternativeDataSource:
         )
         game_data.update(revenue_data)
 
-        print(f"Built game data from RAWG: {game_data['name']}")
+        print(f"Built game data from multiple sources: {game_data['name']}")
         print(f"  Ownership: {ownership_data['owners_display']}")
         print(f"  Confidence: {ownership_data['confidence']}")
         print(f"  Signals: {', '.join(ownership_data['signals_used'])}")
+        print(f"  Data Sources: {game_data['data_source']}")
 
         return game_data
+
+    def _build_data_source_string(
+        self,
+        rawg_data: Optional[Dict[str, Any]],
+        igdb_data: Optional[Dict[str, Any]],
+        trends_data: Optional[Dict[str, Any]],
+        youtube_data: Optional[Dict[str, Any]]
+    ) -> str:
+        """Build a human-readable string showing which data sources were used"""
+        sources = []
+
+        if rawg_data:
+            sources.append("RAWG API")
+        if igdb_data:
+            sources.append("IGDB API")
+        if trends_data:
+            sources.append("Google Trends")
+        if youtube_data:
+            sources.append("YouTube Data")
+
+        if len(sources) == 0:
+            return "Generic Estimation"
+        elif len(sources) == 1:
+            return f"{sources[0]} + Smart Estimation"
+        else:
+            return f"{' + '.join(sources)} + Smart Estimation"
 
 
 def test_alternative_source():
