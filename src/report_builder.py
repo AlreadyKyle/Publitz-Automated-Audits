@@ -77,7 +77,7 @@ class ExecutiveSummarySection(ReportSection):
         self.all_sections = all_sections or []
         self.priority_actions = []
         self.overall_score = 0
-        self.roi_projection = {}
+        self.section_breakdown = {}
 
     def analyze(self) -> Dict[str, Any]:
         """Analyze all sections and create executive summary"""
@@ -87,19 +87,104 @@ class ExecutiveSummarySection(ReportSection):
         if self.all_sections:
             section_scores = [s.get_score() for s in self.all_sections if hasattr(s, 'get_score')]
             self.overall_score = int(sum(section_scores) / len(section_scores)) if section_scores else 0
+
+            # Build section breakdown
+            for section in self.all_sections:
+                if hasattr(section, 'section_name'):
+                    self.section_breakdown[section.section_name] = {
+                        'score': section.get_score(),
+                        'rating': section.get_rating()
+                    }
         else:
             self.overall_score = 0
+
+        # Collect all recommendations from all sections
+        all_recommendations = []
+        for section in self.all_sections:
+            if hasattr(section, 'recommendations'):
+                all_recommendations.extend(section.recommendations)
+
+        # Select priority actions
+        self.priority_actions = self._select_priority_actions(all_recommendations)
 
         self.score = self.overall_score
         self.rating = self.get_rating()
         self.analyzed = True
 
+        logger.info(f"Executive summary generated: Score {self.overall_score}/100, {len(self.priority_actions)} priority actions")
+
         return {
             'score': self.score,
             'rating': self.rating,
             'overall_score': self.overall_score,
-            'priority_actions': self.priority_actions
+            'priority_actions': self.priority_actions,
+            'section_breakdown': self.section_breakdown
         }
+
+    def _select_priority_actions(self, recommendations: List) -> List:
+        """
+        Select top priority actions from all recommendations
+
+        Algorithm:
+        1. All CRITICAL priority items
+        2. High impact + High/Medium priority
+        3. Sort by impact level
+        4. Return top 5
+
+        Args:
+            recommendations: List of Recommendation objects
+
+        Returns:
+            List of top priority recommendations
+        """
+        if not recommendations:
+            return []
+
+        priority_actions = []
+
+        # Helper to get priority value
+        def get_priority_value(rec):
+            if hasattr(rec, 'priority'):
+                if hasattr(rec.priority, 'value'):
+                    return rec.priority.value
+                return rec.priority
+            return 'medium'
+
+        # Helper to get impact value
+        def get_impact_value(rec):
+            if hasattr(rec, 'impact'):
+                if hasattr(rec.impact, 'value'):
+                    return rec.impact.value
+                return rec.impact
+            return 'medium'
+
+        # Priority 1: All critical items
+        critical_items = [r for r in recommendations if get_priority_value(r) == 'critical']
+        priority_actions.extend(critical_items)
+
+        # Priority 2: High impact + high priority
+        high_items = [r for r in recommendations
+                     if get_priority_value(r) == 'high' and get_impact_value(r) == 'high']
+        priority_actions.extend(high_items)
+
+        # Priority 3: High impact + medium priority
+        if len(priority_actions) < 5:
+            medium_high_items = [r for r in recommendations
+                                if get_priority_value(r) == 'medium' and get_impact_value(r) == 'high']
+            priority_actions.extend(medium_high_items)
+
+        # Remove duplicates and limit to top 5
+        seen = set()
+        unique_actions = []
+        for action in priority_actions[:8]:  # Check up to 8 to ensure 5 unique
+            action_id = f"{action.title}_{action.category}" if hasattr(action, 'title') else str(action)
+            if action_id not in seen:
+                seen.add(action_id)
+                unique_actions.append(action)
+                if len(unique_actions) >= 5:
+                    break
+
+        return unique_actions
 
     def generate_markdown(self) -> str:
         """Generate executive summary markdown"""
@@ -115,22 +200,72 @@ class ExecutiveSummarySection(ReportSection):
 
         emoji = rating_emoji.get(self.rating, '⚪')
 
-        markdown = f"""# EXECUTIVE SUMMARY
+        # Header
+        markdown = f"""# 📊 EXECUTIVE SUMMARY
 
 ## Overall Assessment
-**Score: {self.overall_score}/100** {emoji} {self.rating.title()}
 
-Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**Overall Score: {self.overall_score}/100** {emoji} **{self.rating.upper()}**
 
----
+*Report Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}*
 
 """
 
+        # Add interpretation
+        if self.overall_score >= 80:
+            markdown += "\n✨ **Excellent foundation.** Your store page is well-optimized. Focus on fine-tuning and marketing execution.\n\n"
+        elif self.overall_score >= 65:
+            markdown += "\n👍 **Solid foundation with room for improvement.** Address the priority actions below to maximize your launch potential.\n\n"
+        elif self.overall_score >= 50:
+            markdown += "\n⚠️ **Significant gaps identified.** Critical improvements needed before launch. Priority actions below will have major impact.\n\n"
+        else:
+            markdown += "\n🚨 **Store page needs major work.** Multiple critical issues must be addressed. Start with priority actions immediately.\n\n"
+
+        markdown += "---\n\n"
+
+        # Section breakdown
+        if self.section_breakdown:
+            markdown += "## Section Scores\n\n"
+            markdown += "| Section | Score | Rating |\n"
+            markdown += "|---------|-------|--------|\n"
+
+            for section_name, section_data in self.section_breakdown.items():
+                score = section_data['score']
+                rating = section_data['rating']
+                section_emoji = rating_emoji.get(rating, '⚪')
+
+                markdown += f"| {section_name} | {score}/100 | {section_emoji} {rating.title()} |\n"
+
+            markdown += "\n---\n\n"
+
+        # Priority actions
         if self.priority_actions:
-            markdown += "## Priority Actions\n\n"
-            for i, action in enumerate(self.priority_actions[:5], 1):
-                markdown += f"{i}. **{action.get('title', 'Action')}**\n"
-                markdown += f"   - {action.get('description', 'No description')}\n\n"
+            markdown += "## 🎯 Priority Actions\n\n"
+            markdown += "*Top recommendations ranked by impact and urgency*\n\n"
+
+            for i, action in enumerate(self.priority_actions, 1):
+                # Get priority and impact
+                priority_val = action.priority.value if hasattr(action.priority, 'value') else action.priority
+                impact_val = action.impact.value if hasattr(action.impact, 'value') else action.impact
+
+                priority_emoji = {
+                    'critical': '🔴',
+                    'high': '🟡',
+                    'medium': '🟢',
+                    'low': '⚪'
+                }
+
+                impact_label = impact_val.upper() if isinstance(impact_val, str) else str(impact_val)
+                emoji_icon = priority_emoji.get(priority_val, '⚪')
+
+                markdown += f"### {i}. {emoji_icon} {action.title}\n\n"
+                markdown += f"**Priority:** {priority_val.title()} | **Impact:** {impact_label}\n\n"
+                markdown += f"{action.description}\n\n"
+
+                if hasattr(action, 'time_estimate') and action.time_estimate:
+                    markdown += f"*Estimated time: {action.time_estimate}*\n\n"
+
+            markdown += "---\n\n"
 
         return markdown
 
@@ -139,28 +274,30 @@ class StorePageSection(ReportSection):
     """Store page optimization analysis"""
 
     def analyze(self) -> Dict[str, Any]:
-        """Analyze store page elements"""
+        """Analyze store page elements using StorePageAnalyzer"""
         logger.info("Analyzing store page")
 
-        # Placeholder scoring logic - will be enhanced in Phase 1
+        from src.store_analyzer import StorePageAnalyzer
+
         game_data = self.data.get('game_data', {})
+        competitor_data = self.data.get('competitors', [])
 
-        # Basic scoring based on available data
-        scores = {
-            'has_description': 10 if game_data.get('short_description') else 0,
-            'has_screenshots': 10 if game_data.get('screenshots') else 0,
-            'has_movies': 10 if game_data.get('movies') else 0,
-            'has_genres': 10 if game_data.get('genres') else 0,
-        }
+        analyzer = StorePageAnalyzer()
+        analysis = analyzer.analyze_complete(game_data, competitor_data)
 
-        self.score = sum(scores.values())
-        self.rating = self.get_rating()
+        self.score = analysis['overall_score']
+        self.rating = analysis['overall_rating']
+        self.recommendations = analysis['recommendations']
+        self.benchmarks = analysis.get('sections', {})
         self.analyzed = True
 
         return {
             'score': self.score,
             'rating': self.rating,
-            'scores': scores
+            'recommendations': self.recommendations,
+            'sections': analysis['sections'],
+            'strengths': analysis['strengths'],
+            'weaknesses': analysis['weaknesses']
         }
 
     def generate_markdown(self) -> str:
@@ -168,14 +305,58 @@ class StorePageSection(ReportSection):
         if not self.analyzed:
             self.analyze()
 
-        return f"""## Store Page Analysis
+        rating_emoji = {'excellent': '✅', 'good': '🟢', 'fair': '🟡', 'poor': '🔴'}
+        emoji = rating_emoji.get(self.rating, '⚪')
 
-**Score: {self.score}/100** - {self.rating.title()}
+        markdown = f"""## Store Page Optimization
 
-### Current Status
-[Detailed analysis will be added in Phase 1]
+**Overall Score: {self.score}/100** {emoji} {self.rating.title()}
 
 """
+
+        # Section breakdown
+        if self.benchmarks:
+            markdown += "### Component Scores\n\n"
+            for section_name, section_data in self.benchmarks.items():
+                section_score = section_data.get('score', 0)
+                section_rating = section_data.get('rating', 'unknown')
+                section_emoji = rating_emoji.get(section_rating, '⚪')
+
+                markdown += f"- **{section_name.title()}**: {section_score}/100 {section_emoji}\n"
+                markdown += f"  - {section_data.get('reason', 'No details')}\n"
+
+            markdown += "\n"
+
+        # Recommendations
+        if self.recommendations:
+            markdown += "### Recommendations\n\n"
+
+            # Group by priority
+            critical = [r for r in self.recommendations if r.priority == 'critical' or (hasattr(r, 'priority') and r.priority.value == 'critical')]
+            high = [r for r in self.recommendations if r.priority == 'high' or (hasattr(r, 'priority') and r.priority.value == 'high')]
+            medium = [r for r in self.recommendations if r.priority == 'medium' or (hasattr(r, 'priority') and r.priority.value == 'medium')]
+
+            if critical:
+                markdown += "#### 🔴 Critical Priority\n\n"
+                for rec in critical:
+                    markdown += f"**{rec.title}**\n"
+                    markdown += f"{rec.description}\n\n"
+
+            if high:
+                markdown += "#### 🟡 High Priority\n\n"
+                for rec in high:
+                    markdown += f"**{rec.title}**\n"
+                    markdown += f"{rec.description}\n\n"
+
+            if medium:
+                markdown += "#### 🟢 Medium Priority\n\n"
+                for rec in medium[:3]:  # Limit to top 3 medium priority
+                    markdown += f"**{rec.title}**\n"
+                    markdown += f"{rec.description}\n\n"
+
+        markdown += "---\n\n"
+
+        return markdown
 
 
 class CompetitorSection(ReportSection):
