@@ -13,17 +13,19 @@ class SteamDBScraper:
         }
         self.alternative_source = AlternativeDataSource()
 
-    def get_sales_data(self, app_id: Any) -> Dict[str, Any]:
+    def get_sales_data(self, app_id: Any, game_name: str = None) -> Dict[str, Any]:
         """
         IMPROVED: Get sales and revenue estimates using multiple methods
 
         Priority order:
         1. Alternative source (Steam store page scraping) - works when API is blocked
-        2. SteamSpy API - fallback if scraping fails
-        3. Fallback estimates - last resort
+        2. RAWG API + Smart Estimation (when Steam is blocked and game_name provided)
+        3. SteamSpy API - fallback if scraping fails
+        4. Fallback estimates - last resort
 
         Args:
             app_id: Steam app ID
+            game_name: Game name (optional, enables RAWG fallback)
 
         Returns:
             Dictionary with enhanced sales data including confidence ranges
@@ -34,7 +36,7 @@ class SteamDBScraper:
         # PRIORITY 1: Try alternative source (Steam store page scraping)
         try:
             print(f"Attempting to fetch data using alternative source for app {app_id}...")
-            alt_data = self.alternative_source.get_complete_game_data(int(app_id))
+            alt_data = self.alternative_source.get_complete_game_data(int(app_id), game_name=game_name)
 
             if alt_data and alt_data.get('reviews_total', 0) > 0:
                 print(f"✓ Successfully retrieved data from alternative source")

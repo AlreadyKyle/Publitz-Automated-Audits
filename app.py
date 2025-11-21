@@ -173,7 +173,7 @@ def main():
 
             # Phase 2.2: Step 4 - Gather Steam data
             with st.spinner("📊 Gathering Steam market data..."):
-                sales_data = steamdb_scraper.get_sales_data(game_data['app_id'])
+                sales_data = steamdb_scraper.get_sales_data(game_data['app_id'], game_name=game_name)
                 # Get review velocity data
                 review_stats = steamdb_scraper.get_review_stats(game_data['app_id'])
                 # Analyze capsule image for CTR optimization
@@ -188,7 +188,10 @@ def main():
             with st.spinner("📊 Analyzing competitor performance..."):
                 for competitor in competitor_data:
                     try:
-                        competitor['steam_data'] = steamdb_scraper.get_sales_data(competitor['app_id'])
+                        competitor['steam_data'] = steamdb_scraper.get_sales_data(
+                            competitor['app_id'],
+                            game_name=competitor.get('name', 'Unknown')
+                        )
                     except Exception as e:
                         print(f"Warning: Failed to get data for competitor {competitor.get('name', 'Unknown')}: {e}")
                         competitor['steam_data'] = {}

@@ -26,6 +26,19 @@ class AlternativeDataSource:
         self.session = requests.Session()
         self.session.headers.update(self.headers)
 
+        # Import RAWG and Smart Estimator
+        try:
+            from src.rawg_api import RAWGApi
+            from src.smart_estimator import SmartEstimator
+            self.rawg = RAWGApi()
+            self.estimator = SmartEstimator()
+            self.use_smart_estimation = True
+        except ImportError as e:
+            print(f"Warning: Could not import RAWG/Estimator: {e}")
+            self.rawg = None
+            self.estimator = None
+            self.use_smart_estimation = False
+
     def get_game_data_from_store_page(self, app_id: int) -> Dict[str, Any]:
         """
         Scrape game data directly from Steam store page
@@ -287,25 +300,49 @@ class AlternativeDataSource:
             'confidence': 'low'
         }
 
-    def get_complete_game_data(self, app_id: int) -> Dict[str, Any]:
+    def get_complete_game_data(self, app_id: int, game_name: str = None) -> Dict[str, Any]:
         """
         Get complete game data from alternative sources
+
+        Priority order:
+        1. Steam store page scraping (best if it works)
+        2. RAWG API + smart estimation (when Steam is blocked)
+        3. Minimal fallback (last resort)
 
         This is the main entry point that orchestrates data fetching
         """
         print(f"Fetching data for app_id {app_id} using alternative sources...")
 
-        # Get base game data from store page
+        # PRIORITY 1: Try Steam store page
         game_data = self.get_game_data_from_store_page(app_id)
 
-        if not game_data or 'reviews_total' not in game_data:
-            print("Failed to get game data from store page")
-            return {}
+        if game_data and game_data.get('reviews_total', 0) > 0:
+            print("✓ Got data from Steam store page")
+            # Estimate ownership based on reviews
+            review_count = game_data.get('reviews_total', 0)
+            ownership_data = self.get_ownership_estimates(app_id, review_count)
+            game_data.update(ownership_data)
+        else:
+            print("✗ Steam store page failed or returned no data")
 
-        # Estimate ownership based on reviews
-        review_count = game_data.get('reviews_total', 0)
-        ownership_data = self.get_ownership_estimates(app_id, review_count)
-        game_data.update(ownership_data)
+            # PRIORITY 2: Try RAWG API + Smart Estimation
+            if self.use_smart_estimation and game_name:
+                print(f"Trying RAWG API fallback for: {game_name}")
+                rawg_data = None
+                if self.rawg:
+                    rawg_data = self.rawg.search_game(game_name)
+
+                if rawg_data:
+                    print(f"✓ Got data from RAWG: {rawg_data['name']}")
+                    # Use smart estimation based on RAWG data
+                    game_data = self._build_from_rawg(app_id, rawg_data)
+                else:
+                    print("✗ RAWG API failed or no results")
+                    # PRIORITY 3: Minimal fallback
+                    return {}
+            else:
+                print("✗ Smart estimation not available or no game name provided")
+                return {}
 
         # Estimate revenue
         price = game_data.get('price_raw', 0)
@@ -326,6 +363,79 @@ class AlternativeDataSource:
             game_data['quality_multiplier'] = 0.9
 
         print(f"Successfully fetched data: {game_data.get('name')} - {review_count:,} reviews")
+        return game_data
+
+    def _build_from_rawg(self, app_id: int, rawg_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Build game data from RAWG API data + smart estimation
+
+        Uses multi-signal analysis to estimate ownership and revenue
+        """
+        # Use smart estimator for ownership
+        ownership_data = self.estimator.estimate_ownership({}, rawg_data)
+
+        # Estimate reviews from RAWG ratings (rough conversion)
+        # RAWG ratings ≈ 10-20% of Steam reviews typically
+        estimated_reviews = int(rawg_data.get('ratings_count', 0) * 0.15)
+        positive_percent = rawg_data.get('positive_rating_percent', 75)
+        estimated_positive = int(estimated_reviews * (positive_percent / 100))
+        estimated_negative = estimated_reviews - estimated_positive
+
+        # Build comprehensive game data
+        game_data = {
+            'app_id': app_id,
+            'name': rawg_data.get('name'),
+            'developer': 'Unknown',  # RAWG doesn't always have this
+            'publisher': 'Unknown',
+            'release_date': rawg_data.get('released', 'Unknown'),
+            'genres': rawg_data.get('genres', []),
+            'tags': rawg_data.get('tags', []),
+            'description': rawg_data.get('description', '')[:200] if rawg_data.get('description') else '',
+
+            # Price - we don't have this from RAWG, use genre average
+            'price': '$29.99',  # Default assumption
+            'price_raw': 29.99,
+
+            # Reviews (estimated from RAWG ratings)
+            'reviews_total': estimated_reviews,
+            'reviews_positive': estimated_positive,
+            'reviews_negative': estimated_negative,
+            'review_score': f"{positive_percent:.1f}%",
+            'review_score_raw': positive_percent,
+
+            # Ownership (from smart estimation)
+            'owners_min': ownership_data['owners_min'],
+            'owners_max': ownership_data['owners_max'],
+            'owners_avg': ownership_data['owners_avg'],
+            'owners_display': ownership_data['owners_display'],
+            'estimation_method': f"rawg_smart_estimation",
+            'confidence': ownership_data['confidence'],
+
+            # Metadata
+            'quality_multiplier': ownership_data.get('total_multiplier', 1.0),
+            'data_source': 'RAWG API + Smart Estimation',
+            'signals_used': ownership_data.get('signals_used', []),
+
+            # RAWG-specific enrichment
+            'metacritic': rawg_data.get('metacritic'),
+            'average_playtime': rawg_data.get('playtime', 0),
+            'rawg_rating': rawg_data.get('rating', 0),
+            'rawg_ratings_count': rawg_data.get('ratings_count', 0),
+        }
+
+        # Estimate revenue
+        revenue_data = self.estimator.estimate_revenue(
+            ownership_data,
+            game_data['price_raw'],
+            positive_percent
+        )
+        game_data.update(revenue_data)
+
+        print(f"Built game data from RAWG: {game_data['name']}")
+        print(f"  Ownership: {ownership_data['owners_display']}")
+        print(f"  Confidence: {ownership_data['confidence']}")
+        print(f"  Signals: {', '.join(ownership_data['signals_used'])}")
+
         return game_data
 
 
