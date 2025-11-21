@@ -376,5 +376,5 @@ class SteamDBScraper:
             return {'recent_reviews': recent_reviews}
 
         except Exception as e:
-            {logger.error(f"Error getting recent reviews: {e}")
+            logger.error(f"Error getting recent reviews: {e}")
             return {'recent_reviews': 0}
