@@ -367,32 +367,109 @@ class CompetitorSection(ReportSection):
         logger.info("Analyzing competitors")
 
         competitors = self.data.get('competitors', [])
+        game_data = self.data.get('game_data', {})
 
-        # Basic scoring - will be enhanced
-        self.score = 70 if len(competitors) >= 3 else 40
+        # Score based on competitive positioning
+        if len(competitors) >= 5:
+            self.score = 80
+            self.rating = "good"
+        elif len(competitors) >= 3:
+            self.score = 65
+            self.rating = "fair"
+        else:
+            self.score = 40
+            self.rating = "poor"
+
+        # Analyze pricing vs competitors
+        your_price = game_data.get('price_overview', {}).get('final', 0) / 100
+        comp_prices = [c.get('price_overview', {}).get('final', 0) / 100
+                      for c in competitors if c.get('price_overview')]
+
+        if comp_prices:
+            avg_comp_price = sum(comp_prices) / len(comp_prices)
+            price_diff_pct = abs(your_price - avg_comp_price) / avg_comp_price * 100 if avg_comp_price > 0 else 0
+
+            # Adjust score based on pricing
+            if price_diff_pct < 15:  # Within 15% of average
+                self.score += 10
+            elif price_diff_pct > 30:  # More than 30% different
+                self.score -= 5
+
+        self.score = min(100, max(0, self.score))
         self.rating = self.get_rating()
         self.analyzed = True
 
         return {
             'score': self.score,
             'rating': self.rating,
-            'competitor_count': len(competitors)
+            'competitor_count': len(competitors),
+            'price_positioning': 'competitive' if price_diff_pct < 15 else 'divergent'
         }
 
     def generate_markdown(self) -> str:
-        """Generate competitor analysis markdown"""
+        """Generate competitor analysis markdown with visualizations"""
         if not self.analyzed:
             self.analyze()
 
+        from src.visualizations import ReportVisualizer
+
         competitors = self.data.get('competitors', [])
+        game_data = self.data.get('game_data', {})
+
+        rating_emoji = {'excellent': '✅', 'good': '🟢', 'fair': '🟡', 'poor': '🔴'}
+        emoji = rating_emoji.get(self.rating, '⚪')
 
         markdown = f"""## Competitive Analysis
 
-**Score: {self.score}/100** - {self.rating.title()}
+**Score: {self.score}/100** {emoji} {self.rating.title()}
 
-Found {len(competitors)} competitors for analysis.
+Analyzed {len(competitors)} direct competitors in your genre.
+
+---
 
 """
+
+        # Add comparison table
+        if competitors and game_data:
+            viz = ReportVisualizer()
+            markdown += viz.create_comparison_table(game_data, competitors)
+            markdown += "\n"
+
+        # Add top competitors highlight
+        if competitors:
+            viz = ReportVisualizer()
+            markdown += viz.create_competitor_highlights(competitors, top_n=5)
+
+        # Add insights
+        markdown += "### Key Insights\n\n"
+
+        if competitors:
+            # Price analysis
+            your_price = game_data.get('price_overview', {}).get('final', 0) / 100
+            comp_prices = [c.get('price_overview', {}).get('final', 0) / 100
+                          for c in competitors if c.get('price_overview')]
+
+            if comp_prices:
+                avg_price = sum(comp_prices) / len(comp_prices)
+                if your_price < avg_price * 0.85:
+                    markdown += f"- 💰 **Pricing**: Your price (${your_price:.2f}) is **{((avg_price - your_price) / avg_price * 100):.0f}% below** competitors (${avg_price:.2f}). Consider if you're undervaluing.\n"
+                elif your_price > avg_price * 1.15:
+                    markdown += f"- 💰 **Pricing**: Your price (${your_price:.2f}) is **{((your_price - avg_price) / avg_price * 100):.0f}% above** competitors (${avg_price:.2f}). Ensure premium positioning is justified.\n"
+                else:
+                    markdown += f"- 💰 **Pricing**: Your price (${your_price:.2f}) is **well-positioned** vs competitors (${avg_price:.2f}).\n"
+
+            # Screenshot comparison
+            your_screenshots = len(game_data.get('screenshots', []))
+            comp_screenshots = [len(c.get('screenshots', [])) for c in competitors]
+            avg_screenshots = sum(comp_screenshots) / len(comp_screenshots) if comp_screenshots else 0
+
+            if your_screenshots < avg_screenshots * 0.8:
+                markdown += f"- 📸 **Screenshots**: You have {your_screenshots} screenshots. Competitors average {avg_screenshots:.0f}. **Add {int(avg_screenshots - your_screenshots)} more**.\n"
+            else:
+                markdown += f"- 📸 **Screenshots**: Your {your_screenshots} screenshots match competitor standards ({avg_screenshots:.0f} avg).\n"
+
+        markdown += "\n---\n\n"
+
         return markdown
 
 
