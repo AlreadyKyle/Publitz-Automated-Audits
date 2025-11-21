@@ -1985,6 +1985,414 @@ class ReviewVulnerabilitySection(ReportSection):
         return markdown
 
 
+class ABTestingSection(ReportSection):
+    """A/B testing recommendations for store page optimization"""
+
+    def __init__(self, section_name: str, data: Dict[str, Any]):
+        super().__init__(section_name, data)
+        self.ab_data = None
+
+    def analyze(self) -> Dict[str, Any]:
+        """Generate A/B testing recommendations"""
+        from src.ab_testing import ABTestingRecommender
+
+        game_data = self.data.get('game_data', {})
+        sales_data = self.data.get('sales_data', {})
+        competitor_data = self.data.get('competitor_data', [])
+
+        # Extract price
+        price_str = game_data.get('price', '$19.99')
+        import re
+        price_clean = re.sub(r'[^0-9.]', '', price_str)
+        try:
+            base_price = float(price_clean) if price_clean else 19.99
+        except:
+            base_price = 19.99
+
+        recommender = ABTestingRecommender()
+        self.ab_data = recommender.generate_recommendations(
+            game_data, sales_data, base_price
+        )
+
+        # Always scores 100 (it's guidance, not evaluated)
+        self.score = 100
+        self.rating = 'excellent'
+        self.analyzed = True
+
+        return {
+            'score': self.score,
+            'rating': self.rating,
+            'ab_data': self.ab_data
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate markdown for A/B testing recommendations"""
+        if not self.analyzed:
+            self.analyze()
+
+        markdown = f"## {self.section_name}\n\n"
+        markdown += "**Test and optimize your store page elements to maximize conversion rates.**\n\n"
+
+        # Top recommended tests
+        recommended_tests = self.ab_data.get('recommended_tests', [])
+        if recommended_tests:
+            markdown += "### Priority A/B Tests\n\n"
+            markdown += "*Start with these high-impact, easy-to-implement tests*\n\n"
+
+            for i, test in enumerate(recommended_tests[:5], 1):  # Top 5
+                priority = test.get('priority', 'MEDIUM')
+                test_name = test.get('test_name', '')
+                test_type = test.get('test_type', '')
+                expected_impact = test.get('expected_impact', 'Unknown')
+                difficulty = test.get('difficulty', 'MEDIUM')
+
+                priority_emoji = {'HIGH': '🔴', 'MEDIUM': '🟡', 'LOW': '🟢'}.get(priority, '⚪')
+
+                markdown += f"#### {i}. {test_name} {priority_emoji}\n"
+                markdown += f"**Test Type:** {test_type.replace('_', ' ').title()} | "
+                markdown += f"**Difficulty:** {difficulty} | "
+                markdown += f"**Expected Impact:** {expected_impact}\n\n"
+
+                markdown += f"**Hypothesis:** {test.get('hypothesis', 'N/A')}\n\n"
+
+                markdown += "**Variations:**\n"
+                markdown += f"- Control: {test.get('control', 'Current version')}\n"
+                markdown += f"- Variation A: {test.get('variation_a', 'N/A')}\n"
+                if 'variation_b' in test:
+                    markdown += f"- Variation B: {test.get('variation_b', 'N/A')}\n"
+                markdown += "\n"
+
+                markdown += "**Implementation Steps:**\n"
+                for step in test.get('implementation', []):
+                    markdown += f"  {step}\n"
+                markdown += "\n"
+
+                markdown += "**Measure:**\n"
+                for metric in test.get('measurement_metrics', []):
+                    markdown += f"- {metric}\n"
+                markdown += "\n"
+
+            markdown += "---\n\n"
+
+        # Testing timeline
+        testing_timeline = self.ab_data.get('testing_timeline', [])
+        if testing_timeline:
+            markdown += "### Suggested Testing Timeline\n\n"
+            markdown += "| Weeks | Test ID | Test Name | Priority | Expected Impact |\n"
+            markdown += "|-------|---------|-----------|----------|------------------|\n"
+
+            for timeline_item in testing_timeline[:6]:  # First 6 tests
+                weeks = f"Week {timeline_item['week_start']}"
+                if timeline_item['week_end'] > timeline_item['week_start']:
+                    weeks += f"-{timeline_item['week_end']}"
+
+                markdown += f"| {weeks} | {timeline_item['test_id']} | {timeline_item['test_name']} | "
+                markdown += f"{timeline_item['priority']} | {timeline_item['expected_impact']} |\n"
+
+            markdown += "\n"
+
+        # Measurement guide
+        measurement_guide = self.ab_data.get('measurement_guide', {})
+        if measurement_guide:
+            markdown += "### How to Measure Results\n\n"
+
+            key_metrics = measurement_guide.get('key_metrics', {})
+            if key_metrics:
+                markdown += "**Key Metrics:**\n"
+                for metric_name, formula in key_metrics.items():
+                    markdown += f"- **{metric_name.replace('_', ' ').title()}:** {formula}\n"
+                markdown += "\n"
+
+            sample_sizes = measurement_guide.get('sample_size_requirements', {})
+            if sample_sizes:
+                markdown += "**Sample Size Requirements:**\n"
+                for req_type, req_value in sample_sizes.items():
+                    markdown += f"- {req_type.replace('_', ' ').title()}: {req_value}\n"
+                markdown += "\n"
+
+            stat_sig = measurement_guide.get('statistical_significance', {})
+            if stat_sig:
+                markdown += "**Statistical Significance:**\n"
+                for sig_metric, sig_value in stat_sig.items():
+                    markdown += f"- {sig_metric.replace('_', ' ').title()}: {sig_value}\n"
+                markdown += "\n"
+
+        # Statistical significance calculator
+        sig_calculator = self.ab_data.get('statistical_significance_calculator', '')
+        if sig_calculator:
+            markdown += sig_calculator
+            markdown += "\n"
+
+        return markdown
+
+
+class CommunityHealthSection(ReportSection):
+    """Community health scoring for Discord/Reddit"""
+
+    def __init__(self, section_name: str, data: Dict[str, Any]):
+        super().__init__(section_name, data)
+        self.health_data = None
+
+    def analyze(self) -> Dict[str, Any]:
+        """Analyze community health"""
+        from src.community_health import CommunityHealthAnalyzer
+
+        game_data = self.data.get('game_data', {})
+        community_data = self.data.get('community_data', {
+            'discord': {},
+            'reddit': {},
+            'development_stage': 'announced'
+        })
+
+        analyzer = CommunityHealthAnalyzer()
+        self.health_data = analyzer.analyze_health(game_data, community_data)
+
+        # Score is the overall health score
+        self.score = self.health_data.get('overall_health_score', 50)
+
+        if self.score >= 80:
+            self.rating = 'excellent'
+        elif self.score >= 60:
+            self.rating = 'good'
+        elif self.score >= 40:
+            self.rating = 'fair'
+        else:
+            self.rating = 'poor'
+
+        self.analyzed = True
+
+        return {
+            'score': self.score,
+            'rating': self.rating,
+            'health_data': self.health_data
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate markdown for community health"""
+        if not self.analyzed:
+            self.analyze()
+
+        markdown = f"## {self.section_name}\n\n"
+
+        overall_score = self.health_data.get('overall_health_score', 0)
+        health_tier = self.health_data.get('health_tier', 'Unknown')
+
+        tier_emoji = {
+            'Thriving': '🟢',
+            'Healthy': '🟡',
+            'Growing': '🟠',
+            'Needs Attention': '🔴'
+        }.get(health_tier, '⚪')
+
+        markdown += f"**Overall Community Health:** {overall_score:.1f}/100 ({health_tier}) {tier_emoji}\n\n"
+
+        # Discord analysis
+        discord_analysis = self.health_data.get('discord_analysis', {})
+        if discord_analysis:
+            markdown += "### Discord Community\n\n"
+            markdown += f"**Score:** {discord_analysis.get('score', 0):.1f}/100 ({discord_analysis.get('status', 'Unknown')})\n\n"
+
+            metrics = discord_analysis.get('metrics', {})
+            markdown += "**Current Metrics:**\n"
+            markdown += f"- Members: {metrics.get('members', 0):,}\n"
+            markdown += f"- Daily Active: {metrics.get('daily_active', 0):,} ({metrics.get('engagement_rate', 0):.1f}% engagement)\n"
+            markdown += f"- Messages/Day: {metrics.get('messages_per_day', 0):,}\n"
+            markdown += f"- Channels: {metrics.get('channels', 0)}\n\n"
+
+            benchmarks = discord_analysis.get('benchmarks', {})
+            if benchmarks:
+                markdown += "**Benchmarks for Your Stage:**\n"
+                markdown += f"- Target Members: {benchmarks.get('members', 0):,}\n"
+                markdown += f"- Target Daily Active: {benchmarks.get('daily_active', 0):,}\n"
+                markdown += f"- Target Messages/Day: {benchmarks.get('messages_per_day', 0):,}\n\n"
+
+            strengths = discord_analysis.get('strengths', [])
+            if strengths:
+                markdown += "**Strengths:**\n"
+                for strength in strengths:
+                    markdown += f"- ✅ {strength}\n"
+                markdown += "\n"
+
+            weaknesses = discord_analysis.get('weaknesses', [])
+            if weaknesses:
+                markdown += "**Areas for Improvement:**\n"
+                for weakness in weaknesses:
+                    markdown += f"- ⚠️ {weakness}\n"
+                markdown += "\n"
+
+        # Reddit analysis
+        reddit_analysis = self.health_data.get('reddit_analysis', {})
+        if reddit_analysis:
+            markdown += "### Reddit Community\n\n"
+            markdown += f"**Score:** {reddit_analysis.get('score', 0):.1f}/100 ({reddit_analysis.get('status', 'Unknown')})\n\n"
+
+            metrics = reddit_analysis.get('metrics', {})
+            markdown += "**Current Metrics:**\n"
+            markdown += f"- Subscribers: {metrics.get('subscribers', 0):,}\n"
+            markdown += f"- Daily Posts: {metrics.get('daily_posts', 0)}\n"
+            markdown += f"- Comments/Post: {metrics.get('comments_per_post', 0):.1f}\n"
+            markdown += f"- Upvote Ratio: {metrics.get('upvote_ratio', 0)*100:.0f}%\n\n"
+
+            benchmarks = reddit_analysis.get('benchmarks', {})
+            if benchmarks:
+                markdown += "**Benchmarks for Your Stage:**\n"
+                markdown += f"- Target Subscribers: {benchmarks.get('subscribers', 0):,}\n"
+                markdown += f"- Target Daily Posts: {benchmarks.get('daily_posts', 0)}\n"
+                markdown += f"- Target Comments/Post: {benchmarks.get('comments_per_post', 0)}\n\n"
+
+            strengths = reddit_analysis.get('strengths', [])
+            if strengths:
+                markdown += "**Strengths:**\n"
+                for strength in strengths:
+                    markdown += f"- ✅ {strength}\n"
+                markdown += "\n"
+
+            weaknesses = reddit_analysis.get('weaknesses', [])
+            if weaknesses:
+                markdown += "**Areas for Improvement:**\n"
+                for weakness in weaknesses:
+                    markdown += f"- ⚠️ {weakness}\n"
+                markdown += "\n"
+
+        # Growth strategies
+        growth_strategies = self.health_data.get('growth_strategies', [])
+        if growth_strategies:
+            markdown += "### Community Growth Strategies\n\n"
+
+            for i, strategy in enumerate(growth_strategies[:5], 1):
+                platform = strategy.get('platform', 'Unknown')
+                priority = strategy.get('priority', 'MEDIUM')
+                strategy_name = strategy.get('strategy', '')
+                expected_impact = strategy.get('expected_impact', '')
+                time_required = strategy.get('time_required', '')
+
+                priority_emoji = {'HIGH': '🔴', 'MEDIUM': '🟡', 'LOW': '🟢'}.get(priority, '⚪')
+
+                markdown += f"#### {i}. {strategy_name} ({platform}) {priority_emoji}\n"
+                markdown += f"*{priority} priority | Expected impact: {expected_impact} | Time: {time_required}*\n\n"
+
+                tactics = strategy.get('tactics', [])
+                if tactics:
+                    markdown += "**Tactics:**\n"
+                    for tactic in tactics:
+                        markdown += f"- {tactic}\n"
+                    markdown += "\n"
+
+        # Best practices
+        best_practices = self.health_data.get('best_practices', [])
+        if best_practices:
+            markdown += "### Community Management Best Practices\n\n"
+            for practice in best_practices:
+                markdown += f"- {practice}\n"
+            markdown += "\n"
+
+        return markdown
+
+
+class RegionalPricingSection(ReportSection):
+    """Regional pricing optimization"""
+
+    def __init__(self, section_name: str, data: Dict[str, Any]):
+        super().__init__(section_name, data)
+        self.pricing_data = None
+
+    def analyze(self) -> Dict[str, Any]:
+        """Analyze regional pricing"""
+        from src.regional_pricing import RegionalPricingAnalyzer
+
+        game_data = self.data.get('game_data', {})
+
+        # Extract price
+        price_str = game_data.get('price', '$19.99')
+        import re
+        price_clean = re.sub(r'[^0-9.]', '', price_str)
+        try:
+            base_price_usd = float(price_clean) if price_clean else 19.99
+        except:
+            base_price_usd = 19.99
+
+        analyzer = RegionalPricingAnalyzer()
+        self.pricing_data = analyzer.analyze_pricing(base_price_usd)
+
+        # Score based on revenue increase potential
+        revenue_increase = self.pricing_data.get('revenue_impact', {}).get('revenue_increase_percent', 0)
+        self.score = min(100, 50 + int(revenue_increase))
+
+        if self.score >= 75:
+            self.rating = 'excellent'
+        elif self.score >= 60:
+            self.rating = 'good'
+        elif self.score >= 45:
+            self.rating = 'fair'
+        else:
+            self.rating = 'poor'
+
+        self.analyzed = True
+
+        return {
+            'score': self.score,
+            'rating': self.rating,
+            'pricing_data': self.pricing_data
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate markdown for regional pricing"""
+        if not self.analyzed:
+            self.analyze()
+
+        markdown = f"## {self.section_name}\n\n"
+
+        base_price = self.pricing_data.get('base_price_usd', 0)
+        markdown += f"**Base Price (USD):** ${base_price:.2f}\n\n"
+
+        # Priority regions
+        priority_regions = self.pricing_data.get('priority_regions', [])
+        if priority_regions:
+            markdown += "### Recommended Regional Pricing\n\n"
+            markdown += "| Region | Market Size | Recommended Price | USD Equivalent |\n"
+            markdown += "|--------|-------------|-------------------|----------------|\n"
+
+            for region in priority_regions[:8]:  # Top 8 regions
+                region_name = region.get('region_name', '')
+                market_size = region.get('market_size', '').replace('_', ' ').title()
+                recommended_price = region.get('recommended_price', '')
+
+                # Get actual price data
+                region_code = region.get('region_code', '')
+                recommended_prices = self.pricing_data.get('recommended_prices', {})
+                price_data = recommended_prices.get(region_code, {})
+                ppp_adjusted = price_data.get('ppp_adjusted', 0)
+
+                markdown += f"| {region_name} | {market_size} | {recommended_price} | ${ppp_adjusted:.2f} |\n"
+
+            markdown += "\n"
+
+        # Revenue impact
+        revenue_impact = self.pricing_data.get('revenue_impact', {})
+        if revenue_impact:
+            markdown += "### Revenue Impact Analysis\n\n"
+
+            total_potential = revenue_impact.get('total_revenue_potential', 0)
+            us_only = revenue_impact.get('us_only_revenue', 0)
+            additional = revenue_impact.get('additional_revenue', 0)
+            increase_pct = revenue_impact.get('revenue_increase_percent', 0)
+
+            markdown += f"**Revenue Projection (per 1,000 units):**\n"
+            markdown += f"- US-Only Pricing: ${us_only:,.0f}\n"
+            markdown += f"- Regional Pricing: ${total_potential:,.0f}\n"
+            markdown += f"- Additional Revenue: ${additional:,.0f} (+{increase_pct:.1f}%)\n\n"
+
+        # Recommendations
+        recommendations = self.pricing_data.get('recommendations', [])
+        if recommendations:
+            markdown += "### Pricing Recommendations\n\n"
+            for rec in recommendations:
+                markdown += f"{rec}\n"
+            markdown += "\n"
+
+        return markdown
+
+
 class CustomDashboardSection(ReportSection):
     """Custom tracking dashboard and tools"""
 
@@ -2160,6 +2568,27 @@ class ReportBuilder:
             'report_type': self.report_type
         })
         self.add_section(marketing_section)
+
+        # Create A/B testing section (optimization recommendations)
+        ab_testing_section = ABTestingSection("A/B Testing Recommendations", {
+            'game_data': self.game_data,
+            'sales_data': self.sales_data,
+            'competitor_data': self.competitor_data
+        })
+        self.add_section(ab_testing_section)
+
+        # Create community health section (Discord/Reddit analysis)
+        community_section = CommunityHealthSection("Community Health Scoring", {
+            'game_data': self.game_data,
+            'community_data': None  # Will use defaults
+        })
+        self.add_section(community_section)
+
+        # Create regional pricing section (multi-market optimization)
+        regional_pricing_section = RegionalPricingSection("Regional Pricing Optimization", {
+            'game_data': self.game_data
+        })
+        self.add_section(regional_pricing_section)
 
         # Create custom dashboard section LAST (tracking tools)
         dashboard_section = CustomDashboardSection("Custom Tracking Dashboard", {
