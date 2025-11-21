@@ -265,16 +265,22 @@ def main():
             progress_bar.progress(90, text="✨ Step 3/3: Generating enhanced final report...")
 
             with st.spinner("✨ Step 3/3: Multi-pass AI analysis with vision + corrections... (this may take 4-5 minutes)"):
-                # Use 3-pass system for all reports
-                report_data, audit_results = ai_generator.generate_report_with_audit(
+                # Use enhanced report system: Structured analysis + AI insights
+                from src.report_integration import create_report_with_ai
+
+                report_data, report_metadata = create_report_with_ai(
                     game_data,
                     sales_data,
                     competitor_data,
                     steamdb_data=sales_data,
                     report_type=report_type,
+                    ai_generator=ai_generator,
                     review_stats=review_stats,
                     capsule_analysis=capsule_analysis
                 )
+
+                # Extract audit results from metadata
+                audit_results = report_metadata.get('audit_results')
 
             progress_bar.progress(100, text="✅ Report generated successfully!")
 
