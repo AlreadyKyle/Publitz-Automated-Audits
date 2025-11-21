@@ -33,10 +33,17 @@ class SteamDBScraper:
         if app_id == 'unknown' or app_id == 'fallback' or str(app_id).startswith('fallback'):
             return self._generate_fallback_sales_data()
 
+        # Validate and convert app_id to int
+        try:
+            app_id_int = int(app_id)
+        except (ValueError, TypeError) as e:
+            print(f"⚠️ Invalid app_id format '{app_id}': {e}")
+            return self._generate_fallback_sales_data()
+
         # PRIORITY 1: Try alternative source (Steam store page scraping)
         try:
-            print(f"Attempting to fetch data using alternative source for app {app_id}...")
-            alt_data = self.alternative_source.get_complete_game_data(int(app_id), game_name=game_name)
+            print(f"Attempting to fetch data using alternative source for app {app_id_int}...")
+            alt_data = self.alternative_source.get_complete_game_data(app_id_int, game_name=game_name)
 
             if alt_data and alt_data.get('reviews_total', 0) > 0:
                 print(f"✓ Successfully retrieved data from alternative source")

@@ -343,7 +343,8 @@ class SmartEstimator:
             else:
                 return 2.5  # Classic/legacy title (cap at 2.5x)
 
-        except:
+        except (ValueError, AttributeError, TypeError) as e:
+            print(f"Error parsing release date '{release_date}': {e}")
             return 1.0
 
     def _playtime_multiplier(self, playtime_hours: int) -> float:

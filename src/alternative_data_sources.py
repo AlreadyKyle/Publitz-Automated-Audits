@@ -26,28 +26,50 @@ class AlternativeDataSource:
         self.session = requests.Session()
         self.session.headers.update(self.headers)
 
-        # Import all data source APIs
+        # Import data source APIs individually for graceful degradation
+        self.rawg = None
+        self.igdb = None
+        self.trends = None
+        self.youtube = None
+        self.estimator = None
+        self.use_smart_estimation = False
+
+        # Try to import each API separately
         try:
             from src.rawg_api import RAWGApi
-            from src.igdb_api import IGDBApi
-            from src.trends_api import TrendsApi
-            from src.youtube_api import YouTubeApi
-            from src.smart_estimator import SmartEstimator
-
             self.rawg = RAWGApi()
+            print("✓ RAWG API initialized")
+        except ImportError as e:
+            print(f"⚠️ RAWG API unavailable: {e}")
+
+        try:
+            from src.igdb_api import IGDBApi
             self.igdb = IGDBApi()
+            print("✓ IGDB API initialized")
+        except ImportError as e:
+            print(f"⚠️ IGDB API unavailable: {e}")
+
+        try:
+            from src.trends_api import TrendsApi
             self.trends = TrendsApi()
+            print("✓ Google Trends API initialized")
+        except ImportError as e:
+            print(f"⚠️ Google Trends API unavailable: {e}")
+
+        try:
+            from src.youtube_api import YouTubeApi
             self.youtube = YouTubeApi()
+            print("✓ YouTube API initialized")
+        except ImportError as e:
+            print(f"⚠️ YouTube API unavailable: {e}")
+
+        try:
+            from src.smart_estimator import SmartEstimator
             self.estimator = SmartEstimator()
             self.use_smart_estimation = True
-            print("✓ Initialized all data source APIs (RAWG, IGDB, Trends, YouTube)")
+            print("✓ Smart Estimator initialized")
         except ImportError as e:
-            print(f"Warning: Could not import data source APIs: {e}")
-            self.rawg = None
-            self.igdb = None
-            self.trends = None
-            self.youtube = None
-            self.estimator = None
+            print(f"⚠️ Smart Estimator unavailable: {e}")
             self.use_smart_estimation = False
 
     def get_game_data_from_store_page(self, app_id: int) -> Dict[str, Any]:
@@ -373,6 +395,7 @@ class AlternativeDataSource:
         else:
             game_data['quality_multiplier'] = 0.9
 
+        review_count = game_data.get('reviews_total', 0)
         print(f"Successfully fetched data: {game_data.get('name')} - {review_count:,} reviews")
         return game_data
 

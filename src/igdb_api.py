@@ -7,6 +7,7 @@ Provides comprehensive game database with ratings, platforms, release dates
 import requests
 import os
 import time
+from datetime import datetime
 from typing import Dict, Any, Optional
 
 
@@ -131,7 +132,6 @@ class IGDBApi:
         # Convert Unix timestamp to readable date
         release_date = None
         if 'first_release_date' in raw_data:
-            from datetime import datetime
             timestamp = raw_data['first_release_date']
             release_date = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
 

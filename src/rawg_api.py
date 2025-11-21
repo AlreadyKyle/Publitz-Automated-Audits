@@ -6,6 +6,7 @@ Provides game metadata from RAWG.io database
 
 import requests
 import os
+from datetime import datetime
 from typing import Dict, Any, Optional
 
 
@@ -171,11 +172,11 @@ class RAWGApi:
             return False
 
         try:
-            from datetime import datetime
             release = datetime.strptime(release_date, '%Y-%m-%d')
             years_old = (datetime.now() - release).days / 365.25
             return years_old <= 2
-        except:
+        except (ValueError, AttributeError) as e:
+            print(f"Error parsing release date '{release_date}': {e}")
             return False
 
 
