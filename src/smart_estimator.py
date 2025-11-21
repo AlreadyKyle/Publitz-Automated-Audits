@@ -4,7 +4,7 @@ Smart Game Metrics Estimator
 Uses multiple signals to estimate ownership, revenue when APIs are blocked
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 import re
 
@@ -351,10 +351,6 @@ class SmartEstimator:
             'estimation_method': 'minimal_fallback',
             'calculation_factors': {}
         }
-
-
-# Make Optional available for type hints
-from typing import Optional
 
 
 def test_estimator():
