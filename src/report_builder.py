@@ -535,6 +535,298 @@ class MarketingSection(ReportSection):
 """
 
 
+class CommunitySection(ReportSection):
+    """Community and social media analysis"""
+
+    def analyze(self) -> Dict[str, Any]:
+        """Analyze community presence"""
+        logger.info("Analyzing community presence")
+
+        reddit_data = self.data.get('reddit', {})
+        subreddits = reddit_data.get('subreddits', [])
+
+        # Score based on subreddit reach
+        total_reach = reddit_data.get('total_reach', 0)
+
+        if total_reach > 1000000:
+            self.score = 85
+        elif total_reach > 500000:
+            self.score = 75
+        elif total_reach > 100000:
+            self.score = 65
+        else:
+            self.score = 50
+
+        self.rating = self.get_rating()
+        self.analyzed = True
+
+        return {
+            'score': self.score,
+            'rating': self.rating,
+            'subreddit_count': len(subreddits),
+            'total_reach': total_reach
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate community analysis markdown"""
+        if not self.analyzed:
+            self.analyze()
+
+        reddit_data = self.data.get('reddit', {})
+        subreddits = reddit_data.get('subreddits', [])
+        recommendations = reddit_data.get('recommendations', [])
+
+        rating_emoji = {'excellent': '✅', 'good': '🟢', 'fair': '🟡', 'poor': '🔴'}
+        emoji = rating_emoji.get(self.rating, '⚪')
+
+        markdown = f"""## Community & Social Presence
+
+**Score: {self.score}/100** {emoji} {self.rating.title()}
+
+### Reddit Communities
+
+Found {len(subreddits)} relevant subreddits with {reddit_data.get('total_reach', 0):,} combined subscribers.
+
+"""
+
+        # Top subreddits table
+        if subreddits:
+            markdown += "| Subreddit | Subscribers | Description |\n"
+            markdown += "|-----------|-------------|-------------|\n"
+
+            for sub in subreddits[:5]:
+                markdown += f"| r/{sub['name']} | {sub.get('subscribers', 0):,} | {sub.get('description', 'N/A')[:50]}... |\n"
+
+            markdown += "\n"
+
+        # Recommendations
+        if recommendations:
+            markdown += "### Recommendations\n\n"
+            for rec in recommendations:
+                markdown += f"- {rec}\n"
+            markdown += "\n"
+
+        markdown += "---\n\n"
+
+        return markdown
+
+
+class InfluencerSection(ReportSection):
+    """Influencer and content creator outreach analysis"""
+
+    def analyze(self) -> Dict[str, Any]:
+        """Analyze influencer opportunities"""
+        logger.info("Analyzing influencer opportunities")
+
+        twitch_data = self.data.get('twitch', {})
+        youtube_data = self.data.get('youtube', {})
+        curator_data = self.data.get('curators', {})
+
+        # Calculate score based on total reach potential
+        total_reach = 0
+        total_reach += sum(s.get('followers', 0) for s in twitch_data.get('streamers', []))
+        total_reach += sum(c.get('subscribers', 0) for c in youtube_data.get('channels', []))
+        total_reach += sum(c.get('followers', 0) for c in curator_data.get('curators', []))
+
+        if total_reach > 5000000:
+            self.score = 90
+        elif total_reach > 2000000:
+            self.score = 80
+        elif total_reach > 500000:
+            self.score = 70
+        else:
+            self.score = 60
+
+        self.rating = self.get_rating()
+        self.analyzed = True
+
+        return {
+            'score': self.score,
+            'rating': self.rating,
+            'total_reach': total_reach
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate influencer outreach markdown"""
+        if not self.analyzed:
+            self.analyze()
+
+        twitch_data = self.data.get('twitch', {})
+        youtube_data = self.data.get('youtube', {})
+        curator_data = self.data.get('curators', {})
+
+        rating_emoji = {'excellent': '✅', 'good': '🟢', 'fair': '🟡', 'poor': '🔴'}
+        emoji = rating_emoji.get(self.rating, '⚪')
+
+        markdown = f"""## Influencer Outreach Strategy
+
+**Score: {self.score}/100** {emoji} {self.rating.title()}
+
+### Twitch Streamers
+
+"""
+        streamers = twitch_data.get('streamers', [])
+        if streamers:
+            markdown += f"Found {len(streamers)} relevant streamers.\n\n"
+            markdown += "| Streamer | Followers | Priority | ROI Score |\n"
+            markdown += "|----------|-----------|----------|----------|\n"
+
+            for streamer in streamers[:5]:
+                markdown += f"| {streamer['name']} | {streamer.get('followers', 0):,} | {streamer.get('priority', 'medium').title()} | {streamer.get('roi_score', 0):.0f} |\n"
+
+            markdown += "\n"
+        else:
+            markdown += "No streamer data available.\n\n"
+
+        # YouTube
+        markdown += "### YouTube Channels\n\n"
+        channels = youtube_data.get('channels', [])
+        if channels:
+            markdown += f"Found {len(channels)} relevant channels.\n\n"
+            markdown += "| Channel | Subscribers | Priority | ROI Score |\n"
+            markdown += "|---------|-------------|----------|----------|\n"
+
+            for channel in channels[:5]:
+                markdown += f"| {channel.get('name', 'Unknown')} | {channel.get('subscribers', 0):,} | {channel.get('outreach_priority', 'medium').title()} | {channel.get('roi_score', 0):.0f} |\n"
+
+            markdown += "\n"
+        else:
+            markdown += "No YouTube data available.\n\n"
+
+        # Steam Curators
+        markdown += "### Steam Curators\n\n"
+        curators = curator_data.get('curators', [])
+        if curators:
+            outreach_plan = curator_data.get('outreach_plan', {})
+            markdown += f"Found {len(curators)} relevant curators with {outreach_plan.get('estimated_total_reach', 0):,} total reach.\n\n"
+
+            markdown += "**Top Priority Curators:**\n\n"
+            markdown += "| Curator | Followers | Response Rate | Priority |\n"
+            markdown += "|---------|-----------|---------------|----------|\n"
+
+            for curator in curators[:5]:
+                markdown += f"| {curator['name']} | {curator.get('followers', 0):,} | {curator.get('response_rate', 'Medium')} | {curator.get('priority', 0):.0f} |\n"
+
+            markdown += "\n"
+        else:
+            markdown += "No curator data available.\n\n"
+
+        markdown += "---\n\n"
+
+        return markdown
+
+
+class GlobalReachSection(ReportSection):
+    """Regional pricing and localization analysis"""
+
+    def analyze(self) -> Dict[str, Any]:
+        """Analyze global market readiness"""
+        logger.info("Analyzing global market readiness")
+
+        pricing_data = self.data.get('regional_pricing', {})
+        localization_data = self.data.get('localization', {})
+
+        # Score based on market coverage
+        current_reach = localization_data.get('current_market_reach_percent', 0)
+
+        if current_reach >= 80:
+            self.score = 90
+        elif current_reach >= 60:
+            self.score = 75
+        elif current_reach >= 40:
+            self.score = 65
+        else:
+            self.score = 50
+
+        self.rating = self.get_rating()
+        self.analyzed = True
+
+        return {
+            'score': self.score,
+            'rating': self.rating,
+            'market_coverage': current_reach
+        }
+
+    def generate_markdown(self) -> str:
+        """Generate global reach analysis markdown"""
+        if not self.analyzed:
+            self.analyze()
+
+        pricing_data = self.data.get('regional_pricing', {})
+        localization_data = self.data.get('localization', {})
+
+        rating_emoji = {'excellent': '✅', 'good': '🟢', 'fair': '🟡', 'poor': '🔴'}
+        emoji = rating_emoji.get(self.rating, '⚪')
+
+        markdown = f"""## Global Market Readiness
+
+**Score: {self.score}/100** {emoji} {self.rating.title()}
+
+### Regional Pricing
+
+"""
+
+        if pricing_data:
+            revenue_impact = pricing_data.get('revenue_impact', {})
+            markdown += f"**Revenue Potential**: {revenue_impact.get('revenue_increase_percent', 0):.1f}% increase with optimized regional pricing\n\n"
+
+            priority_regions = pricing_data.get('priority_regions', [])
+            if priority_regions:
+                markdown += "**Priority Regions:**\n\n"
+                markdown += "| Region | Recommended Price | Market Size |\n"
+                markdown += "|--------|-------------------|-------------|\n"
+
+                for region in priority_regions[:8]:
+                    markdown += f"| {region['region_name']} | {region['recommended_price']} | {region['market_size'].title()} |\n"
+
+                markdown += "\n"
+
+            # Recommendations
+            recommendations = pricing_data.get('recommendations', [])
+            if recommendations:
+                markdown += "**Pricing Recommendations:**\n\n"
+                for rec in recommendations:
+                    markdown += f"- {rec}\n"
+                markdown += "\n"
+        else:
+            markdown += "No regional pricing data available.\n\n"
+
+        # Localization
+        markdown += "### Localization Strategy\n\n"
+
+        if localization_data:
+            current_languages = localization_data.get('current_languages', [])
+            current_reach = localization_data.get('current_market_reach_percent', 0)
+
+            markdown += f"**Current Coverage**: {len(current_languages)} languages, ~{current_reach}% of global market\n\n"
+
+            missing_languages = localization_data.get('missing_languages', [])
+            if missing_languages:
+                markdown += "**High-ROI Language Opportunities:**\n\n"
+                markdown += "| Language | Cost | Potential Revenue | ROI % |\n"
+                markdown += "|----------|------|-------------------|-------|\n"
+
+                for lang in missing_languages[:5]:
+                    if lang.get('priority') == 'high':
+                        markdown += f"| {lang['language']} | ${lang['localization_cost']:,} | ${lang['additional_revenue']:,.0f} | {lang['roi_percent']:.0f}% |\n"
+
+                markdown += "\n"
+
+            # Recommendations
+            loc_recommendations = localization_data.get('recommendations', [])
+            if loc_recommendations:
+                markdown += "**Localization Recommendations:**\n\n"
+                for rec in loc_recommendations:
+                    markdown += f"- {rec}\n"
+                markdown += "\n"
+        else:
+            markdown += "No localization data available.\n\n"
+
+        markdown += "---\n\n"
+
+        return markdown
+
+
 class ReportBuilder:
     """Orchestrates report generation from multiple sections"""
 

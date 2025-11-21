@@ -6,8 +6,9 @@ Bridges the new modular report system with existing AI generation
 
 from typing import Dict, List, Any, Tuple
 from src.logger import get_logger
-from src.report_builder import ReportBuilder
+from src.report_builder import ReportBuilder, CommunitySection, InfluencerSection, GlobalReachSection
 from src.models import create_report_data, ReportType
+from src.phase2_integration import collect_phase2_data
 
 logger = get_logger(__name__)
 
@@ -16,9 +17,10 @@ def generate_enhanced_report(game_data: Dict[str, Any],
                              sales_data: Dict[str, Any],
                              competitor_data: List[Dict[str, Any]],
                              report_type: str,
-                             ai_report: str = None) -> Tuple[str, Dict[str, Any]]:
+                             ai_report: str = None,
+                             include_phase2: bool = True) -> Tuple[str, Dict[str, Any]]:
     """
-    Generate enhanced report with structured analysis + AI insights
+    Generate enhanced report with structured analysis + AI insights + Phase 2 enrichment
 
     Args:
         game_data: Game data from Steam
@@ -26,6 +28,7 @@ def generate_enhanced_report(game_data: Dict[str, Any],
         competitor_data: Competitor information
         report_type: "Pre-Launch" or "Post-Launch"
         ai_report: Optional existing AI-generated report to append
+        include_phase2: Whether to include Phase 2 enrichment data
 
     Returns:
         Tuple of (complete_markdown_report, structured_data)
@@ -34,12 +37,33 @@ def generate_enhanced_report(game_data: Dict[str, Any],
 
     # Step 1: Build structured report using new system
     builder = ReportBuilder(game_data, sales_data, competitor_data, report_type)
+
+    # Step 2: Collect Phase 2 enrichment data if requested
+    if include_phase2:
+        logger.info("Collecting Phase 2 enrichment data...")
+        phase2_data = collect_phase2_data(game_data)
+
+        # Add Phase 2 sections to report
+        community_section = CommunitySection("Community", phase2_data)
+        builder.add_section(community_section)
+
+        influencer_section = InfluencerSection("Influencers", phase2_data)
+        builder.add_section(influencer_section)
+
+        global_reach_section = GlobalReachSection("Global Reach", phase2_data)
+        builder.add_section(global_reach_section)
+
+        logger.info("Phase 2 sections added to report")
+
+    # Step 3: Build complete structured report
     structured_report = builder.build()
 
-    # Step 2: Get structured data for exports
+    # Step 4: Get structured data for exports
     structured_data = builder.get_structured_data()
+    if include_phase2:
+        structured_data['phase2_data'] = phase2_data
 
-    # Step 3: Combine with AI report if provided
+    # Step 5: Combine with AI report if provided
     if ai_report:
         # Extract sections from AI report (everything after the intro)
         # The AI report typically starts with game overview

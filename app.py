@@ -9,6 +9,8 @@ from src.game_search import GameSearch
 from src.steamdb_scraper import SteamDBScraper
 from src.pdf_generator import create_downloadable_pdf
 from src.logger import get_logger, setup_logger
+from src.export_system import create_csv_exports
+from src.outreach_templates import generate_outreach_templates
 from src.exceptions import (
     PublitzError,
     InvalidSteamURLError,
@@ -65,6 +67,8 @@ if 'generating' not in st.session_state:
     st.session_state.generating = False
 if 'audit_results' not in st.session_state:
     st.session_state.audit_results = None
+if 'structured_data' not in st.session_state:
+    st.session_state.structured_data = None
 
 def main():
     # Header
@@ -289,6 +293,7 @@ def main():
             st.session_state.report_generated = True
             st.session_state.report_data = report_data
             st.session_state.audit_results = audit_results  # Phase 3: Store audit results
+            st.session_state.structured_data = report_metadata  # Phase 3: Store structured data for exports
             st.session_state.game_name = game_name
             st.session_state.report_type = report_type
             st.session_state.num_competitors = num_competitors
@@ -528,6 +533,131 @@ def main():
                 use_container_width=True,
                 key="download_md_bottom"
             )
+
+        # CSV Exports & Templates Section
+        if st.session_state.structured_data and st.session_state.structured_data.get('phase2_data'):
+            st.markdown("---")
+            st.markdown("### 📦 Additional Resources")
+
+            # Create tabs for different export types
+            export_tabs = st.tabs(["📊 CSV Exports", "✉️ Outreach Templates", "📚 Marketing Guides"])
+
+            # Tab 1: CSV Exports
+            with export_tabs[0]:
+                st.markdown("**Download structured data for your project management tools:**")
+
+                try:
+                    csv_exports = create_csv_exports(st.session_state.structured_data)
+
+                    if csv_exports:
+                        # Display available exports
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            st.markdown("#### Contact Lists")
+                            for filename, csv_content in csv_exports.items():
+                                if 'curator' in filename or 'streamer' in filename or 'youtube' in filename or 'reddit' in filename:
+                                    st.download_button(
+                                        label=f"📥 {filename}",
+                                        data=csv_content,
+                                        file_name=filename,
+                                        mime="text/csv",
+                                        key=f"csv_{filename}",
+                                        use_container_width=True
+                                    )
+
+                        with col2:
+                            st.markdown("#### Analysis Data")
+                            for filename, csv_content in csv_exports.items():
+                                if 'pricing' in filename or 'localization' in filename:
+                                    st.download_button(
+                                        label=f"📥 {filename}",
+                                        data=csv_content,
+                                        file_name=filename,
+                                        mime="text/csv",
+                                        key=f"csv_{filename}_analysis",
+                                        use_container_width=True
+                                    )
+
+                        st.info("💡 **Tip**: Import these CSV files into spreadsheet tools for tracking outreach progress")
+                    else:
+                        st.info("No CSV exports available for this report")
+
+                except Exception as e:
+                    logger.error(f"CSV export error: {e}")
+                    st.warning("CSV exports temporarily unavailable")
+
+            # Tab 2: Outreach Templates
+            with export_tabs[1]:
+                st.markdown("**Customizable email templates for your outreach campaigns:**")
+
+                try:
+                    templates = generate_outreach_templates(st.session_state.game_data)
+
+                    if templates:
+                        template_cols = st.columns(3)
+
+                        idx = 0
+                        for template_name, template_content in templates.items():
+                            with template_cols[idx % 3]:
+                                display_name = template_name.replace('_template.txt', '').replace('_', ' ').title()
+                                st.download_button(
+                                    label=f"📧 {display_name}",
+                                    data=template_content,
+                                    file_name=template_name,
+                                    mime="text/plain",
+                                    key=f"template_{template_name}",
+                                    use_container_width=True
+                                )
+                            idx += 1
+
+                        st.info("💡 **Tip**: Customize these templates with game-specific details and personal touches")
+                    else:
+                        st.info("Templates temporarily unavailable")
+
+                except Exception as e:
+                    logger.error(f"Template generation error: {e}")
+                    st.warning("Templates temporarily unavailable")
+
+            # Tab 3: Marketing Guides
+            with export_tabs[2]:
+                st.markdown("**Comprehensive guides for Steam marketing success:**")
+
+                guides = [
+                    ("📄 Steam Store Optimization", "resources/steam_store_optimization.md", "Complete guide to optimizing your Steam store page"),
+                    ("🎯 Influencer Outreach", "resources/influencer_outreach_guide.md", "Best practices for working with content creators"),
+                    ("🚀 Launch Checklist", "resources/launch_checklist.md", "Step-by-step launch preparation timeline")
+                ]
+
+                for title, filepath, description in guides:
+                    with st.expander(title):
+                        st.markdown(f"**{description}**")
+
+                        try:
+                            guide_path = os.path.join(os.path.dirname(__file__), filepath)
+                            if os.path.exists(guide_path):
+                                with open(guide_path, 'r', encoding='utf-8') as f:
+                                    guide_content = f.read()
+
+                                st.download_button(
+                                    label=f"📥 Download {title}",
+                                    data=guide_content,
+                                    file_name=os.path.basename(filepath),
+                                    mime="text/markdown",
+                                    key=f"guide_{os.path.basename(filepath)}",
+                                    use_container_width=True
+                                )
+
+                                # Show preview
+                                with st.expander("👀 Preview"):
+                                    st.markdown(guide_content[:1000] + "..." if len(guide_content) > 1000 else guide_content)
+                            else:
+                                st.info(f"Guide not yet available: {filepath}")
+                        except Exception as e:
+                            logger.error(f"Guide read error for {filepath}: {e}")
+                            st.info("Guide temporarily unavailable")
+
+                st.info("💡 **Tip**: Save these guides for reference during your marketing campaign")
 
         # Success message
         st.success("✅ Report generated successfully! Download as PDF or Markdown, or use '🔄 Generate New Report' to analyze another game.")
