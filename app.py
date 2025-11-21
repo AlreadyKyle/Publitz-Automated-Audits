@@ -440,11 +440,23 @@ def main():
         with dl_col1:
             # PDF Download
             try:
+                # Enhance audit results with section scores if available
+                enhanced_audit_results = st.session_state.audit_results.copy() if st.session_state.audit_results else {}
+
+                if st.session_state.structured_data and 'sections' in st.session_state.structured_data:
+                    sections = st.session_state.structured_data['sections']
+                    section_scores = {s['name']: {'score': s['score'], 'rating': s['rating']}
+                                    for s in sections if 'name' in s and 'score' in s}
+
+                    if section_scores:
+                        enhanced_audit_results['section_scores'] = section_scores
+                        enhanced_audit_results['overall_score'] = st.session_state.structured_data.get('overall_score', 0)
+
                 pdf_bytes, pdf_filename = create_downloadable_pdf(
                     st.session_state.report_data,
                     st.session_state.game_name,
                     st.session_state.report_type,
-                    st.session_state.audit_results
+                    enhanced_audit_results
                 )
 
                 st.download_button(
@@ -477,6 +489,146 @@ def main():
                 key="download_md_top"
             )
 
+        # Display visual score summary if structured data available
+        if st.session_state.structured_data and 'sections' in st.session_state.structured_data:
+            st.markdown("---")
+            st.markdown("### 📊 Score Summary")
+
+            overall_score = st.session_state.structured_data.get('overall_score', 0)
+
+            # Overall score with large metric
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                score_delta = None
+                score_color = "normal"
+
+                if overall_score >= 80:
+                    score_label = "🟢 Excellent"
+                    score_color = "normal"
+                elif overall_score >= 65:
+                    score_label = "🔵 Good"
+                    score_color = "normal"
+                elif overall_score >= 50:
+                    score_label = "🟡 Fair"
+                    score_color = "off"
+                else:
+                    score_label = "🔴 Needs Work"
+                    score_color = "off"
+
+                st.metric(
+                    label="Overall Score",
+                    value=f"{overall_score}/100",
+                    delta=score_label,
+                    delta_color=score_color
+                )
+
+            st.markdown("")
+
+            # Section scores in expandable
+            with st.expander("📋 Section Breakdown", expanded=False):
+                sections = st.session_state.structured_data.get('sections', [])
+
+                # Display sections in 2-column grid
+                for idx in range(0, len(sections), 2):
+                    col1, col2 = st.columns(2)
+
+                    # First column
+                    with col1:
+                        if idx < len(sections):
+                            section = sections[idx]
+                            section_name = section.get('name', 'Unknown')
+                            section_score = section.get('score', 0)
+                            section_rating = section.get('rating', 'unknown')
+
+                            st.markdown(f"**{section_name}**")
+                            st.progress(section_score / 100)
+                            st.caption(f"{section_score}/100 - {section_rating.title()}")
+                            st.markdown("")
+
+                    # Second column
+                    with col2:
+                        if idx + 1 < len(sections):
+                            section = sections[idx + 1]
+                            section_name = section.get('name', 'Unknown')
+                            section_score = section.get('score', 0)
+                            section_rating = section.get('rating', 'unknown')
+
+                            st.markdown(f"**{section_name}**")
+                            st.progress(section_score / 100)
+                            st.caption(f"{section_score}/100 - {section_rating.title()}")
+                            st.markdown("")
+
+        # Display key metrics dashboard if Phase 2 data available
+        if st.session_state.structured_data and st.session_state.structured_data.get('phase2_data'):
+            st.markdown("---")
+            st.markdown("### 🎯 Key Opportunities")
+
+            phase2_data = st.session_state.structured_data['phase2_data']
+
+            # Calculate key metrics
+            total_reach = 0
+            total_contacts = 0
+
+            # Influencer reach
+            if 'twitch' in phase2_data:
+                streamers = phase2_data['twitch'].get('streamers', [])
+                total_contacts += len(streamers)
+                total_reach += sum(s.get('followers', 0) for s in streamers)
+
+            if 'youtube' in phase2_data:
+                channels = phase2_data['youtube'].get('channels', [])
+                total_contacts += len(channels)
+                total_reach += sum(c.get('subscribers', 0) for c in channels)
+
+            if 'curators' in phase2_data:
+                curators = phase2_data['curators'].get('curators', [])
+                total_contacts += len(curators)
+                total_reach += sum(c.get('followers', 0) for c in curators)
+
+            # Community reach
+            if 'reddit' in phase2_data:
+                total_reach += phase2_data['reddit'].get('total_reach', 0)
+
+            # Display metrics in columns
+            metric_cols = st.columns(4)
+
+            with metric_cols[0]:
+                st.metric(
+                    label="Total Reach",
+                    value=f"{total_reach:,}",
+                    help="Combined followers/subscribers across all influencers and communities"
+                )
+
+            with metric_cols[1]:
+                st.metric(
+                    label="Influencer Contacts",
+                    value=total_contacts,
+                    help="Total number of streamers, YouTubers, and curators identified"
+                )
+
+            with metric_cols[2]:
+                revenue_impact = 0
+                if 'regional_pricing' in phase2_data:
+                    revenue_impact = phase2_data['regional_pricing'].get('revenue_impact', {}).get('revenue_increase_percent', 0)
+
+                st.metric(
+                    label="Revenue Potential",
+                    value=f"+{revenue_impact:.0f}%",
+                    help="Estimated revenue increase with optimized regional pricing"
+                )
+
+            with metric_cols[3]:
+                loc_languages = 0
+                if 'localization' in phase2_data:
+                    missing_langs = phase2_data['localization'].get('missing_languages', [])
+                    loc_languages = len([l for l in missing_langs if l.get('priority') == 'high'])
+
+                st.metric(
+                    label="High-ROI Languages",
+                    value=loc_languages,
+                    help="Number of high-priority language localizations identified"
+                )
+
         # Display full report
         st.markdown("---")
         st.markdown("### 📝 Full Audit Report")
@@ -497,11 +649,23 @@ def main():
         with dl_col1_bottom:
             # PDF Download
             try:
+                # Enhance audit results with section scores if available
+                enhanced_audit_results = st.session_state.audit_results.copy() if st.session_state.audit_results else {}
+
+                if st.session_state.structured_data and 'sections' in st.session_state.structured_data:
+                    sections = st.session_state.structured_data['sections']
+                    section_scores = {s['name']: {'score': s['score'], 'rating': s['rating']}
+                                    for s in sections if 'name' in s and 'score' in s}
+
+                    if section_scores:
+                        enhanced_audit_results['section_scores'] = section_scores
+                        enhanced_audit_results['overall_score'] = st.session_state.structured_data.get('overall_score', 0)
+
                 pdf_bytes, pdf_filename = create_downloadable_pdf(
                     st.session_state.report_data,
                     st.session_state.game_name,
                     st.session_state.report_type,
-                    st.session_state.audit_results
+                    enhanced_audit_results
                 )
 
                 st.download_button(
