@@ -92,7 +92,7 @@ class RegionalPricingAnalyzer:
             # Calculate gap if current price provided
             if current_regional_prices and region_code in current_regional_prices:
                 current = current_regional_prices[region_code]
-                gap_percent = ((current - recommended_price) / recommended_price) * 100
+                gap_percent = ((current - recommended_price) / recommended_price) * 100 if recommended_price > 0 else 0
                 price_gaps[region_code] = {
                     'current': current,
                     'recommended': recommended_price,
@@ -280,7 +280,7 @@ class RegionalPricingAnalyzer:
         # Calculate impact vs US-only pricing
         us_only_revenue = base_price * 1000
         additional_revenue = total_revenue_potential - us_only_revenue
-        revenue_increase_percent = (additional_revenue / us_only_revenue) * 100
+        revenue_increase_percent = (additional_revenue / us_only_revenue) * 100 if us_only_revenue > 0 else 0
 
         return {
             'total_revenue_potential': total_revenue_potential,
@@ -347,7 +347,7 @@ class RegionalPricingAnalyzer:
                 additional_revenue = additional_units * base_price
                 localization_cost = lang_data['cost']
 
-                roi = ((additional_revenue - localization_cost) / localization_cost) * 100
+                roi = ((additional_revenue - localization_cost) / localization_cost) * 100 if localization_cost > 0 else 0
                 payback_units = localization_cost / base_price if base_price > 0 else 0
 
                 missing_languages.append({
