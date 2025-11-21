@@ -69,56 +69,74 @@ if 'audit_results' not in st.session_state:
 def main():
     # Header
     st.title("📊 Publitz Automated Game Audits")
-    st.markdown("Paste a Steam game URL to generate a professional audit report")
+
+    # If report is generated, show it prominently and collapse input form
+    if st.session_state.report_generated:
+        col_title, col_button = st.columns([4, 1])
+        with col_title:
+            st.markdown(f"**Current Report:** {st.session_state.game_name}")
+        with col_button:
+            if st.button("🔄 New Report", type="primary", use_container_width=True, key="header_new_report"):
+                st.session_state.report_generated = False
+                st.session_state.report_data = None
+                st.session_state.game_name = None
+                st.session_state.generating = False
+                st.rerun()
+    else:
+        st.markdown("Paste a Steam game URL to generate a professional audit report")
+
     st.markdown("---")
 
-    # API Key input (can be hidden in sidebar or environment variable)
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    # Collapse input form when report is shown, expand when generating new report
+    input_expanded = not st.session_state.report_generated
+    input_container = st.expander("🎮 Generate Audit Report", expanded=input_expanded)
 
-    if not api_key:
-        with st.expander("⚙️ API Configuration", expanded=True):
-            api_key = st.text_input(
-                "Anthropic API Key",
-                type="password",
-                help="Enter your Anthropic API key. Get one at https://console.anthropic.com/",
-                key="api_key_input"
-            )
+    with input_container:
+        # API Key input (can be hidden in sidebar or environment variable)
+        api_key = os.getenv("ANTHROPIC_API_KEY", "")
 
-            if not api_key:
-                logger.info("User prompted for API key")
-                st.warning("⚠️ Please enter your Anthropic API Key to continue")
-                st.info("💡 **Tip**: Set ANTHROPIC_API_KEY environment variable to skip this step")
+        if not api_key:
+            with st.expander("⚙️ API Configuration", expanded=True):
+                api_key = st.text_input(
+                    "Anthropic API Key",
+                    type="password",
+                    help="Enter your Anthropic API key. Get one at https://console.anthropic.com/",
+                    key="api_key_input"
+                )
+
+                if not api_key:
+                    logger.info("User prompted for API key")
+                    st.warning("⚠️ Please enter your Anthropic API Key to continue")
+                    st.info("💡 **Tip**: Set ANTHROPIC_API_KEY environment variable to skip this step")
+                    st.stop()
+
+        # Validate API key format (basic check)
+        if api_key:
+            api_key = api_key.strip()
+            if len(api_key) < 20:
+                logger.warning("Invalid API key format provided")
+                st.error("❌ Invalid API key format. Please check your API key.")
+                st.info("💡 API keys start with 'sk-ant-' and are much longer")
                 st.stop()
 
-    # Validate API key format (basic check)
-    if api_key:
-        api_key = api_key.strip()
-        if len(api_key) < 20:
-            logger.warning("Invalid API key format provided")
-            st.error("❌ Invalid API key format. Please check your API key.")
-            st.info("💡 API keys start with 'sk-ant-' and are much longer")
-            st.stop()
+        # Main input - Steam URL
+        st.markdown("### 🎮 Enter Steam Game URL")
 
-    # Main input - Steam URL
-    st.markdown("### 🎮 Enter Steam Game URL")
+        steam_url = st.text_input(
+            "Steam Store URL",
+            placeholder="https://store.steampowered.com/app/12345/Game_Name/",
+            help="Paste the full URL from Steam store page",
+            label_visibility="collapsed",
+            key="steam_url_input"
+        )
 
-    steam_url = st.text_input(
-        "Steam Store URL",
-        placeholder="https://store.steampowered.com/app/12345/Game_Name/",
-        help="Paste the full URL from Steam store page",
-        label_visibility="collapsed",
-        key="steam_url_input"
-    )
+        # Example URLs
+        with st.expander("📝 Example URLs"):
+            st.code("https://store.steampowered.com/app/292030/The_Witcher_3_Wild_Hunt/", language="text")
+            st.code("https://store.steampowered.com/app/730/CounterStrike_2/", language="text")
+            st.code("https://store.steampowered.com/app/570/Dota_2/", language="text")
 
-    # Example URLs
-    with st.expander("📝 Example URLs"):
-        st.code("https://store.steampowered.com/app/292030/The_Witcher_3_Wild_Hunt/", language="text")
-        st.code("https://store.steampowered.com/app/730/CounterStrike_2/", language="text")
-        st.code("https://store.steampowered.com/app/570/Dota_2/", language="text")
-
-    # Generate button
-    col1, col2 = st.columns([3, 1])
-    with col1:
+        # Generate button
         # Phase 2.1 & 2.4: Disable button during generation and show state
         button_text = "⏳ Generating Report..." if st.session_state.generating else "🚀 Generate Audit Report"
 
@@ -134,15 +152,6 @@ def main():
             disabled=st.session_state.generating,
             on_click=start_generation
         )
-    with col2:
-        if st.session_state.report_generated:
-            if st.button("🔄 Generate New Report", use_container_width=True, key="new_report_btn"):
-                # Reset session state
-                st.session_state.report_generated = False
-                st.session_state.report_data = None
-                st.session_state.game_name = None
-                st.session_state.generating = False
-                st.rerun()
 
     # Only generate if button clicked and not already generated
     if generate_button and not st.session_state.report_generated:
