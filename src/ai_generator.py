@@ -464,10 +464,29 @@ Based on the Pre-Launch Report Template, your report must include:
         capsule_analysis: Dict[str, Any] = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
-        Generate a report using the ENHANCED 5-pass system:
-        Draft → Audit → Fact-Check → Consistency Check → Enhanced Final
+        Generate a report using the ENHANCED 9-PASS AUDIT SYSTEM:
 
-        Phase 1 Enhancement: Added fact-checking, consistency validation, and specificity enforcement
+        PHASE 1 (Original):
+        Pass 1: Draft → Generate initial report (5k tokens, temp 0.5)
+        Pass 2: Audit → Check for common errors (competitors, revenue, success, tags)
+
+        PHASE 1 ENHANCEMENTS:
+        Pass 3: Fact-Check → Verify all numerical claims against source data
+        Pass 4: Consistency → Check for internal contradictions between sections
+        Pass 5: Specificity → Scan for vague recommendations
+
+        PHASE 2 ENHANCEMENTS:
+        Pass 6: Competitor Validation → Ensure competitors are truly comparable
+        Pass 7: Specialized Audits → Domain experts (pricing, marketing, competitive intelligence)
+        Pass 8: Recommendation Feasibility → Check if recommendations are realistic
+
+        FINAL GENERATION:
+        Pass 9: Enhanced Report → Apply ALL corrections from passes 2-8 (16k tokens, temp 0.7)
+
+        Post-Processing:
+        - Add executive snapshot
+        - Add data quality warnings
+        - Format final document
 
         Args:
             game_data: Game information
@@ -475,6 +494,8 @@ Based on the Pre-Launch Report Template, your report must include:
             competitor_data: List of competitor game data
             steamdb_data: Additional SteamDB data
             report_type: "Post-Launch" or "Pre-Launch"
+            review_stats: Review statistics
+            capsule_analysis: Capsule image analysis
 
         Returns:
             Tuple of (final_report, audit_results)
@@ -500,6 +521,24 @@ Based on the Pre-Launch Report Template, your report must include:
             draft_report, game_data, sales_data
         )
         audit_results['consistency_check'] = consistency_results
+
+        # Phase 3.2.7: PHASE 2 - Validate competitors are truly comparable
+        competitor_validation = self._validate_competitors(
+            game_data, sales_data, competitor_data
+        )
+        audit_results['competitor_validation'] = competitor_validation
+
+        # Phase 3.2.8: PHASE 2 - Specialized domain audits (run conceptually in parallel)
+        specialized_audits = self._run_specialized_audits(
+            draft_report, game_data, sales_data, competitor_data
+        )
+        audit_results['specialized_audits'] = specialized_audits
+
+        # Phase 3.2.9: PHASE 2 - Validate recommendation feasibility
+        recommendation_validation = self._validate_recommendations(
+            draft_report, game_data, sales_data
+        )
+        audit_results['recommendation_validation'] = recommendation_validation
 
         # Phase 3.3: Generate enhanced final report with all corrections
         final_report = self._generate_enhanced_report(
@@ -1053,6 +1092,382 @@ Return ONLY valid JSON, no other text.
             # If specificity check fails, just return original report
             return report
 
+    def _validate_competitors(
+        self,
+        game_data: Dict[str, Any],
+        sales_data: Dict[str, Any],
+        competitor_data: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Phase 3.2.7 (Phase 2): Validate that competitors are truly comparable
+
+        Ensures competitors match on critical dimensions:
+        - Same monetization model (paid vs F2P)
+        - Genre overlap
+        - Price range similarity
+        - Release timeframe relevance
+        - Platform match
+
+        This prevents comparing apples to oranges (e.g., $60 AAA vs $5 indie)
+        """
+        # Build comparison data
+        game_info = {
+            "name": game_data.get('name'),
+            "price": game_data.get('price', 'Unknown'),
+            "genres": game_data.get('genres', ''),
+            "release_date": game_data.get('release_date', ''),
+            "tags": game_data.get('tags', '')
+        }
+
+        competitors_info = []
+        for comp in competitor_data[:10]:  # Limit to top 10
+            competitors_info.append({
+                "name": comp.get('name'),
+                "price": comp.get('price', 'Unknown'),
+                "genres": comp.get('genres', ''),
+                "tags": comp.get('tags', ''),
+                "release_date": comp.get('release_date', '')
+            })
+
+        validation_prompt = f"""You are a competitor validation specialist for game marketing.
+
+Analyze if these competitors are TRULY COMPARABLE to the target game.
+
+**TARGET GAME:**
+{json.dumps(game_info, indent=2)}
+
+**COMPETITORS TO VALIDATE:**
+{json.dumps(competitors_info, indent=2)}
+
+**VALIDATION CRITERIA:**
+
+1. **Monetization Match** (CRITICAL)
+   - Is target game paid? Are competitors paid?
+   - Is target game F2P? Are competitors F2P?
+   - Mismatch = INVALID competitor
+
+2. **Genre Overlap** (HIGH PRIORITY)
+   - Do genres overlap significantly?
+   - Example: RPG vs RPG = good, RPG vs Racing = bad
+
+3. **Price Range** (HIGH PRIORITY for paid games)
+   - Are prices within 2x of each other?
+   - Example: $20 vs $40 = acceptable, $5 vs $60 = questionable
+
+4. **Release Recency** (MEDIUM PRIORITY)
+   - Are games from similar era?
+   - Games >5 years apart may have different market dynamics
+
+5. **Tag Similarity** (MEDIUM PRIORITY)
+   - Do tags show similar game mechanics/themes?
+
+**OUTPUT FORMAT (JSON):**
+Return ONLY valid JSON:
+{{
+  "valid_competitors": [
+    {{
+      "name": "Competitor Name",
+      "similarity_score": 85,
+      "match_reasons": ["Same genre", "Similar price", "Recent release"]
+    }}
+  ],
+  "invalid_competitors": [
+    {{
+      "name": "Competitor Name",
+      "similarity_score": 25,
+      "rejection_reasons": ["F2P vs paid mismatch", "Different genre entirely"],
+      "severity": "high"
+    }}
+  ],
+  "overall_competitor_quality": 75,
+  "recommendation": "Replace 2 invalid competitors with better matches"
+}}
+
+Return ONLY valid JSON, no other text.
+"""
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1500,
+                temperature=0.2,
+                messages=[{"role": "user", "content": validation_prompt}]
+            )
+
+            response_text = ""
+            for content_block in response.content:
+                if hasattr(content_block, 'text'):
+                    response_text += content_block.text
+
+            # Parse JSON response
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+
+            validation_results = json.loads(response_text)
+            return validation_results
+
+        except Exception as e:
+            # Return default if validation fails
+            return {
+                "valid_competitors": [],
+                "invalid_competitors": [],
+                "overall_competitor_quality": 100,  # Assume pass
+                "recommendation": "",
+                "error": f"Competitor validation failed: {str(e)}"
+            }
+
+    def _run_specialized_audits(
+        self,
+        draft_report: str,
+        game_data: Dict[str, Any],
+        sales_data: Dict[str, Any],
+        competitor_data: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Phase 3.2.8 (Phase 2): Run specialized domain audits in parallel
+
+        Instead of one general audit, run specialized audits for:
+        1. Pricing Strategy (is pricing analysis sound?)
+        2. Marketing Tactics (are marketing recommendations realistic?)
+        3. Competitive Intelligence (is competitor analysis accurate?)
+        4. Technical/Platform Assessment (are technical recommendations feasible?)
+
+        Each specialist has domain expertise and catches domain-specific errors
+        """
+        # Note: In true parallel execution, these would run simultaneously
+        # For now, we run them sequentially but conceptually they're parallel
+
+        specialized_results = {
+            "pricing_audit": {"score": 100, "issues": []},
+            "marketing_audit": {"score": 100, "issues": []},
+            "competitive_audit": {"score": 100, "issues": []},
+            "overall_score": 100
+        }
+
+        audit_prompt = f"""You are a panel of specialized game industry auditors reviewing a draft report.
+
+**DRAFT REPORT (excerpt):**
+{draft_report[:5000]}
+
+**GAME CONTEXT:**
+- Price: {game_data.get('price')}
+- Revenue: {sales_data.get('estimated_revenue')}
+- Genre: {game_data.get('genres')}
+
+**YOUR TASK:**
+Review this report from THREE specialist perspectives:
+
+1. **PRICING SPECIALIST:**
+   - Is pricing analysis realistic for this genre/quality level?
+   - Are discount recommendations appropriate (not too deep, not too shallow)?
+   - Does regional pricing make sense?
+   - Are bundle opportunities realistic?
+
+2. **MARKETING SPECIALIST:**
+   - Are marketing channel recommendations appropriate for this game type?
+   - Are budget estimates realistic?
+   - Are influencer strategies feasible?
+   - Are growth projections reasonable?
+
+3. **COMPETITIVE INTELLIGENCE SPECIALIST:**
+   - Is competitor comparison apples-to-apples?
+   - Are competitive advantages accurately identified?
+   - Are market positioning claims supported?
+
+**OUTPUT FORMAT (JSON):**
+Return ONLY valid JSON:
+{{
+  "pricing_audit": {{
+    "score": 85,
+    "issues": ["Discount recommendations too aggressive for indie game", "Regional pricing missing for key markets"],
+    "strengths": ["Price point well-justified"]
+  }},
+  "marketing_audit": {{
+    "score": 90,
+    "issues": ["Influencer budget seems high for this revenue level"],
+    "strengths": ["Marketing channels well-targeted", "Timeline realistic"]
+  }},
+  "competitive_audit": {{
+    "score": 75,
+    "issues": ["One competitor is F2P vs this game's paid model"],
+    "strengths": ["Genre matching is good"]
+  }},
+  "overall_score": 83,
+  "summary": "Strong report with minor pricing and competitive analysis issues"
+}}
+
+Return ONLY valid JSON, no other text.
+"""
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1500,
+                temperature=0.3,
+                messages=[{"role": "user", "content": audit_prompt}]
+            )
+
+            response_text = ""
+            for content_block in response.content:
+                if hasattr(content_block, 'text'):
+                    response_text += content_block.text
+
+            # Parse JSON response
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+
+            specialized_results = json.loads(response_text)
+            return specialized_results
+
+        except Exception as e:
+            # Return default if specialized audits fail
+            return {
+                "pricing_audit": {"score": 100, "issues": [], "strengths": []},
+                "marketing_audit": {"score": 100, "issues": [], "strengths": []},
+                "competitive_audit": {"score": 100, "issues": [], "strengths": []},
+                "overall_score": 100,
+                "summary": "",
+                "error": f"Specialized audits failed: {str(e)}"
+            }
+
+    def _validate_recommendations(
+        self,
+        draft_report: str,
+        game_data: Dict[str, Any],
+        sales_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Phase 3.2.9 (Phase 2): Validate recommendation feasibility
+
+        Checks if recommendations are:
+        - Realistic (not "get 1M wishlists in 1 week")
+        - Achievable with available resources
+        - Properly prioritized
+        - Have success metrics defined
+        - Are specific enough to act on
+        """
+        # Extract key constraints
+        constraints = {
+            "revenue": sales_data.get('estimated_revenue', 'Unknown'),
+            "review_count": sales_data.get('reviews_total', 0),
+            "price": game_data.get('price', 'Unknown'),
+            "is_indie": "indie" in str(game_data.get('tags', '')).lower() or "indie" in str(game_data.get('developer', '')).lower()
+        }
+
+        validation_prompt = f"""You are a feasibility auditor for game marketing recommendations.
+
+**DRAFT REPORT RECOMMENDATIONS (excerpt):**
+{draft_report[draft_report.find('RECOMMENDATION'):draft_report.find('RECOMMENDATION')+3000] if 'RECOMMENDATION' in draft_report else draft_report[-3000:]}
+
+**GAME CONSTRAINTS:**
+{json.dumps(constraints, indent=2)}
+
+**FEASIBILITY CHECKS:**
+
+1. **Resource Realism**
+   - Are recommendations realistic given the game's revenue/team size?
+   - Example: $100K revenue game shouldn't recommend $50K ad campaign
+   - Indie game can't hire 10-person community team
+
+2. **Timeline Feasibility**
+   - Are timelines achievable?
+   - Example: "redesign capsule in 2 days" = unrealistic
+   - "launch marketing campaign in 2 weeks" = realistic
+
+3. **Impact Estimates**
+   - Are projected outcomes realistic?
+   - Example: "+500% revenue in 1 month" = unrealistic
+   - "+15-25% wishlist growth" = realistic
+
+4. **Specificity**
+   - Are recommendations specific enough to execute?
+   - Do they have clear success metrics?
+   - Do they have assigned owners/roles?
+
+5. **Prioritization**
+   - Are recommendations prioritized by impact/effort?
+   - Are quick wins separated from long-term projects?
+
+**OUTPUT FORMAT (JSON):**
+Return ONLY valid JSON:
+{{
+  "unrealistic_recommendations": [
+    {{
+      "recommendation": "Launch $50K ad campaign",
+      "issue": "Budget too high for game's revenue level ($100K total)",
+      "severity": "high",
+      "suggestion": "Start with $5K test campaign"
+    }}
+  ],
+  "under_specified_recommendations": [
+    {{
+      "recommendation": "Improve marketing",
+      "issue": "Too vague - no channel, budget, or timeline specified",
+      "severity": "medium"
+    }}
+  ],
+  "realistic_recommendations": [
+    {{
+      "recommendation": "Reduce price from $19.99 to $16.99 during Steam Summer Sale",
+      "strengths": ["Specific price", "Specific event", "Realistic timeline"]
+    }}
+  ],
+  "feasibility_score": 70,
+  "summary": "Most recommendations realistic but 2 need budget adjustments and 3 need more specificity"
+}}
+
+Return ONLY valid JSON, no other text.
+"""
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1500,
+                temperature=0.3,
+                messages=[{"role": "user", "content": validation_prompt}]
+            )
+
+            response_text = ""
+            for content_block in response.content:
+                if hasattr(content_block, 'text'):
+                    response_text += content_block.text
+
+            # Parse JSON response
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+
+            validation_results = json.loads(response_text)
+            return validation_results
+
+        except Exception as e:
+            # Return default if validation fails
+            return {
+                "unrealistic_recommendations": [],
+                "under_specified_recommendations": [],
+                "realistic_recommendations": [],
+                "feasibility_score": 100,  # Assume pass
+                "summary": "",
+                "error": f"Recommendation validation failed: {str(e)}"
+            }
+
     def _generate_enhanced_report(
         self,
         game_data: Dict[str, Any],
@@ -1120,6 +1535,65 @@ The following contradictions were found between sections:
 
 CRITICAL: Ensure all sections tell a consistent story. Consistency score: {consistency.get('consistency_score', 100)}%
 Revision notes: {consistency.get('revision_notes', 'None')}
+"""
+
+        # PHASE 2: Add competitor validation results
+        comp_validation = audit_results.get('competitor_validation', {})
+        if comp_validation.get('invalid_competitors') and len(comp_validation['invalid_competitors']) > 0:
+            correction_instructions += f"""
+**COMPETITOR VALIDATION ISSUES (Phase 2 Enhancement):**
+The following competitors are NOT truly comparable:
+{json.dumps(comp_validation.get('invalid_competitors', []), indent=2)}
+
+CRITICAL: {comp_validation.get('recommendation', 'Review competitor selection')}
+Competitor quality score: {comp_validation.get('overall_competitor_quality', 100)}%
+"""
+
+        # PHASE 2: Add specialized audit results
+        specialized = audit_results.get('specialized_audits', {})
+        has_specialized_issues = (
+            (specialized.get('pricing_audit', {}).get('issues') and len(specialized['pricing_audit']['issues']) > 0) or
+            (specialized.get('marketing_audit', {}).get('issues') and len(specialized['marketing_audit']['issues']) > 0) or
+            (specialized.get('competitive_audit', {}).get('issues') and len(specialized['competitive_audit']['issues']) > 0)
+        )
+        if has_specialized_issues:
+            correction_instructions += f"""
+**SPECIALIZED DOMAIN AUDIT FINDINGS (Phase 2 Enhancement):**
+
+Pricing Specialist (Score: {specialized.get('pricing_audit', {}).get('score', 100)}):
+Issues: {specialized.get('pricing_audit', {}).get('issues', [])}
+Strengths: {specialized.get('pricing_audit', {}).get('strengths', [])}
+
+Marketing Specialist (Score: {specialized.get('marketing_audit', {}).get('score', 100)}):
+Issues: {specialized.get('marketing_audit', {}).get('issues', [])}
+Strengths: {specialized.get('marketing_audit', {}).get('strengths', [])}
+
+Competitive Intelligence (Score: {specialized.get('competitive_audit', {}).get('score', 100)}):
+Issues: {specialized.get('competitive_audit', {}).get('issues', [])}
+Strengths: {specialized.get('competitive_audit', {}).get('strengths', [])}
+
+Overall Specialist Score: {specialized.get('overall_score', 100)}%
+Summary: {specialized.get('summary', '')}
+"""
+
+        # PHASE 2: Add recommendation feasibility results
+        rec_validation = audit_results.get('recommendation_validation', {})
+        has_feasibility_issues = (
+            (rec_validation.get('unrealistic_recommendations') and len(rec_validation['unrealistic_recommendations']) > 0) or
+            (rec_validation.get('under_specified_recommendations') and len(rec_validation['under_specified_recommendations']) > 0)
+        )
+        if has_feasibility_issues:
+            correction_instructions += f"""
+**RECOMMENDATION FEASIBILITY ISSUES (Phase 2 Enhancement):**
+
+Unrealistic Recommendations:
+{json.dumps(rec_validation.get('unrealistic_recommendations', []), indent=2)}
+
+Under-Specified Recommendations:
+{json.dumps(rec_validation.get('under_specified_recommendations', []), indent=2)}
+
+CRITICAL: Adjust recommendations to be realistic and specific. Feasibility score: {rec_validation.get('feasibility_score', 100)}%
+{rec_validation.get('summary', '')}
 """
 
         if correction_instructions:
