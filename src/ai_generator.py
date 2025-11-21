@@ -250,9 +250,13 @@ Based on the Post-Launch Report Template, your report must include:
     - Partnership opportunities
     - Platform expansion possibilities
 
-Format the report in clear, professional markdown with proper headings, bullet points, and data visualization suggestions.
-Use specific metrics and data points from the provided information.
-Be analytical, actionable, and focused on driving results.
+**Formatting Requirements:**
+- Use clear, professional markdown with proper headings and bullet points
+- DO NOT list competitors at the beginning of the report
+- DO NOT create a "Top 10 Competitors" or "Competitors Analyzed" section at the start
+- Competitor analysis should ONLY appear in Section 5 (COMPETITOR COMPARISON)
+- Use specific metrics and data points from the provided information
+- Be analytical, actionable, and focused on driving results
 """
 
         try:
@@ -386,9 +390,13 @@ Based on the Pre-Launch Report Template, your report must include:
     - Contingency plans
     - Success metrics and KPIs
 
-Format the report in clear, professional markdown with proper headings, bullet points, and actionable recommendations.
-Use specific metrics and data points from the competitor analysis.
-Be strategic, actionable, and focused on maximizing launch success.
+**Formatting Requirements:**
+- Use clear, professional markdown with proper headings and bullet points
+- DO NOT list competitors at the beginning of the report
+- DO NOT create a "Top 10 Competitors" or "Competitors Analyzed" section at the start
+- Competitor analysis should ONLY appear in Section 2 (COMPETITIVE ANALYSIS)
+- Use specific metrics and data points from the competitor analysis
+- Be strategic, actionable, and focused on maximizing launch success
 """
 
         try:
@@ -466,8 +474,28 @@ Be strategic, actionable, and focused on maximizing launch success.
             draft_report, audit_results, report_type, review_stats, capsule_analysis
         )
 
-        # Phase 3.4: Add fallback data warnings if detected
+        # Phase 3.4: Add executive snapshot and data warnings
         fallback_warnings = self._detect_fallback_data(sales_data, competitor_data)
+
+        # Build and insert executive snapshot section
+        snapshot_section = self._build_snapshot_section(sales_data, game_data, fallback_warnings)
+
+        # Insert snapshot after first heading
+        lines = final_report.split('\n')
+        insert_index = 0
+        for i, line in enumerate(lines):
+            if line.strip().startswith('#'):
+                insert_index = i + 1
+                break
+
+        if insert_index > 0:
+            lines.insert(insert_index, snapshot_section)
+        else:
+            lines.insert(0, snapshot_section)
+
+        final_report = '\n'.join(lines)
+
+        # Add data quality warnings if needed (serious issues only)
         if fallback_warnings:
             final_report = self._add_fallback_warnings(final_report, fallback_warnings)
 
@@ -840,6 +868,9 @@ Generate a comprehensive, professional report with these sections:
 - Be specific with metrics and data points
 - Recommendations should match the game's actual performance level
 - Format in professional markdown with clear sections and bullet points
+- DO NOT list competitors at the beginning of the report
+- DO NOT create a "Top 10 Competitors" or "Competitors Analyzed" section at the start
+- Competitor analysis should ONLY appear in Section 5 (COMPETITOR COMPARISON)
 
 Generate a comprehensive, accurate, and actionable report.
 """
@@ -975,74 +1006,94 @@ Recommendations:
 
         return warnings
 
+    def _build_snapshot_section(
+        self,
+        sales_data: Dict[str, Any],
+        game_data: Dict[str, Any],
+        warnings: List[str]
+    ) -> str:
+        """Build executive snapshot section with key metrics"""
+
+        snapshot = "---\n\n## 📊 EXECUTIVE SNAPSHOT\n\n"
+
+        # Key metrics in a compact format
+        snapshot += "| Metric | Value |\n"
+        snapshot += "|--------|-------|\n"
+        snapshot += f"| **Estimated Revenue** | {sales_data.get('estimated_revenue', 'N/A')} |\n"
+        snapshot += f"| **Revenue Range** | {sales_data.get('revenue_range', 'N/A')} |\n"
+        snapshot += f"| **Estimated Owners** | {sales_data.get('owners_display', 'N/A')} |\n"
+        snapshot += f"| **Price** | {sales_data.get('price', 'N/A')} |\n"
+        snapshot += f"| **Review Score** | {sales_data.get('review_score', 'N/A')} |\n"
+        snapshot += f"| **Total Reviews** | {sales_data.get('reviews_total', 'N/A'):,} |\n" if isinstance(sales_data.get('reviews_total'), (int, float)) else f"| **Total Reviews** | {sales_data.get('reviews_total', 'N/A')} |\n"
+        snapshot += f"| **Developer** | {game_data.get('developer', 'N/A')} |\n"
+        snapshot += f"| **Release Date** | {game_data.get('release_date', 'N/A')} |\n"
+
+        snapshot += "\n"
+
+        # Data source info (compact)
+        has_serious_warnings = any('⚠️' in w and 'fallback' in w.lower() for w in warnings)
+
+        if has_serious_warnings:
+            snapshot += "⚠️ **Data Quality:** Limited data available - using fallback estimates\n\n"
+        else:
+            data_source = sales_data.get('data_source', 'Unknown')
+            confidence = sales_data.get('confidence', 'unknown')
+            snapshot += f"**Data Source:** {data_source} (Confidence: {confidence.title()})\n\n"
+
+        snapshot += "---\n\n"
+
+        return snapshot
+
     def _add_fallback_warnings(self, report: str, warnings: List[str]) -> str:
         """
-        Add data source transparency and warnings to the report
+        Add executive snapshot and data source info to the report
 
         Args:
             report: The generated report markdown
             warnings: List of warning/info messages about data sources
 
         Returns:
-            Modified report with transparency information at the top
+            Modified report with snapshot section at the top
         """
-        # Separate warnings from info messages
+        # Build snapshot section instead of old warnings format
+        # (snapshot is built in generate_report_with_audit where we have access to sales_data)
+
+        # For serious warnings, still add a warning banner
         has_serious_warnings = any('⚠️' in w and 'fallback' in w.lower() for w in warnings)
-        has_estimation = any('RAWG' in w or 'Smart Estimation' in w for w in warnings)
 
         if has_serious_warnings:
-            # Serious data quality issues
             warning_section = "---\n\n## ⚠️ DATA QUALITY WARNING\n\n"
             warning_section += "**This report contains incomplete data. Please review carefully:**\n\n"
 
             for warning in warnings:
-                # Don't add extra ⚠️ if message already has one
                 if warning.startswith('⚠️') or warning.startswith('✓') or warning.startswith('📊'):
                     warning_section += f"{warning}\n\n"
                 else:
                     warning_section += f"- ⚠️ {warning}\n"
 
-            warning_section += "\n**Impact:** The analysis below may not accurately reflect actual performance. "
-            warning_section += "Real-time API data could not be retrieved. Please verify critical metrics independently.\n\n"
-            warning_section += "**Recommendation:** Try regenerating the report, or check if the game exists on Steam. "
-            warning_section += "If the issue persists, some Steam API endpoints may be temporarily unavailable.\n\n"
+            warning_section += "\n**Impact:** The analysis below may not accurately reflect actual performance.\n\n"
             warning_section += "---\n\n"
-
-        elif has_estimation:
-            # RAWG estimation - info rather than warning
-            warning_section = "---\n\n## 📊 Data Source Information\n\n"
-
-            for warning in warnings:
-                warning_section += f"{warning}\n\n"
-
-            warning_section += "**Note:** While these estimates are based on multiple quality signals, they may not perfectly "
-            warning_section += "reflect actual Steam performance. Use as directional guidance rather than exact figures.\n\n"
-            warning_section += "---\n\n"
-
         else:
-            # Best case - real data or minimal issues
-            warning_section = "---\n\n## ℹ️ Data Source\n\n"
+            # No serious warnings - snapshot will show data source
+            warning_section = ""
 
-            for warning in warnings:
-                warning_section += f"{warning}\n\n"
+        if warning_section:
+            # Insert warnings after the first heading (title)
+            lines = report.split('\n')
+            insert_index = 0
 
-            warning_section += "---\n\n"
+            # Find the first heading or first line
+            for i, line in enumerate(lines):
+                if line.strip().startswith('#'):
+                    insert_index = i + 1
+                    break
 
-        # Insert warnings after the first heading (title)
-        lines = report.split('\n')
-        insert_index = 0
+            # Insert warning after first heading
+            if insert_index > 0:
+                lines.insert(insert_index, warning_section)
+            else:
+                lines.insert(0, warning_section)
 
-        # Find the first heading or first line
-        for i, line in enumerate(lines):
-            if line.strip().startswith('#'):
-                insert_index = i + 1
-                break
+            return '\n'.join(lines)
 
-        # Insert warning after first heading
-        if insert_index > 0:
-            lines.insert(insert_index, warning_section)
-        else:
-            # If no heading found, add at the very top
-            lines.insert(0, warning_section)
-
-        return '\n'.join(lines)
+        return report
