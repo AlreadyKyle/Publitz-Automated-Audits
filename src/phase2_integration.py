@@ -97,11 +97,11 @@ class Phase2DataCollector:
                 lambda: get_reddit_analysis(genres, tags)
             )
 
-            # Twitch analysis
+            # Twitch analysis (pass game_name for real API lookup)
             tasks['twitch'] = executor.submit(
                 self._safe_collect,
                 'Twitch',
-                lambda: get_twitch_analysis(genres, tags)
+                lambda: get_twitch_analysis(genres, tags, game_name=game_name)
             )
 
             # YouTube analysis
