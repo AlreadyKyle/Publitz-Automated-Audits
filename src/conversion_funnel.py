@@ -249,7 +249,13 @@ class ConversionFunnelAnalyzer:
         base_rate = self.BASE_RATES['wishlist_conv']['average']
 
         # Factor 1: Review score (50% weight)
-        review_score = sales_data.get('review_score', 75)
+        # FIX: Use review_score_raw (numeric) instead of review_score (string)
+        review_score_raw = sales_data.get('review_score_raw', sales_data.get('review_score', 75))
+        try:
+            review_score = float(review_score_raw) if review_score_raw is not None else 75
+        except (ValueError, TypeError):
+            review_score = 75
+
         if review_score >= 90:
             quality_mult = 1.3
         elif review_score >= 80:
@@ -316,7 +322,13 @@ class ConversionFunnelAnalyzer:
         base_rate = self.BASE_RATES['purchase_conv']['average']
 
         # Factor 1: Review score (40% weight)
-        review_score = sales_data.get('review_score', 75)
+        # FIX: Use review_score_raw (numeric) instead of review_score (string)
+        review_score_raw = sales_data.get('review_score_raw', sales_data.get('review_score', 75))
+        try:
+            review_score = float(review_score_raw) if review_score_raw is not None else 75
+        except (ValueError, TypeError):
+            review_score = 75
+
         if review_score >= 85:
             quality_mult = 1.3
         elif review_score >= 75:

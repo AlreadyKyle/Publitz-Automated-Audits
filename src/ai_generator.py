@@ -103,6 +103,12 @@ class AIGenerator:
             response = requests.get(capsule_url, timeout=10)
             response.raise_for_status()
 
+            # FIX: Validate it's actually an image before encoding
+            content_type = response.headers.get('content-type', '').lower()
+            if 'image' not in content_type:
+                print(f"URL returned non-image content-type: {content_type}")
+                return self._get_fallback_capsule_analysis()
+
             # Convert to base64
             image_data = base64.standard_b64encode(response.content).decode('utf-8')
 
@@ -552,6 +558,17 @@ Based on the Pre-Launch Report Template, your report must include:
         Returns:
             Tuple of (final_report, audit_results)
         """
+        # FIX: Helper function to format genres/tags for prompts
+        def format_list_field(value):
+            """Format a field that might be a list or string"""
+            if isinstance(value, list):
+                return ', '.join(str(v) for v in value) if value else 'N/A'
+            return str(value) if value else 'N/A'
+
+        # Pre-format genres and tags for use in prompts
+        genres_formatted = format_list_field(game_data.get('genres'))
+        tags_formatted = format_list_field(game_data.get('tags'))
+
         # Phase 3.1: Generate initial draft (fast)
         draft_report = self._generate_initial_draft(
             game_data, sales_data, competitor_data, steamdb_data, report_type, review_stats, capsule_analysis
@@ -674,6 +691,13 @@ Based on the Pre-Launch Report Template, your report must include:
         except (ValueError, TypeError):
             reviews_total_formatted = "0"
 
+        # FIX: Format genres/tags as comma-separated strings if they're lists
+        genres_raw = game_data.get('genres', 'N/A')
+        genres_formatted = ', '.join(str(g) for g in genres_raw) if isinstance(genres_raw, list) else str(genres_raw)
+
+        tags_raw = game_data.get('tags', 'N/A')
+        tags_formatted = ', '.join(str(t) for t in tags_raw) if isinstance(tags_raw, list) else str(tags_raw)
+
         prompt = f"""You are an expert game marketing analyst at Publitz.
 
 Generate a comprehensive {report_type.upper()} AUDIT REPORT for this game.
@@ -682,7 +706,7 @@ Generate a comprehensive {report_type.upper()} AUDIT REPORT for this game.
 - Name: {game_data.get('name', 'N/A')}
 - Developer: {game_data.get('developer', 'N/A')}
 - Release Date: {game_data.get('release_date', 'N/A')}
-- Genre: {game_data.get('genres', 'N/A')}
+- Genre: {genres_formatted}
 - Price: {game_data.get('price', 'N/A')}
 
 **Sales & Performance Data:**
@@ -776,6 +800,10 @@ Format in clear markdown with headings, bullet points, and specific data.
         analyzer = GameAnalyzer()
         success_analysis = analyzer.analyze_success_level(game_data, sales_data, review_stats)
 
+        # FIX: Format genres as comma-separated strings if they're lists
+        genres_raw = game_data.get('genres', 'N/A')
+        genres_formatted = ', '.join(str(g) for g in genres_raw) if isinstance(genres_raw, list) else str(genres_raw)
+
         audit_prompt = f"""You are a quality auditor for game marketing reports.
 
 Review the following DRAFT REPORT and check for accuracy issues.
@@ -785,7 +813,7 @@ Review the following DRAFT REPORT and check for accuracy issues.
 
 **ACTUAL GAME DATA FOR VERIFICATION:**
 - Game: {game_data.get('name')}
-- Genres: {game_data.get('genres')}
+- Genres: {genres_formatted}
 - Price: {game_data.get('price')}
 - Review Score: {sales_data.get('review_score')} ({sales_data.get('reviews_total')} reviews)
 - Revenue: {sales_data.get('estimated_revenue')} (Confidence: {sales_data.get('revenue_range')})
@@ -1393,6 +1421,10 @@ Return ONLY valid JSON, no other text.
             "overall_score": 100
         }
 
+        # FIX: Format genres as comma-separated strings if they're lists
+        genres_raw = game_data.get('genres', 'N/A')
+        genres_formatted = ', '.join(str(g) for g in genres_raw) if isinstance(genres_raw, list) else str(genres_raw)
+
         audit_prompt = f"""You are a panel of specialized game industry auditors reviewing a draft report.
 
 **DRAFT REPORT (excerpt):**
@@ -1401,7 +1433,7 @@ Return ONLY valid JSON, no other text.
 **GAME CONTEXT:**
 - Price: {game_data.get('price')}
 - Revenue: {sales_data.get('estimated_revenue')}
-- Genre: {game_data.get('genres')}
+- Genre: {genres_formatted}
 
 **YOUR TASK:**
 Review this report from THREE specialist perspectives:

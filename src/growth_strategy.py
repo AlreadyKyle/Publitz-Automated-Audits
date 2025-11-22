@@ -404,9 +404,16 @@ class GrowthStrategyAnalyzer:
         tier_2 = [c for c in all_creators if 50 <= c['estimated_wishlists_avg'] <= 150][:10]
 
         # Budget allocation recommendation
+        # FIX: Safely parse cost range with error handling
+        def safe_parse_cost(cost_range):
+            try:
+                return int(cost_range.split('-')[0].replace('$', '').replace(',', ''))
+            except (ValueError, IndexError, KeyError, AttributeError):
+                return 0
+
         total_sponsored_cost = sum(
-            int(c['cost_range'].split('-')[0].replace('$', '').replace(',', ''))
-            for c in tier_1 if c['offer_type'] == 'Sponsored Coverage'
+            safe_parse_cost(c.get('cost_range', '0'))
+            for c in tier_1 if c.get('offer_type') == 'Sponsored Coverage'
         )
 
         budget_recommendation = {

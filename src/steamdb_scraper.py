@@ -85,7 +85,13 @@ class SteamDBScraper:
                 logger.warning("SteamSpy API returned 'Access denied' - IP may be blocked")
                 raise Exception("Access denied by SteamSpy")
 
-            data = response.json()
+            # FIX: Add error handling for JSON decode
+            try:
+                data = response.json()
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.error(f"Invalid JSON response from SteamSpy: {e}")
+                return self._generate_fallback_sales_data(app_id, game_name)
+
             logger.info(f"Successfully got data from SteamSpy API")
 
             # Parse owner data
@@ -368,7 +374,13 @@ class SteamDBScraper:
                 timeout=10
             )
             response.raise_for_status()
-            data = response.json()
+
+            # FIX: Add error handling for JSON decode
+            try:
+                data = response.json()
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.error(f"Invalid JSON response from Steam API: {e}")
+                return {'recent_reviews': 0}
 
             query_summary = data.get('query_summary', {})
             recent_reviews = query_summary.get('total_reviews', 0)

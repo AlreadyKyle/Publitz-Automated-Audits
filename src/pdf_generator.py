@@ -670,13 +670,25 @@ def _render_table(pdf: PDFReportGenerator, table_rows: list):
     pdf.ln(5)
 
     # Parse table data
-    header = [cell.strip() for cell in table_rows[0].split('|')[1:-1]]
+    # FIX: Check if table has rows before accessing
+    if not table_rows:
+        return
+
+    try:
+        header = [cell.strip() for cell in table_rows[0].split('|')[1:-1]]
+    except (IndexError, AttributeError):
+        logger.warning("Failed to parse table header")
+        return
+
     data_rows = []
 
     for row in table_rows[1:]:
-        cells = [cell.strip() for cell in row.split('|')[1:-1]]
-        if cells:  # Skip empty rows
-            data_rows.append(cells)
+        try:
+            cells = [cell.strip() for cell in row.split('|')[1:-1]]
+            if cells:  # Skip empty rows
+                data_rows.append(cells)
+        except (IndexError, AttributeError):
+            continue
 
     if not data_rows:
         return

@@ -335,7 +335,15 @@ class GameSearch:
             # Extract price information
             price_overview = game_data.get('price_overview', {})
             price_formatted = price_overview.get('final_formatted', 'Free')
-            price_raw = price_overview.get('final', 0) / 100 if price_overview.get('final') else 0  # Convert cents to dollars
+
+            # FIX: Safely convert price from cents to dollars
+            price_value = price_overview.get('final', 0)
+            if isinstance(price_value, str):
+                try:
+                    price_value = float(price_value)
+                except ValueError:
+                    price_value = 0
+            price_raw = price_value / 100 if price_value else 0  # Convert cents to dollars
 
             # Analyze Steam Deck readiness
             categories = [c['description'] for c in game_data.get('categories', [])]
@@ -350,11 +358,18 @@ class GameSearch:
             }
 
             # Extract relevant information
+            # FIX: Safely extract first element from developer/publisher lists
+            developers = game_data.get('developers', ['Unknown'])
+            developer = developers[0] if (isinstance(developers, list) and developers) else 'Unknown'
+
+            publishers = game_data.get('publishers', ['Unknown'])
+            publisher = publishers[0] if (isinstance(publishers, list) and publishers) else 'Unknown'
+
             game_details = {
                 'name': game_data.get('name', 'Unknown'),
                 'app_id': app_id,
-                'developer': game_data.get('developers', ['Unknown'])[0] if game_data.get('developers') else 'Unknown',
-                'publisher': game_data.get('publishers', ['Unknown'])[0] if game_data.get('publishers') else 'Unknown',
+                'developer': developer,
+                'publisher': publisher,
                 'release_date': game_data.get('release_date', {}).get('date', 'Unknown'),
                 'genres': [g['description'] for g in game_data.get('genres', [])],
                 'tags': spy_data.get('tags', []),
@@ -685,7 +700,14 @@ class GameSearch:
                     break
 
                 # Get tags for this game
-                game_spy_tags = set(spy_data.get('tags', {}).keys() if isinstance(spy_data.get('tags'), dict) else [])
+                # FIX: Handle tags as both dict and list
+                tags_raw = spy_data.get('tags', [])
+                if isinstance(tags_raw, dict):
+                    game_spy_tags = set(tags_raw.keys())
+                elif isinstance(tags_raw, list):
+                    game_spy_tags = set(tags_raw)
+                else:
+                    game_spy_tags = set()
 
                 # Calculate similarity - require meaningful overlap
                 tag_overlap = len(game_tags & game_spy_tags)
