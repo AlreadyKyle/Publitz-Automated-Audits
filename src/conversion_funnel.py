@@ -138,8 +138,20 @@ class ConversionFunnelAnalyzer:
 
     def _extract_primary_genre(self, game_data: Dict[str, Any]) -> str:
         """Extract primary genre from game data"""
-        genres = game_data.get('genres', '').lower()
-        tags = game_data.get('tags', '').lower()
+        genres_raw = game_data.get('genres', '')
+        tags_raw = game_data.get('tags', '')
+
+        # Handle genres as either list or string
+        if isinstance(genres_raw, list):
+            genres = ', '.join(genres_raw).lower() if genres_raw else ''
+        else:
+            genres = str(genres_raw).lower() if genres_raw else ''
+
+        # Handle tags as either list or string
+        if isinstance(tags_raw, list):
+            tags = ', '.join(tags_raw).lower() if tags_raw else ''
+        else:
+            tags = str(tags_raw).lower() if tags_raw else ''
 
         # Check for specific high-priority genres first
         priority_genres = ['roguelike', 'roguelite', 'deckbuilder', 'card game']

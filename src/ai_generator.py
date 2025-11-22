@@ -2553,7 +2553,19 @@ Include the A/B test suggestions as actionable next steps.
         """
         game_price = game_data.get('price', 'Unknown')
         game_name = game_data.get('name', 'this game')
-        genres = game_data.get('genres', '')
+        genres_raw = game_data.get('genres', '')
+
+        # Handle genres as either list or string
+        if isinstance(genres_raw, list):
+            genres = genres_raw[0].lower().strip() if genres_raw else 'gaming'
+            genres_full = ', '.join(genres_raw) if genres_raw else ''
+        elif isinstance(genres_raw, str):
+            genres = genres_raw.split(',')[0].lower().strip() if genres_raw else 'gaming'
+            genres_full = genres_raw
+        else:
+            genres = 'gaming'
+            genres_full = ''
+
         reviews_total = sales_data.get('reviews_total', 0)
         review_score = sales_data.get('review_score', 0)
         estimated_revenue = sales_data.get('estimated_revenue', 0)
@@ -2584,7 +2596,7 @@ Your recommendations must follow these patterns. Every recommendation needs:
 **GOOD vs BAD Examples for "{game_name}":**
 
 ❌ BAD (VAGUE): "Consider improving the game's marketing presence"
-✅ GOOD (SPECIFIC): "Launch targeted Reddit campaign in r/indiegaming and r/{genres.split(',')[0].lower().strip() if genres else 'gaming'} with 5 posts/week for 30 days. Budget: $500/month. Expected outcome: +200-400 wishlist additions (10-20% conversion). Owner: Marketing Team. Start date: Within 7 days."
+✅ GOOD (SPECIFIC): "Launch targeted Reddit campaign in r/indiegaming and r/{genres} with 5 posts/week for 30 days. Budget: $500/month. Expected outcome: +200-400 wishlist additions (10-20% conversion). Owner: Marketing Team. Start date: Within 7 days."
 
 ❌ BAD (VAGUE): "Optimize pricing strategy"
 ✅ GOOD (SPECIFIC): "Reduce base price from ${game_price} to ${float(str(game_price).replace('$', '')) * 0.85:.2f if isinstance(game_price, (int, float)) or (isinstance(game_price, str) and '$' in game_price) else 'XX.XX'} (15% reduction) to match competitor average of ${avg_comp_price:.2f}. Launch 20% off sale during Steam Next Fest (February 5-12, 2024). Expected outcome: +25% conversion rate, +$8K-12K additional revenue over 90 days."
@@ -2596,7 +2608,7 @@ Your recommendations must follow these patterns. Every recommendation needs:
 ✅ GOOD (SPECIFIC): "Add these high-traffic tags: 'Roguelike', 'Pixel Art', 'Procedural Generation'. Remove low-performing tags: 'Casual', 'Family Friendly' (both <5% click-through from tag pages). Implement within 24 hours. Expected outcome: +15-25% tag page impressions, +50-100 additional wishlist adds per week from tag traffic. Owner: Steam Store Manager."
 
 ❌ BAD (VAGUE): "Engage with content creators"
-✅ GOOD (SPECIFIC): "Contact these 5 YouTubers: (1) SplatterCat (250K subs, {genres} specialist), (2) Wanderbots (180K), (3) EnterElysium (150K), (4) Retromation (140K), (5) Northernlion (1M+). Offer free keys + $200-500 sponsored coverage for channels >200K. Timeline: Outreach week 1, follow-ups week 2, content publication weeks 3-5. Expected reach: 400K-800K views, +1,000-2,500 wishlists. Owner: Influencer Relations."
+✅ GOOD (SPECIFIC): "Contact these 5 YouTubers: (1) SplatterCat (250K subs, {genres_full} specialist), (2) Wanderbots (180K), (3) EnterElysium (150K), (4) Retromation (140K), (5) Northernlion (1M+). Offer free keys + $200-500 sponsored coverage for channels >200K. Timeline: Outreach week 1, follow-ups week 2, content publication weeks 3-5. Expected reach: 400K-800K views, +1,000-2,500 wishlists. Owner: Influencer Relations."
 
 ❌ BAD (VAGUE): "Run a sale to boost visibility"
 ✅ GOOD (SPECIFIC): "Schedule 30% discount (${'%.2f' % (float(str(game_price).replace('$', '')) * 0.70) if isinstance(game_price, (int, float)) or (isinstance(game_price, str) and '$' in game_price) else 'XX.XX'}) during Steam Summer Sale (June 27 - July 11, 2024). Feature in Daily Deal if possible (contact Steam rep by June 1). Expected sales: 800-1,400 units (+$12K-20K revenue), +200-350 new reviews. Owner: Publishing Team. Prepare marketing assets by June 15."
