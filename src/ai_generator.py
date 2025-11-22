@@ -667,6 +667,13 @@ Based on the Pre-Launch Report Template, your report must include:
         success_analysis = analyzer.analyze_success_level(game_data, sales_data, review_stats)
         success_context = success_analysis['context_for_ai']
 
+        # FIX: Safely format reviews_total (might be string from some data sources)
+        reviews_total_raw = sales_data.get('reviews_total', 0)
+        try:
+            reviews_total_formatted = f"{int(reviews_total_raw):,}" if reviews_total_raw is not None else "0"
+        except (ValueError, TypeError):
+            reviews_total_formatted = "0"
+
         prompt = f"""You are an expert game marketing analyst at Publitz.
 
 Generate a comprehensive {report_type.upper()} AUDIT REPORT for this game.
@@ -681,7 +688,7 @@ Generate a comprehensive {report_type.upper()} AUDIT REPORT for this game.
 **Sales & Performance Data:**
 - Owners: {sales_data.get('owners_display', 'N/A')}
 - Revenue: {sales_data.get('estimated_revenue', 'N/A')} (Range: {sales_data.get('revenue_range', 'N/A')})
-- Reviews: {sales_data.get('reviews_total', 0):,} total
+- Reviews: {reviews_total_formatted} total
 - Review Score: {sales_data.get('review_score', 'N/A')}
 
 **SUCCESS CONTEXT FOR ANALYSIS:**
@@ -2279,16 +2286,16 @@ IMPORTANT: Synthesize insights from multiple models. When models agree (consensu
         if correction_instructions:
             correction_instructions += "\nApply ALL these corrections and enhancements in your final analysis.\n"
 
-        # Generate specific recommendation examples based on this game's data
-        specific_examples = self._generate_specific_recommendation_examples(
-            game_data, sales_data, competitor_data
-        )
+        # FIX: Safely format reviews_total for use in prompt (might be string from some data sources)
+        reviews_total_raw = sales_data.get('reviews_total', 0)
+        try:
+            reviews_total_formatted = f"{int(reviews_total_raw):,}" if reviews_total_raw is not None else "0"
+        except (ValueError, TypeError):
+            reviews_total_formatted = "0"
 
         prompt = f"""You are an expert game marketing analyst at Publitz creating the FINAL {report_type.upper()} AUDIT REPORT.
 
 {correction_instructions}
-
-{specific_examples}
 
 **Game Information:**
 - Name: {game_data.get('name', 'N/A')}
@@ -2354,7 +2361,7 @@ Generate a comprehensive, professional report with these sections:
 
 6. **REVIEW & SENTIMENT ANALYSIS**
    - Steam review score analysis: {sales_data.get('review_score')}
-   - {sales_data.get('reviews_total'):,} total reviews - context for engagement level
+   - {reviews_total_formatted} total reviews - context for engagement level
    - User sentiment breakdown
 
 7. **VISIBILITY & DISCOVERABILITY**
