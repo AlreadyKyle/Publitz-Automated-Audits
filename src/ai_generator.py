@@ -1138,14 +1138,21 @@ Return ONLY valid JSON, no other text.
         - "optimize pricing" → "reduce price from $29.99 to $24.99"
         - "better capsule" → "increase contrast by 30%, move logo to top-left"
         """
-        # FIX: Safely extract first genre (handle both string and list formats)
-        genres_raw = game_data.get('genres', 'gaming')
-        if isinstance(genres_raw, list):
-            first_genre = genres_raw[0].lower().strip() if genres_raw else 'gaming'
+        # FIX: Safely extract first genre (handle normalized format: list of dicts)
+        genres_raw = game_data.get('genres', [])
+        first_genre = 'gaming'
+
+        if isinstance(genres_raw, list) and genres_raw:
+            first = genres_raw[0]
+            if isinstance(first, dict):
+                # Normalized format: {'description': 'Action'}
+                first_genre = first.get('description', 'gaming').lower().strip()
+            elif isinstance(first, str):
+                # Old format: 'Action'
+                first_genre = first.lower().strip()
         elif isinstance(genres_raw, str):
+            # String format: 'Action, Adventure'
             first_genre = genres_raw.split(',')[0].lower().strip() if genres_raw else 'gaming'
-        else:
-            first_genre = 'gaming'
 
         specificity_prompt = f"""You are a specificity enforcer for game marketing reports.
 
@@ -2601,18 +2608,27 @@ Include the A/B test suggestions as actionable next steps.
         """
         game_price = game_data.get('price', 'Unknown')
         game_name = game_data.get('name', 'this game')
-        genres_raw = game_data.get('genres', '')
+        genres_raw = game_data.get('genres', [])
 
-        # Handle genres as either list or string
-        if isinstance(genres_raw, list):
-            genres = genres_raw[0].lower().strip() if genres_raw else 'gaming'
-            genres_full = ', '.join(genres_raw) if genres_raw else ''
+        # Handle genres in normalized format (list of dicts)
+        genres = 'gaming'
+        genres_full = ''
+
+        if isinstance(genres_raw, list) and genres_raw:
+            # Extract descriptions from normalized format
+            genre_list = []
+            for g in genres_raw:
+                if isinstance(g, dict):
+                    genre_list.append(g.get('description', ''))
+                elif isinstance(g, str):
+                    genre_list.append(g)
+
+            if genre_list:
+                genres = genre_list[0].lower().strip()
+                genres_full = ', '.join(genre_list)
         elif isinstance(genres_raw, str):
             genres = genres_raw.split(',')[0].lower().strip() if genres_raw else 'gaming'
             genres_full = genres_raw
-        else:
-            genres = 'gaming'
-            genres_full = ''
 
         # FIX: Ensure all values are numeric for comparisons (defensive programming)
         reviews_total_raw = sales_data.get('reviews_total', 0)
