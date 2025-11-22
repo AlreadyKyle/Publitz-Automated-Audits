@@ -43,8 +43,31 @@ class Phase2DataCollector:
 
         # Extract game info
         game_name = game_data.get('name', 'Unknown Game')
-        genres = [g.get('description', '') for g in game_data.get('genres', [])]
-        tags = game_data.get('tags', [])
+
+        # FIX: Handle genres as string, list of strings, or list of dicts
+        genres_raw = game_data.get('genres', [])
+        if isinstance(genres_raw, str):
+            genres = [genres_raw] if genres_raw else []
+        elif isinstance(genres_raw, list):
+            genres = []
+            for g in genres_raw:
+                if isinstance(g, dict):
+                    genres.append(g.get('description', ''))
+                else:
+                    genres.append(str(g))
+        else:
+            genres = []
+
+        # FIX: Handle tags as string, list, or dict
+        tags_raw = game_data.get('tags', [])
+        if isinstance(tags_raw, str):
+            tags = [tags_raw] if tags_raw else []
+        elif isinstance(tags_raw, dict):
+            tags = list(tags_raw.keys())
+        elif isinstance(tags_raw, list):
+            tags = [str(t) for t in tags_raw]
+        else:
+            tags = []
         base_price = game_data.get('price_overview', {}).get('final', 1999) / 100  # Convert to dollars
         supported_languages = game_data.get('supported_languages', [])
 
