@@ -299,6 +299,12 @@ class AlternativeDataSource:
         if owners_avg < 100 or price_raw <= 0:
             return self._get_minimal_revenue_estimate()
 
+        # FIX: Ensure review_score is numeric (defensive programming)
+        try:
+            review_score_numeric = float(review_score) if review_score is not None else 0.0
+        except (ValueError, TypeError):
+            review_score_numeric = 0.0
+
         # Account for:
         # - Regional pricing (avg 70% of base price globally)
         # - Steam's 30% cut
@@ -307,7 +313,7 @@ class AlternativeDataSource:
 
         regional_multiplier = 0.70  # Regional pricing
         steam_cut = 0.70  # After Steam's 30%
-        refund_rate = 0.08 if review_score >= 80 else 0.12  # Lower refunds for good games
+        refund_rate = 0.08 if review_score_numeric >= 80 else 0.12  # Lower refunds for good games
         discount_factor = 0.85  # Average discount impact over time
 
         effective_price = price_raw * regional_multiplier * steam_cut * (1 - refund_rate) * discount_factor
@@ -365,10 +371,17 @@ class AlternativeDataSource:
         # PRIORITY 1: Try Steam store page
         game_data = self.get_game_data_from_store_page(app_id)
 
-        if game_data and game_data.get('reviews_total', 0) > 0:
+        # FIX: Safely check reviews_total (defensive programming)
+        reviews_total_check = game_data.get('reviews_total', 0) if game_data else 0
+        try:
+            reviews_total_numeric = int(reviews_total_check) if reviews_total_check is not None else 0
+        except (ValueError, TypeError):
+            reviews_total_numeric = 0
+
+        if game_data and reviews_total_numeric > 0:
             print("✓ Got data from Steam store page")
             # Estimate ownership based on reviews
-            review_count = game_data.get('reviews_total', 0)
+            review_count = reviews_total_numeric
             ownership_data = self.get_ownership_estimates(app_id, review_count)
             game_data.update(ownership_data)
         else:
@@ -395,8 +408,14 @@ class AlternativeDataSource:
 
         # Estimate revenue
         price = game_data.get('price_raw', 0)
-        review_score = game_data.get('review_score_raw', 0)
+        review_score_raw = game_data.get('review_score_raw', 0)
         owners = game_data.get('owners_avg', 0)
+
+        # FIX: Ensure review_score is numeric before comparisons
+        try:
+            review_score = float(review_score_raw) if review_score_raw is not None else 0.0
+        except (ValueError, TypeError):
+            review_score = 0.0
 
         revenue_data = self.estimate_revenue(owners, price, review_score)
         game_data.update(revenue_data)
@@ -411,7 +430,13 @@ class AlternativeDataSource:
         else:
             game_data['quality_multiplier'] = 0.9
 
-        review_count = game_data.get('reviews_total', 0)
+        # FIX: Ensure review_count is numeric for formatting
+        review_count_raw = game_data.get('reviews_total', 0)
+        try:
+            review_count = int(review_count_raw) if review_count_raw is not None else 0
+        except (ValueError, TypeError):
+            review_count = 0
+
         print(f"Successfully fetched data: {game_data.get('name')} - {review_count:,} reviews")
         return game_data
 
@@ -470,7 +495,14 @@ class AlternativeDataSource:
         # Estimate reviews from RAWG ratings (rough conversion)
         # RAWG ratings ≈ 10-20% of Steam reviews typically
         estimated_reviews = int(rawg_data.get('ratings_count', 0) * 0.15)
-        positive_percent = rawg_data.get('positive_rating_percent', 75)
+
+        # FIX: Ensure positive_percent is always numeric (RAWG API might return string)
+        positive_percent_raw = rawg_data.get('positive_rating_percent', 75)
+        try:
+            positive_percent = float(positive_percent_raw) if positive_percent_raw is not None else 75.0
+        except (ValueError, TypeError):
+            positive_percent = 75.0
+
         estimated_positive = int(estimated_reviews * (positive_percent / 100))
         estimated_negative = estimated_reviews - estimated_positive
 
