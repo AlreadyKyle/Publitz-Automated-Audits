@@ -46,6 +46,11 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
+
+# Cache
+.cache/
+__pycache__/
 
 # Test data
 test_data/

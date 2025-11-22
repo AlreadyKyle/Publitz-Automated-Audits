@@ -617,7 +617,7 @@ Based on the Pre-Launch Report Template, your report must include:
         )
 
         # Phase 3.3.5: NEW - Enforce specificity in recommendations
-        final_report = self._enforce_specificity(final_report)
+        final_report = self._enforce_specificity(final_report, game_data, sales_data)
 
         # Phase 3.4: Add executive snapshot and data warnings
         fallback_warnings = self._detect_fallback_data(sales_data, competitor_data)
@@ -718,6 +718,19 @@ Generate a comprehensive {report_type.upper()} AUDIT REPORT for this game.
 - Apply Boxleiter messaging framework: evaluate clarity and conversion focus of store page copy
 - Be data-driven and specific with metrics
 - Keep it professional and actionable
+
+**RECOMMENDATION SPECIFICITY REQUIREMENTS:**
+Every recommendation must include:
+1. **Specific action** - Not "improve marketing" but "Launch Reddit campaign in r/indiegaming with 5 posts/week"
+2. **Timeline** - Exact dates or time windows ("within 7 days", "by March 15", "during Steam Summer Sale June 27-July 11")
+3. **Budget/Cost** - Resources needed ("$500/month", "15 hours dev time", "hire contractor for $1,500")
+4. **Owner/Team** - Who executes ("Marketing Team", "Community Manager", "Development Team")
+5. **Expected Impact** - Measurable outcomes with ranges ("+200-400 wishlists", "+15-25% conversion", "+$8K-12K revenue")
+6. **Success Metrics** - How to measure success ("track wishlist adds via Steam dashboard", "monitor review velocity")
+
+Examples:
+✅ GOOD: "Reduce price from $19.99 to $16.99 (15% reduction) to match competitor average of $17.50. Implement within 48 hours. Expected: +20-30% conversion rate, +$5K revenue over 60 days. Owner: Publishing Team."
+❌ BAD: "Consider adjusting pricing to be more competitive"
 
 Format in clear markdown with headings, bullet points, and specific data.
 """
@@ -1080,7 +1093,12 @@ Return ONLY valid JSON, no other text.
                 "error": f"Consistency check failed: {str(e)}"
             }
 
-    def _enforce_specificity(self, report: str) -> str:
+    def _enforce_specificity(
+        self,
+        report: str,
+        game_data: Dict[str, Any],
+        sales_data: Dict[str, Any]
+    ) -> str:
         """
         Phase 3.3.5: Enforce specificity in recommendations
 
@@ -1094,10 +1112,17 @@ Return ONLY valid JSON, no other text.
         """
         specificity_prompt = f"""You are a specificity enforcer for game marketing reports.
 
-Scan this report for VAGUE recommendations and suggest SPECIFIC replacements.
+Scan this report for VAGUE recommendations and suggest SPECIFIC replacements based on the game's actual data.
 
 **REPORT TO SCAN:**
 {report[:8000]}  # First 8000 chars
+
+**GAME CONTEXT FOR SPECIFICITY:**
+- Game: {game_data.get('name', 'Unknown')}
+- Price: {game_data.get('price', 'Unknown')}
+- Genre: {game_data.get('genres', 'Unknown')}
+- Revenue: {sales_data.get('estimated_revenue', 'Unknown')}
+- Reviews: {sales_data.get('reviews_total', 0)} ({sales_data.get('review_score', 0)}%)
 
 **VAGUE PATTERNS TO ELIMINATE:**
 - "improve X" → Need specific metric and target
@@ -1106,11 +1131,31 @@ Scan this report for VAGUE recommendations and suggest SPECIFIC replacements.
 - "increase marketing" → Which channel? By how much? When?
 - "adjust pricing" → To what price? When? For how long?
 - "better visuals" → Which specific visual? What specific change?
+- "engage with influencers" → Which influencers? What budget? What timeline?
+- "update the game" → What specific features? When? How long to implement?
+
+**SPECIFICITY REQUIREMENTS - ALL 6 ELEMENTS REQUIRED:**
+Each recommendation must have:
+1. **Specific Action** (concrete task, not vague goal)
+2. **Timeline** (exact dates or time windows)
+3. **Budget/Cost** (money, time, or resources needed)
+4. **Owner/Team** (who does it)
+5. **Expected Impact** (measurable outcome with ranges)
+6. **Success Metrics** (how to measure it worked)
 
 **YOUR TASK:**
-1. Identify all vague recommendations (no metrics, no specifics, no timelines)
-2. For each vague recommendation, suggest a specific replacement
-3. Return list of improvements
+1. Identify all vague recommendations (missing any of the 6 elements above)
+2. For each vague recommendation, create a COMPLETE replacement with all 6 elements
+3. Use the game's actual data (price, genre, revenue) to make examples realistic
+4. Return list of improvements
+
+**EXAMPLE IMPROVEMENTS:**
+
+Original (VAGUE): "Improve marketing presence"
+Replacement (SPECIFIC): "Launch targeted Reddit campaign in r/indiegaming and r/{game_data.get('genres', 'gaming').split(',')[0].lower().strip() if game_data.get('genres') else 'gaming'} with 5 posts/week for 30 days (Timeline). Budget: $500/month for promoted posts (Cost). Owner: Marketing Team (Owner). Expected: +200-400 wishlist additions, 10-20% conversion rate (Impact). Metrics: Track via Reddit analytics and Steam wishlist dashboard (Success Metrics)."
+
+Original (VAGUE): "Consider price adjustment"
+Replacement (SPECIFIC): "Reduce base price from ${game_data.get('price', 'XX.XX')} to $XX.XX (15% reduction) to match competitor average (Action). Implement within 48 hours (Timeline). No direct cost, potential revenue impact (Cost). Owner: Publishing Team (Owner). Expected: +20-30% conversion rate, +$5K-8K additional revenue over 60 days (Impact). Metrics: Monitor conversion rate via Steam analytics, track revenue daily (Success Metrics)."
 
 **OUTPUT FORMAT (JSON):**
 Return ONLY valid JSON:
@@ -1119,13 +1164,14 @@ Return ONLY valid JSON:
     {{
       "original": "Consider improving the game's marketing",
       "location": "Section 9, Recommendations",
-      "specific_replacement": "Increase Facebook ad spend by 25% targeting RPG enthusiast audiences aged 18-35, launching campaign by December 1st with expected +15% wishlist growth",
-      "improvement_type": "added_metrics_timeline_target"
+      "specific_replacement": "Launch targeted Reddit campaign in r/indiegaming with 5 posts/week for 30 days. Budget: $500/month. Owner: Marketing Team. Expected: +200-400 wishlists (10-20% conversion). Metrics: Track via Reddit analytics and Steam dashboard.",
+      "improvement_type": "added_all_6_elements",
+      "elements_added": ["specific_action", "timeline", "budget", "owner", "impact", "metrics"]
     }}
   ],
   "specificity_score": 65,
   "recommendations_needing_specificity": 3,
-  "summary": "Found 3 vague recommendations that need specific metrics, timelines, or targets"
+  "summary": "Found 3 vague recommendations. Enhanced each with specific actions, timelines, budgets, owners, impact ranges, and success metrics."
 }}
 
 Return ONLY valid JSON, no other text.
@@ -1157,13 +1203,24 @@ Return ONLY valid JSON, no other text.
             specificity_results = json.loads(response_text)
 
             # If vague recommendations found, apply a second pass to enhance them
-            if specificity_results.get('vague_recommendations_found') and len(specificity_results['vague_recommendations_found']) > 0:
-                # Note: In a production system, you would actually replace the vague text
-                # For now, we just flag them in the audit results
-                # The next report generation will see these flags and improve
-                pass
+            vague_found = specificity_results.get('vague_recommendations_found', [])
+            if vague_found and len(vague_found) > 0:
+                # Actually apply the replacements to improve the report
+                enhanced_report = report
+                replacements_made = 0
 
-            return report  # Return original report (specificity feedback goes to audit results)
+                for vague_item in vague_found:
+                    original = vague_item.get('original', '')
+                    replacement = vague_item.get('specific_replacement', '')
+
+                    if original and replacement and original in enhanced_report:
+                        enhanced_report = enhanced_report.replace(original, replacement, 1)
+                        replacements_made += 1
+
+                if replacements_made > 0:
+                    return enhanced_report  # Return enhanced version with specific recommendations
+
+            return report  # Return original report if no improvements needed
 
         except Exception as e:
             # If specificity check fails, just return original report
@@ -2487,6 +2544,149 @@ Competitive Context:
 If overall CTR score < 7/10, provide detailed redesign guidance based on the brief above.
 Include the A/B test suggestions as actionable next steps.
 """
+
+    def _generate_specific_recommendation_examples(
+        self,
+        game_data: Dict[str, Any],
+        sales_data: Dict[str, Any],
+        competitor_data: List[Dict[str, Any]]
+    ) -> str:
+        """
+        Generate data-driven, specific recommendation examples tailored to this game.
+        This helps the AI understand exactly how specific recommendations should be.
+
+        Returns:
+            Formatted string with specific examples for this game's context
+        """
+        game_price = game_data.get('price', 'Unknown')
+        game_name = game_data.get('name', 'this game')
+        genres_raw = game_data.get('genres', '')
+
+        # Handle genres as either list or string
+        if isinstance(genres_raw, list):
+            genres = genres_raw[0].lower().strip() if genres_raw else 'gaming'
+            genres_full = ', '.join(genres_raw) if genres_raw else ''
+        elif isinstance(genres_raw, str):
+            genres = genres_raw.split(',')[0].lower().strip() if genres_raw else 'gaming'
+            genres_full = genres_raw
+        else:
+            genres = 'gaming'
+            genres_full = ''
+
+        # FIX: Ensure all values are numeric for comparisons (defensive programming)
+        reviews_total_raw = sales_data.get('reviews_total', 0)
+        try:
+            reviews_total = int(reviews_total_raw) if reviews_total_raw is not None else 0
+        except (ValueError, TypeError):
+            reviews_total = 0
+
+        # FIX: Use review_score_raw (numeric) instead of review_score (string like "85.3%")
+        review_score_raw = sales_data.get('review_score_raw', 0)
+        try:
+            review_score = float(review_score_raw) if review_score_raw is not None else 0.0
+        except (ValueError, TypeError):
+            review_score = 0.0
+
+        estimated_revenue_raw = sales_data.get('estimated_revenue', 0)
+        # Keep estimated_revenue as is since it might be a formatted string, handle in f-string
+
+        # Calculate average competitor price
+        comp_prices = []
+        for comp in competitor_data[:10]:
+            price_str = comp.get('price', '')
+            if isinstance(price_str, str) and '$' in price_str:
+                try:
+                    price_val = float(price_str.replace('$', '').replace(',', ''))
+                    comp_prices.append(price_val)
+                except:
+                    pass
+
+        avg_comp_price = sum(comp_prices) / len(comp_prices) if comp_prices else 0
+
+        # Parse game price for calculations
+        try:
+            if isinstance(game_price, (int, float)):
+                price_value = float(game_price)
+            elif isinstance(game_price, str) and '$' in game_price:
+                price_value = float(game_price.replace('$', '').replace(',', ''))
+            else:
+                price_value = None
+        except:
+            price_value = None
+
+        # Calculate reduced and sale prices
+        if price_value is not None:
+            reduced_price = f"{price_value * 0.85:.2f}"
+            sale_price = f"{price_value * 0.70:.2f}"
+        else:
+            reduced_price = "XX.XX"
+            sale_price = "XX.XX"
+
+        # Build context-specific examples
+        examples = f"""
+**CRITICAL: RECOMMENDATION SPECIFICITY EXAMPLES FOR THIS GAME**
+
+Your recommendations must follow these patterns. Every recommendation needs:
+1. **Specific numbers** (prices, percentages, dates)
+2. **Clear timelines** (exact dates or time windows)
+3. **Measurable outcomes** (expected impact with ranges)
+4. **Assigned ownership** (who does what)
+
+**GOOD vs BAD Examples for "{game_name}":**
+
+❌ BAD (VAGUE): "Consider improving the game's marketing presence"
+✅ GOOD (SPECIFIC): "Launch targeted Reddit campaign in r/indiegaming and r/{genres} with 5 posts/week for 30 days. Budget: $500/month. Expected outcome: +200-400 wishlist additions (10-20% conversion). Owner: Marketing Team. Start date: Within 7 days."
+
+❌ BAD (VAGUE): "Optimize pricing strategy"
+✅ GOOD (SPECIFIC): "Reduce base price from ${game_price} to ${reduced_price} (15% reduction) to match competitor average of ${avg_comp_price:.2f}. Launch 20% off sale during Steam Next Fest (February 5-12, 2024). Expected outcome: +25% conversion rate, +$8K-12K additional revenue over 90 days."
+
+❌ BAD (VAGUE): "Improve capsule image for better click-through"
+✅ GOOD (SPECIFIC): "Redesign capsule image: (1) Increase title text size by 40% and move to top-third, (2) Add high-contrast yellow border (5px), (3) Feature main character prominently in right-third, (4) Reduce background complexity by 30%. A/B test current vs new design for 2 weeks. Expected CTR improvement: +2.5-4.0 percentage points. Designer: Assign to art team by [DATE]. Deploy: 14 days from approval."
+
+❌ BAD (VAGUE): "Add more tags to improve discoverability"
+✅ GOOD (SPECIFIC): "Add these high-traffic tags: 'Roguelike', 'Pixel Art', 'Procedural Generation'. Remove low-performing tags: 'Casual', 'Family Friendly' (both <5% click-through from tag pages). Implement within 24 hours. Expected outcome: +15-25% tag page impressions, +50-100 additional wishlist adds per week from tag traffic. Owner: Steam Store Manager."
+
+❌ BAD (VAGUE): "Engage with content creators"
+✅ GOOD (SPECIFIC): "Contact these 5 YouTubers: (1) SplatterCat (250K subs, {genres_full} specialist), (2) Wanderbots (180K), (3) EnterElysium (150K), (4) Retromation (140K), (5) Northernlion (1M+). Offer free keys + $200-500 sponsored coverage for channels >200K. Timeline: Outreach week 1, follow-ups week 2, content publication weeks 3-5. Expected reach: 400K-800K views, +1,000-2,500 wishlists. Owner: Influencer Relations."
+
+❌ BAD (VAGUE): "Run a sale to boost visibility"
+✅ GOOD (SPECIFIC): "Schedule 30% discount (${sale_price}) during Steam Summer Sale (June 27 - July 11, 2024). Feature in Daily Deal if possible (contact Steam rep by June 1). Expected sales: 800-1,400 units (+$12K-20K revenue), +200-350 new reviews. Owner: Publishing Team. Prepare marketing assets by June 15."
+
+❌ BAD (VAGUE): "Update the game to retain players"
+✅ GOOD (SPECIFIC): "Release 'Winter Content Update' with: (1) New biome (Ice Caverns, 15-20 hours dev time), (2) 3 new enemy types, (3) 5 new items/weapons, (4) Quality-of-life improvements from top 10 Steam review requests. Launch: December 10, 2024 (capitalize on holiday traffic). Announce 2 weeks prior with teaser trailer. Expected outcome: +40% daily active users for 2 weeks, +150-250 new reviews, +10-15 percentage point review score improvement. Owner: Development Team."
+
+❌ BAD (VAGUE): "Improve community engagement"
+✅ GOOD (SPECIFIC): "Launch official Discord server with: (1) Weekly dev Q&A every Friday 3pm EST, (2) Beta testing channel for upcoming features (invite top 50 reviewers), (3) Bug bounty: $25 Steam gift card for critical bugs, (4) Monthly screenshot contest ($50 prize). Moderator: Hire part-time community manager ($1,500/month). Launch within 14 days. Expected outcome: 500-1,000 members in 60 days, -30% support tickets (community self-help), +5-10 UGC features per month. Owner: Community Team."
+
+**REVENUE/BUDGET CONTEXT FOR THIS GAME:**
+- Estimated total revenue: ${estimated_revenue_raw if isinstance(estimated_revenue_raw, (int, float)) else 'Unknown'}
+- Marketing budget guideline: 10-15% of revenue = ${int(estimated_revenue_raw * 0.10) if isinstance(estimated_revenue_raw, (int, float)) else 'Unknown'}-{int(estimated_revenue_raw * 0.15) if isinstance(estimated_revenue_raw, (int, float)) else 'Unknown'}
+- DO NOT recommend spending more than 15% of total revenue on any single initiative
+- Prioritize low-cost, high-impact tactics for games with <$50K revenue
+
+**PERFORMANCE CONTEXT:**
+- Current review count: {reviews_total} ({('Strong' if reviews_total > 500 else 'Moderate' if reviews_total > 100 else 'Limited')} engagement)
+- Current review score: {review_score}% ({('Excellent' if review_score > 90 else 'Very Positive' if review_score > 80 else 'Positive' if review_score > 70 else 'Mixed')} sentiment)
+- Success level: {('Top performer - focus on scaling' if reviews_total > 1000 else 'Moderate success - focus on optimization' if reviews_total > 200 else 'Early stage - focus on fundamentals')}
+
+**COMPETITOR CONTEXT:**
+- Average competitor price: ${avg_comp_price:.2f if avg_comp_price > 0 else 'N/A'}
+- Your price: ${game_price}
+- Price positioning: {('Premium (+' + str(int((float(str(game_price).replace('$', '')) - avg_comp_price) / avg_comp_price * 100)) + '%)' if avg_comp_price > 0 and isinstance(game_price, (int, float, str)) and '$' in str(game_price) and float(str(game_price).replace('$', '')) > avg_comp_price else 'Competitive' if avg_comp_price > 0 and isinstance(game_price, (int, float, str)) and '$' in str(game_price) and abs(float(str(game_price).replace('$', '')) - avg_comp_price) < avg_comp_price * 0.15 else 'Value (-' + str(int((avg_comp_price - float(str(game_price).replace('$', ''))) / avg_comp_price * 100)) + '%)' if avg_comp_price > 0 and isinstance(game_price, (int, float, str)) and '$' in str(game_price) else 'Unknown')}
+
+**FORMAT REQUIREMENTS:**
+Every single recommendation you make must include:
+1. **What to do** (specific action, not vague goal)
+2. **When to do it** (exact date or time window)
+3. **How much it costs** (budget, time, resources needed)
+4. **Who does it** (team/role assignment)
+5. **Expected outcome** (measurable impact with ranges)
+6. **Success metrics** (how to measure if it worked)
+
+If a recommendation lacks ANY of these 6 elements, it is TOO VAGUE. Rewrite it.
+"""
+
+        return examples
 
     def _detect_fallback_data(
         self,

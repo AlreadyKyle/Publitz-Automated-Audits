@@ -2,6 +2,11 @@ import requests
 from typing import Dict, Any, Optional
 import time
 from src.alternative_data_sources import AlternativeDataSource
+from src.cache_manager import get_cache
+from src.logger import get_logger
+
+cache = get_cache()
+logger = get_logger(__name__)
 
 class SteamDBScraper:
     """Scraper for Steam sales and revenue data"""
@@ -15,9 +20,10 @@ class SteamDBScraper:
 
     def get_sales_data(self, app_id: Any, game_name: str = None) -> Dict[str, Any]:
         """
-        IMPROVED: Get sales and revenue estimates using multiple methods
+        IMPROVED: Get sales and revenue estimates using multiple methods (WITH CACHING)
 
         Priority order:
+        0. Cache (24-hour TTL)
         1. Alternative source (Steam store page scraping) - works when API is blocked
         2. RAWG API + Smart Estimation (when Steam is blocked and game_name provided)
         3. SteamSpy API - fallback if scraping fails
@@ -37,26 +43,35 @@ class SteamDBScraper:
         try:
             app_id_int = int(app_id)
         except (ValueError, TypeError) as e:
-            print(f"⚠️ Invalid app_id format '{app_id}': {e}")
+            logger.warning(f"Invalid app_id format '{app_id}': {e}")
             return self._generate_fallback_sales_data()
+
+        # Check cache first (24-hour freshness for sales data)
+        cached_data = cache.get('sales_data', app_id_int, ttl_hours=24)
+        if cached_data:
+            logger.debug(f"Using cached sales data for App ID {app_id_int}")
+            return cached_data
 
         # PRIORITY 1: Try alternative source (Steam store page scraping)
         try:
-            print(f"Attempting to fetch data using alternative source for app {app_id_int}...")
+            logger.info(f"Fetching sales data from alternative source for App ID {app_id_int}...")
             alt_data = self.alternative_source.get_complete_game_data(app_id_int, game_name=game_name)
 
             if alt_data and alt_data.get('reviews_total', 0) > 0:
-                print(f"✓ Successfully retrieved data from alternative source")
+                logger.info(f"Successfully retrieved data from alternative source")
                 # Convert alternative source data to our format
-                return self._format_alternative_data(alt_data)
+                sales_data = self._format_alternative_data(alt_data)
+                # Cache the result
+                cache.set('sales_data', app_id_int, sales_data)
+                return sales_data
             else:
-                print("Alternative source returned incomplete data, trying SteamSpy API...")
+                logger.warning("Alternative source returned incomplete data, trying SteamSpy API...")
         except Exception as e:
-            print(f"Alternative source failed: {e}, trying SteamSpy API...")
+            logger.warning(f"Alternative source failed: {e}, trying SteamSpy API...")
 
         # PRIORITY 2: Try SteamSpy API (original method)
         try:
-            print(f"Attempting to fetch data using SteamSpy API for app {app_id}...")
+            logger.info(f"Fetching sales data from SteamSpy API for App ID {app_id}...")
             response = requests.get(
                 self.steamspy_api_base,
                 params={'request': 'appdetails', 'appid': app_id},
@@ -67,11 +82,11 @@ class SteamDBScraper:
 
             # Check if we got "Access denied"
             if response.text == "Access denied":
-                print("SteamSpy API returned 'Access denied' - IP may be blocked")
+                logger.warning("SteamSpy API returned 'Access denied' - IP may be blocked")
                 raise Exception("Access denied by SteamSpy")
 
             data = response.json()
-            print(f"✓ Got data from SteamSpy API")
+            logger.info(f"Successfully got data from SteamSpy API")
 
             # Parse owner data
             owners = data.get('owners', '0 .. 0')
@@ -159,7 +174,7 @@ class SteamDBScraper:
             else:
                 confidence_level = 'low-medium'
 
-            return {
+            sales_data = {
                 'app_id': app_id,
                 'owners_min': owners_range['min'],
                 'owners_max': owners_range['max'],
@@ -190,8 +205,13 @@ class SteamDBScraper:
                 'tags': list(data.get('tags', {}).keys())[:10] if isinstance(data.get('tags'), dict) else []
             }
 
+            # Cache the result
+            cache.set('sales_data', app_id_int, sales_data)
+
+            return sales_data
+
         except Exception as e:
-            print(f"Error getting sales data: {e}")
+            logger.error(f"Error getting sales data: {e}", exc_info=True)
             return self._generate_fallback_sales_data()
 
     def _format_alternative_data(self, alt_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -235,7 +255,7 @@ class SteamDBScraper:
             max_owners = int(parts[1].strip().replace(',', ''))
             return {'min': min_owners, 'max': max_owners}
         except Exception as e:
-            print(f"Error parsing owners range '{owners_str}': {e}")
+            logger.warning(f"Error parsing owners range '{owners_str}': {e}")
             return {'min': 0, 'max': 0}
 
     def _generate_fallback_sales_data(self) -> Dict[str, Any]:
@@ -356,5 +376,5 @@ class SteamDBScraper:
             return {'recent_reviews': recent_reviews}
 
         except Exception as e:
-            print(f"Error getting recent reviews: {e}")
+            logger.error(f"Error getting recent reviews: {e}")
             return {'recent_reviews': 0}
