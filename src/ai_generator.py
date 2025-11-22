@@ -2290,7 +2290,7 @@ Generate a comprehensive, professional report with these sections:
 
 6. **REVIEW & SENTIMENT ANALYSIS**
    - Steam review score analysis: {sales_data.get('review_score')}
-   - {sales_data.get('reviews_total'):,} total reviews - context for engagement level
+   - {sales_data.get('reviews_total', 0):,} total reviews - context for engagement level
    - User sentiment breakdown
 
 7. **VISIBILITY & DISCOVERABILITY**

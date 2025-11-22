@@ -160,6 +160,19 @@ def main():
                 st.stop()
 
             game_name = game_data.get('name', 'Unknown Game')
+
+            # FIX: Ensure review_score_raw exists in game_data if review_score is present
+            if 'review_score' in game_data and 'review_score_raw' not in game_data:
+                review_score_val = game_data['review_score']
+                if isinstance(review_score_val, str):
+                    try:
+                        game_data['review_score_raw'] = float(review_score_val.rstrip('%')) if review_score_val != 'N/A' else 0
+                    except (ValueError, AttributeError):
+                        game_data['review_score_raw'] = 0
+                else:
+                    game_data['review_score_raw'] = float(review_score_val)
+                    game_data['review_score'] = f"{review_score_val:.1f}%" if review_score_val > 0 else "N/A"
+
             st.success(f"✅ Found game: **{game_name}**")
             progress_bar.progress(20, text="🔎 Detecting launch status...")
 
@@ -196,6 +209,25 @@ def main():
             # Phase 2.2: Step 4 - Gather Steam data
             with st.spinner("📊 Gathering Steam market data..."):
                 sales_data = steamdb_scraper.get_sales_data(game_data['app_id'], game_name=game_name)
+
+                # FIX: Ensure review_score_raw always exists for numeric comparisons
+                if 'review_score_raw' not in sales_data and 'review_score' in sales_data:
+                    review_score_str = sales_data.get('review_score', '0%')
+                    if isinstance(review_score_str, str):
+                        try:
+                            # Extract numeric value from string like "85.3%" or "N/A"
+                            sales_data['review_score_raw'] = float(review_score_str.rstrip('%')) if review_score_str != 'N/A' else 0
+                        except (ValueError, AttributeError):
+                            sales_data['review_score_raw'] = 0
+                    else:
+                        # If it's already numeric, use it
+                        sales_data['review_score_raw'] = float(review_score_str)
+                        sales_data['review_score'] = f"{review_score_str:.1f}%" if review_score_str > 0 else "N/A"
+                elif 'review_score_raw' not in sales_data:
+                    sales_data['review_score_raw'] = 0
+                    if 'review_score' not in sales_data:
+                        sales_data['review_score'] = 'N/A'
+
                 # Get review velocity data
                 review_stats = steamdb_scraper.get_review_stats(game_data['app_id'])
                 # Analyze capsule image for CTR optimization
@@ -209,6 +241,18 @@ def main():
             # Phase 2.2: Step 5 - Gather competitor Steam data
             with st.spinner("📊 Analyzing competitor performance..."):
                 for competitor in competitor_data:
+                    # FIX: Ensure review_score_raw exists in competitor data
+                    if 'review_score' in competitor and 'review_score_raw' not in competitor:
+                        review_score_val = competitor['review_score']
+                        if isinstance(review_score_val, str):
+                            try:
+                                competitor['review_score_raw'] = float(review_score_val.rstrip('%')) if review_score_val != 'N/A' else 0
+                            except (ValueError, AttributeError):
+                                competitor['review_score_raw'] = 0
+                        else:
+                            competitor['review_score_raw'] = float(review_score_val)
+                            competitor['review_score'] = f"{review_score_val:.1f}%" if review_score_val > 0 else "N/A"
+
                     try:
                         competitor['steam_data'] = steamdb_scraper.get_sales_data(
                             competitor['app_id'],
