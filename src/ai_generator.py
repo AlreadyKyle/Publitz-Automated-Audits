@@ -1110,6 +1110,15 @@ Return ONLY valid JSON, no other text.
         - "optimize pricing" → "reduce price from $29.99 to $24.99"
         - "better capsule" → "increase contrast by 30%, move logo to top-left"
         """
+        # FIX: Safely extract first genre (handle both string and list formats)
+        genres_raw = game_data.get('genres', 'gaming')
+        if isinstance(genres_raw, list):
+            first_genre = genres_raw[0].lower().strip() if genres_raw else 'gaming'
+        elif isinstance(genres_raw, str):
+            first_genre = genres_raw.split(',')[0].lower().strip() if genres_raw else 'gaming'
+        else:
+            first_genre = 'gaming'
+
         specificity_prompt = f"""You are a specificity enforcer for game marketing reports.
 
 Scan this report for VAGUE recommendations and suggest SPECIFIC replacements based on the game's actual data.
@@ -1152,7 +1161,7 @@ Each recommendation must have:
 **EXAMPLE IMPROVEMENTS:**
 
 Original (VAGUE): "Improve marketing presence"
-Replacement (SPECIFIC): "Launch targeted Reddit campaign in r/indiegaming and r/{game_data.get('genres', 'gaming').split(',')[0].lower().strip() if game_data.get('genres') else 'gaming'} with 5 posts/week for 30 days (Timeline). Budget: $500/month for promoted posts (Cost). Owner: Marketing Team (Owner). Expected: +200-400 wishlist additions, 10-20% conversion rate (Impact). Metrics: Track via Reddit analytics and Steam wishlist dashboard (Success Metrics)."
+Replacement (SPECIFIC): "Launch targeted Reddit campaign in r/indiegaming and r/{first_genre} with 5 posts/week for 30 days (Timeline). Budget: $500/month for promoted posts (Cost). Owner: Marketing Team (Owner). Expected: +200-400 wishlist additions, 10-20% conversion rate (Impact). Metrics: Track via Reddit analytics and Steam wishlist dashboard (Success Metrics)."
 
 Original (VAGUE): "Consider price adjustment"
 Replacement (SPECIFIC): "Reduce base price from ${game_data.get('price', 'XX.XX')} to $XX.XX (15% reduction) to match competitor average (Action). Implement within 48 hours (Timeline). No direct cost, potential revenue impact (Cost). Owner: Publishing Team (Owner). Expected: +20-30% conversion rate, +$5K-8K additional revenue over 60 days (Impact). Metrics: Monitor conversion rate via Steam analytics, track revenue daily (Success Metrics)."
