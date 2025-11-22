@@ -12,6 +12,7 @@ from src.twitch_collector import get_twitch_analysis
 from src.curator_collector import get_curator_analysis
 from src.youtube_api import get_youtube_outreach_analysis
 from src.regional_pricing import get_regional_pricing_analysis
+from src.external_apis_collector import collect_external_game_data
 
 logger = get_logger(__name__)
 
@@ -125,6 +126,13 @@ class Phase2DataCollector:
                 lambda: get_regional_pricing_analysis(base_price, current_languages)
             )
 
+            # External APIs (RAWG + IGDB)
+            tasks['external_apis'] = executor.submit(
+                self._safe_collect,
+                'External APIs (RAWG/IGDB)',
+                lambda: collect_external_game_data(game_name)
+            )
+
             # Collect results
             results = {}
             for name, future in tasks.items():
@@ -141,7 +149,8 @@ class Phase2DataCollector:
             'youtube': results.get('youtube', {}),
             'curators': results.get('curators', {}),
             'regional_pricing': results.get('pricing', {}).get('pricing', {}),
-            'localization': results.get('pricing', {}).get('localization', {})
+            'localization': results.get('pricing', {}).get('localization', {}),
+            'external_apis': results.get('external_apis', {})  # RAWG + IGDB data
         }
 
         logger.info("Phase 2 data collection complete")
