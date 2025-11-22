@@ -5,6 +5,9 @@ runOnSave = false
 # Disable file watcher caching
 fileWatcherType = "none"
 
+# Prevent browser auto-open (stops multiple tab/window opens)
+headless = true
+
 [client]
 # Show errors in the browser
 showErrorDetails = true
