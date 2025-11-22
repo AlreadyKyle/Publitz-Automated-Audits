@@ -183,6 +183,131 @@ class PDFReportGenerator(FPDF):
         self.line(30, self.get_y(), 180, self.get_y())
         self.ln(5)
 
+    def draw_score_card(self, title: str, score: int, x: float, y: float, width: float = 80, height: float = 35):
+        """
+        Draw a visual score card with progress bar
+
+        Args:
+            title: Card title
+            score: Score value (0-100)
+            x, y: Position coordinates
+            width, height: Card dimensions
+        """
+        # Determine color based on score
+        if score >= 80:
+            bar_color = (46, 204, 113)  # Green
+            rating = "Excellent"
+        elif score >= 65:
+            bar_color = (52, 152, 219)  # Blue
+            rating = "Good"
+        elif score >= 50:
+            bar_color = (241, 196, 15)  # Yellow
+            rating = "Fair"
+        else:
+            bar_color = (231, 76, 60)  # Red
+            rating = "Needs Work"
+
+        # Card background
+        self.set_fill_color(250, 250, 250)
+        self.rect(x, y, width, height, 'F')
+
+        # Card border
+        self.set_draw_color(220, 220, 220)
+        self.set_line_width(0.5)
+        self.rect(x, y, width, height, 'D')
+
+        # Title
+        self.set_xy(x + 5, y + 5)
+        self.set_font('Arial', 'B', 10)
+        self.set_text_color(70, 70, 70)
+        self.cell(width - 10, 5, title, 0, 0, 'L')
+
+        # Score number (large)
+        self.set_xy(x + 5, y + 12)
+        self.set_font('Arial', 'B', 18)
+        self.set_text_color(*bar_color)
+        self.cell(25, 8, str(score), 0, 0, 'C')
+
+        # Rating text
+        self.set_xy(x + 30, y + 14)
+        self.set_font('Arial', '', 9)
+        self.set_text_color(100, 100, 100)
+        self.cell(width - 35, 6, rating, 0, 0, 'L')
+
+        # Progress bar background
+        bar_y = y + height - 10
+        bar_width = width - 10
+        self.set_fill_color(230, 230, 230)
+        self.rect(x + 5, bar_y, bar_width, 5, 'F')
+
+        # Progress bar fill
+        fill_width = (score / 100) * bar_width
+        self.set_fill_color(*bar_color)
+        self.rect(x + 5, bar_y, fill_width, 5, 'F')
+
+    def draw_score_summary_page(self, section_scores: Dict[str, Dict[str, Any]], overall_score: int):
+        """
+        Draw a visual summary page of all section scores
+
+        Args:
+            section_scores: Dict of {section_name: {'score': int, 'rating': str}}
+            overall_score: Overall score (0-100)
+        """
+        self.add_page()
+
+        # Page title with decorative element
+        self.set_fill_color(*self.color_primary)
+        self.rect(15, self.get_y(), 4, 10, 'F')
+
+        self.set_font('Arial', 'B', 18)
+        self.set_text_color(*self.color_primary)
+        self.set_x(25)
+        self.cell(0, 10, 'Score Summary')
+
+        # Underline
+        y = self.get_y() + 10
+        self.set_draw_color(*self.color_primary)
+        self.set_line_width(0.5)
+        self.line(20, y + 2, 190, y + 2)
+
+        self.ln(15)
+
+        # Overall score card (centered, larger)
+        overall_y = self.get_y()
+        self.draw_score_card('OVERALL SCORE', overall_score, 55, overall_y, 100, 40)
+
+        self.ln(50)
+
+        # Section scores header
+        self.set_font('Arial', 'B', 12)
+        self.set_text_color(*self.color_secondary)
+        self.cell(0, 8, 'Section Breakdown', 0, 1, 'L')
+
+        self.ln(5)
+
+        # Draw section score cards in 2-column grid
+        x_left = 20
+        x_right = 110
+        card_width = 80
+        card_height = 35
+        y_offset = self.get_y()
+
+        section_list = list(section_scores.items())
+        for idx, (section_name, section_data) in enumerate(section_list):
+            score = section_data.get('score', 0)
+
+            # Calculate position
+            row = idx // 2
+            col = idx % 2
+            x = x_left if col == 0 else x_right
+            y = y_offset + (row * (card_height + 5))
+
+            self.draw_score_card(section_name, score, x, y, card_width, card_height)
+
+        # Move cursor below cards
+        rows_needed = (len(section_list) + 1) // 2
+        self.set_y(y_offset + (rows_needed * (card_height + 5)) + 5)
+
 
 def generate_pdf_report(
     report_markdown: str,
@@ -325,6 +450,14 @@ def generate_pdf_report(
     pdf.set_text_color(120, 120, 120)
     pdf.multi_cell(0, 4, 'This report contains proprietary market analysis and should be treated as confidential. '
                          'Distribution should be limited to authorized personnel only.', 0, 'C')
+
+    # Add score summary page if audit results contain section scores
+    if audit_results and 'section_scores' in audit_results and 'overall_score' in audit_results:
+        section_scores = audit_results['section_scores']
+        overall_score = audit_results['overall_score']
+
+        if section_scores:
+            pdf.draw_score_summary_page(section_scores, overall_score)
 
     # Start new page for content
     pdf.add_page()
