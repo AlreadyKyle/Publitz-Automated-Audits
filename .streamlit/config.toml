@@ -1,9 +1,9 @@
 [server]
-# Force reload on file changes
-runOnSave = true
+# Disable auto-reload to prevent multiple page opens
+runOnSave = false
 
 # Disable file watcher caching
-fileWatcherType = "auto"
+fileWatcherType = "none"
 
 [client]
 # Show errors in the browser
@@ -19,3 +19,7 @@ magicEnabled = false
 [browser]
 # Prevent browser caching
 gatherUsageStats = false
+
+# Prevent duplicate tab/window opens
+serverPort = 8501
+serverAddress = "localhost"
