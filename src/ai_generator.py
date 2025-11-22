@@ -2583,6 +2583,25 @@ Include the A/B test suggestions as actionable next steps.
 
         avg_comp_price = sum(comp_prices) / len(comp_prices) if comp_prices else 0
 
+        # Parse game price for calculations
+        try:
+            if isinstance(game_price, (int, float)):
+                price_value = float(game_price)
+            elif isinstance(game_price, str) and '$' in game_price:
+                price_value = float(game_price.replace('$', '').replace(',', ''))
+            else:
+                price_value = None
+        except:
+            price_value = None
+
+        # Calculate reduced and sale prices
+        if price_value is not None:
+            reduced_price = f"{price_value * 0.85:.2f}"
+            sale_price = f"{price_value * 0.70:.2f}"
+        else:
+            reduced_price = "XX.XX"
+            sale_price = "XX.XX"
+
         # Build context-specific examples
         examples = f"""
 **CRITICAL: RECOMMENDATION SPECIFICITY EXAMPLES FOR THIS GAME**
@@ -2599,7 +2618,7 @@ Your recommendations must follow these patterns. Every recommendation needs:
 ✅ GOOD (SPECIFIC): "Launch targeted Reddit campaign in r/indiegaming and r/{genres} with 5 posts/week for 30 days. Budget: $500/month. Expected outcome: +200-400 wishlist additions (10-20% conversion). Owner: Marketing Team. Start date: Within 7 days."
 
 ❌ BAD (VAGUE): "Optimize pricing strategy"
-✅ GOOD (SPECIFIC): "Reduce base price from ${game_price} to ${float(str(game_price).replace('$', '')) * 0.85:.2f if isinstance(game_price, (int, float)) or (isinstance(game_price, str) and '$' in game_price) else 'XX.XX'} (15% reduction) to match competitor average of ${avg_comp_price:.2f}. Launch 20% off sale during Steam Next Fest (February 5-12, 2024). Expected outcome: +25% conversion rate, +$8K-12K additional revenue over 90 days."
+✅ GOOD (SPECIFIC): "Reduce base price from ${game_price} to ${reduced_price} (15% reduction) to match competitor average of ${avg_comp_price:.2f}. Launch 20% off sale during Steam Next Fest (February 5-12, 2024). Expected outcome: +25% conversion rate, +$8K-12K additional revenue over 90 days."
 
 ❌ BAD (VAGUE): "Improve capsule image for better click-through"
 ✅ GOOD (SPECIFIC): "Redesign capsule image: (1) Increase title text size by 40% and move to top-third, (2) Add high-contrast yellow border (5px), (3) Feature main character prominently in right-third, (4) Reduce background complexity by 30%. A/B test current vs new design for 2 weeks. Expected CTR improvement: +2.5-4.0 percentage points. Designer: Assign to art team by [DATE]. Deploy: 14 days from approval."
@@ -2611,7 +2630,7 @@ Your recommendations must follow these patterns. Every recommendation needs:
 ✅ GOOD (SPECIFIC): "Contact these 5 YouTubers: (1) SplatterCat (250K subs, {genres_full} specialist), (2) Wanderbots (180K), (3) EnterElysium (150K), (4) Retromation (140K), (5) Northernlion (1M+). Offer free keys + $200-500 sponsored coverage for channels >200K. Timeline: Outreach week 1, follow-ups week 2, content publication weeks 3-5. Expected reach: 400K-800K views, +1,000-2,500 wishlists. Owner: Influencer Relations."
 
 ❌ BAD (VAGUE): "Run a sale to boost visibility"
-✅ GOOD (SPECIFIC): "Schedule 30% discount (${'%.2f' % (float(str(game_price).replace('$', '')) * 0.70) if isinstance(game_price, (int, float)) or (isinstance(game_price, str) and '$' in game_price) else 'XX.XX'}) during Steam Summer Sale (June 27 - July 11, 2024). Feature in Daily Deal if possible (contact Steam rep by June 1). Expected sales: 800-1,400 units (+$12K-20K revenue), +200-350 new reviews. Owner: Publishing Team. Prepare marketing assets by June 15."
+✅ GOOD (SPECIFIC): "Schedule 30% discount (${sale_price}) during Steam Summer Sale (June 27 - July 11, 2024). Feature in Daily Deal if possible (contact Steam rep by June 1). Expected sales: 800-1,400 units (+$12K-20K revenue), +200-350 new reviews. Owner: Publishing Team. Prepare marketing assets by June 15."
 
 ❌ BAD (VAGUE): "Update the game to retain players"
 ✅ GOOD (SPECIFIC): "Release 'Winter Content Update' with: (1) New biome (Ice Caverns, 15-20 hours dev time), (2) 3 new enemy types, (3) 5 new items/weapons, (4) Quality-of-life improvements from top 10 Steam review requests. Launch: December 10, 2024 (capitalize on holiday traffic). Announce 2 weeks prior with teaser trailer. Expected outcome: +40% daily active users for 2 weeks, +150-250 new reviews, +10-15 percentage point review score improvement. Owner: Development Team."
