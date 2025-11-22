@@ -2573,9 +2573,22 @@ Include the A/B test suggestions as actionable next steps.
             genres = 'gaming'
             genres_full = ''
 
-        reviews_total = sales_data.get('reviews_total', 0)
-        review_score = sales_data.get('review_score', 0)
-        estimated_revenue = sales_data.get('estimated_revenue', 0)
+        # FIX: Ensure all values are numeric for comparisons (defensive programming)
+        reviews_total_raw = sales_data.get('reviews_total', 0)
+        try:
+            reviews_total = int(reviews_total_raw) if reviews_total_raw is not None else 0
+        except (ValueError, TypeError):
+            reviews_total = 0
+
+        # FIX: Use review_score_raw (numeric) instead of review_score (string like "85.3%")
+        review_score_raw = sales_data.get('review_score_raw', 0)
+        try:
+            review_score = float(review_score_raw) if review_score_raw is not None else 0.0
+        except (ValueError, TypeError):
+            review_score = 0.0
+
+        estimated_revenue_raw = sales_data.get('estimated_revenue', 0)
+        # Keep estimated_revenue as is since it might be a formatted string, handle in f-string
 
         # Calculate average competitor price
         comp_prices = []
@@ -2646,8 +2659,8 @@ Your recommendations must follow these patterns. Every recommendation needs:
 ✅ GOOD (SPECIFIC): "Launch official Discord server with: (1) Weekly dev Q&A every Friday 3pm EST, (2) Beta testing channel for upcoming features (invite top 50 reviewers), (3) Bug bounty: $25 Steam gift card for critical bugs, (4) Monthly screenshot contest ($50 prize). Moderator: Hire part-time community manager ($1,500/month). Launch within 14 days. Expected outcome: 500-1,000 members in 60 days, -30% support tickets (community self-help), +5-10 UGC features per month. Owner: Community Team."
 
 **REVENUE/BUDGET CONTEXT FOR THIS GAME:**
-- Estimated total revenue: ${estimated_revenue if isinstance(estimated_revenue, (int, float)) else 'Unknown'}
-- Marketing budget guideline: 10-15% of revenue = ${int(estimated_revenue * 0.10) if isinstance(estimated_revenue, (int, float)) else 'Unknown'}-{int(estimated_revenue * 0.15) if isinstance(estimated_revenue, (int, float)) else 'Unknown'}
+- Estimated total revenue: ${estimated_revenue_raw if isinstance(estimated_revenue_raw, (int, float)) else 'Unknown'}
+- Marketing budget guideline: 10-15% of revenue = ${int(estimated_revenue_raw * 0.10) if isinstance(estimated_revenue_raw, (int, float)) else 'Unknown'}-{int(estimated_revenue_raw * 0.15) if isinstance(estimated_revenue_raw, (int, float)) else 'Unknown'}
 - DO NOT recommend spending more than 15% of total revenue on any single initiative
 - Prioritize low-cost, high-impact tactics for games with <$50K revenue
 
