@@ -8,6 +8,7 @@ from src.ai_generator import AIGenerator
 from src.game_search import GameSearch
 from src.steamdb_scraper import SteamDBScraper
 from src.pdf_generator import create_downloadable_pdf
+from src.data_validation import validate_game_data, validate_sales_data, validate_competitor_data
 
 # Load environment variables from .env file
 load_dotenv()
@@ -160,6 +161,10 @@ def main():
                 st.stop()
 
             game_name = game_data.get('name', 'Unknown Game')
+
+            # FIX: Validate and sanitize game data to ensure consistent types
+            game_data = validate_game_data(game_data)
+
             st.success(f"✅ Found game: **{game_name}**")
             progress_bar.progress(20, text="🔎 Detecting launch status...")
 
@@ -196,6 +201,10 @@ def main():
             # Phase 2.2: Step 4 - Gather Steam data
             with st.spinner("📊 Gathering Steam market data..."):
                 sales_data = steamdb_scraper.get_sales_data(game_data['app_id'], game_name=game_name)
+
+                # FIX: Validate and sanitize sales data to ensure consistent types
+                sales_data = validate_sales_data(sales_data)
+
                 # Get review velocity data
                 review_stats = steamdb_scraper.get_review_stats(game_data['app_id'])
                 # Analyze capsule image for CTR optimization
@@ -208,6 +217,9 @@ def main():
 
             # Phase 2.2: Step 5 - Gather competitor Steam data
             with st.spinner("📊 Analyzing competitor performance..."):
+                # FIX: Validate all competitor data for consistent types
+                competitor_data = validate_competitor_data(competitor_data)
+
                 for competitor in competitor_data:
                     try:
                         competitor['steam_data'] = steamdb_scraper.get_sales_data(

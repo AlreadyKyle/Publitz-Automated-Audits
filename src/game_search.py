@@ -330,7 +330,8 @@ class GameSearch:
                 'platforms': platforms,
                 'metacritic': game_data.get('metacritic', {}),
                 'recommendations': game_data.get('recommendations', {}).get('total', 0),
-                'review_score': review_score_percent,
+                'review_score': f"{review_score_percent:.1f}%" if review_score_percent > 0 else "N/A",  # FIX: Consistent string format
+                'review_score_raw': review_score_percent,  # FIX: Add numeric version for comparisons
                 'review_count': total_reviews,
                 'steam_deck_compatibility': steam_deck_data,  # NEW: Steam Deck readiness analysis
                 'capsule_images': capsule_images  # NEW: Capsule image URLs for vision analysis
@@ -378,7 +379,8 @@ class GameSearch:
             'platforms': platforms,
             'metacritic': {},  # Not available from alternative source
             'recommendations': 0,  # Not available from alternative source
-            'review_score': alt_data.get('review_score_raw', 0),
+            'review_score': alt_data.get('review_score', 'N/A'),  # FIX: Use formatted string version
+            'review_score_raw': alt_data.get('review_score_raw', 0),  # FIX: Explicit numeric version
             'review_count': alt_data.get('reviews_total', 0),
             'steam_deck_compatibility': steam_deck_data,
             'capsule_images': capsule_images
