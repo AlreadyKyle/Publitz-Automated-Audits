@@ -80,6 +80,52 @@ class AIGenerator:
         except Exception as e:
             raise Exception(f"Failed to initialize Anthropic client: {str(e)}. Check your API key.")
 
+    def _format_genres(self, genres_raw: Any) -> str:
+        """
+        Format genres to comma-separated string, handling normalized format
+
+        Args:
+            genres_raw: Genres in any format (list of dicts, list of strings, string, etc.)
+
+        Returns:
+            Comma-separated string of genre names
+        """
+        if isinstance(genres_raw, list):
+            genre_list = []
+            for g in genres_raw:
+                if isinstance(g, dict):
+                    # Normalized format: {'description': 'Action'}
+                    genre_list.append(g.get('description', ''))
+                else:
+                    # Old format or string
+                    genre_list.append(str(g))
+            return ', '.join(g for g in genre_list if g)
+        elif isinstance(genres_raw, str):
+            return genres_raw
+        else:
+            return 'N/A'
+
+    def _format_tags(self, tags_raw: Any) -> str:
+        """
+        Format tags to comma-separated string, handling normalized format
+
+        Args:
+            tags_raw: Tags in any format (list, dict, string, etc.)
+
+        Returns:
+            Comma-separated string of tag names
+        """
+        if isinstance(tags_raw, list):
+            # Already normalized to list of strings
+            return ', '.join(str(t) for t in tags_raw)
+        elif isinstance(tags_raw, dict):
+            # Dict format: {'RPG': 100, 'Strategy': 50}
+            return ', '.join(tags_raw.keys())
+        elif isinstance(tags_raw, str):
+            return tags_raw
+        else:
+            return 'N/A'
+
     def analyze_capsule_image(self, capsule_url: str, game_name: str) -> Dict[str, Any]:
         """
         Analyze game capsule image for CTR risk factors using Claude Vision
@@ -691,12 +737,9 @@ Based on the Pre-Launch Report Template, your report must include:
         except (ValueError, TypeError):
             reviews_total_formatted = "0"
 
-        # FIX: Format genres/tags as comma-separated strings if they're lists
-        genres_raw = game_data.get('genres', 'N/A')
-        genres_formatted = ', '.join(str(g) for g in genres_raw) if isinstance(genres_raw, list) else str(genres_raw)
-
-        tags_raw = game_data.get('tags', 'N/A')
-        tags_formatted = ', '.join(str(t) for t in tags_raw) if isinstance(tags_raw, list) else str(tags_raw)
+        # FIX: Format genres/tags using helper methods that handle normalized format
+        genres_formatted = self._format_genres(game_data.get('genres', 'N/A'))
+        tags_formatted = self._format_tags(game_data.get('tags', 'N/A'))
 
         prompt = f"""You are an expert game marketing analyst at Publitz.
 
@@ -800,9 +843,8 @@ Format in clear markdown with headings, bullet points, and specific data.
         analyzer = GameAnalyzer()
         success_analysis = analyzer.analyze_success_level(game_data, sales_data, review_stats)
 
-        # FIX: Format genres as comma-separated strings if they're lists
-        genres_raw = game_data.get('genres', 'N/A')
-        genres_formatted = ', '.join(str(g) for g in genres_raw) if isinstance(genres_raw, list) else str(genres_raw)
+        # FIX: Format genres using helper method that handles normalized format
+        genres_formatted = self._format_genres(game_data.get('genres', 'N/A'))
 
         audit_prompt = f"""You are a quality auditor for game marketing reports.
 
@@ -1428,9 +1470,8 @@ Return ONLY valid JSON, no other text.
             "overall_score": 100
         }
 
-        # FIX: Format genres as comma-separated strings if they're lists
-        genres_raw = game_data.get('genres', 'N/A')
-        genres_formatted = ', '.join(str(g) for g in genres_raw) if isinstance(genres_raw, list) else str(genres_raw)
+        # FIX: Format genres using helper method that handles normalized format
+        genres_formatted = self._format_genres(game_data.get('genres', 'N/A'))
 
         audit_prompt = f"""You are a panel of specialized game industry auditors reviewing a draft report.
 
