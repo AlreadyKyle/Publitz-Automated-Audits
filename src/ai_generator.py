@@ -2492,6 +2492,83 @@ Generate a comprehensive, professional report with these sections:
    2. Prioritize Quick Wins from implementation matrix
    3. Schedule follow-up review timeline
 
+---
+
+## **HOW TO USE THIS REPORT**
+
+   Insert this navigation section immediately after the Executive Summary:
+
+   This audit is structured in three tiers based on your available time:
+
+   **### ⚡ Tier 1: Executive Brief (15 minutes)**
+   **Pages 1-3** | For founders who need the essentials
+
+   - Executive Summary
+   - Top 3 Opportunities with ROI calculations
+   - Top 3 Risks with mitigation strategies
+   - 30-Day Quick Wins checklist
+
+   **👉 Start here if**: You need actionable insights for your next team meeting or board update.
+
+   **### 📊 Tier 2: Strategic Overview (45 minutes)**
+   **Pages 4-12** | For strategic planning and resource allocation
+
+   - Market Position & Competitive Landscape
+   - Revenue Performance & Projections
+   - Marketing Effectiveness Assessment
+   - Growth Opportunity Analysis
+   - Prioritization Matrix (Impact vs. Effort)
+
+   **👉 Read this if**: You're planning quarterly roadmap or allocating marketing budget.
+
+   **### 🔬 Tier 3: Deep-Dive Analysis (2+ hours)**
+   **Pages 13-40** | For comprehensive market intelligence
+
+   - Detailed Competitive Comparison
+   - Store Asset Optimization Analysis
+   - Sentiment & Review Analysis (granular)
+   - Complete Influencer Outreach Database
+   - Data Methodology & Limitations
+   - Regional Market Breakdowns
+
+   **👉 Reference this when**: You need detailed data for specific decisions or want to validate our recommendations.
+
+   ---
+
+   **## Quick Navigation**
+
+   **I need to...**
+
+   - See my overall score and top priorities → **Executive Summary** (Section 1)
+   - Understand competitive positioning → **Market Positioning Analysis** (Section 3)
+   - Get revenue projections → **Sales & Revenue Performance** (Section 4)
+   - Find influencer contacts → **Influencer Outreach Strategy** (Section 14)
+   - Plan next 30 days → **Action Plan & Prioritization** (Section 11)
+   - Understand data quality → **Data Confidence Assessment** (Section 2)
+   - Optimize pricing → **Pricing & Monetization Optimization** (Section 15)
+   - Review store assets → **Capsule & Store Asset Optimization** (Section 9)
+
+   ---
+
+   **TIER MARKERS (use HTML comments to mark content tiers):**
+
+   Add these markers throughout the report:
+   ```
+   <!-- TIER 1: EXECUTIVE BRIEF START -->
+   [Executive Summary + Top Opportunities + Top Risks]
+   <!-- TIER 1: EXECUTIVE BRIEF END -->
+
+   <!-- TIER 2: STRATEGIC OVERVIEW START -->
+   [Market Positioning, Revenue Performance, Marketing, Growth Opportunities, Action Plan]
+   <!-- TIER 2: STRATEGIC OVERVIEW END -->
+
+   <!-- TIER 3: DEEP-DIVE ANALYSIS START -->
+   [Competitor Comparison, Store Optimization, Sentiment Analysis, Influencer Database, Regional Breakdowns]
+   <!-- TIER 3: DEEP-DIVE ANALYSIS END -->
+   ```
+
+---
+
 2. **DATA CONFIDENCE ASSESSMENT**
 
    This report uses multiple data sources with varying reliability. Understanding confidence levels helps you weight recommendations appropriately.
