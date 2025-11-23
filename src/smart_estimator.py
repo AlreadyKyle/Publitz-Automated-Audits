@@ -193,11 +193,13 @@ class SmartEstimator:
         # Calculate final estimate
         final_estimate = int(base_estimate * multiplier)
 
-        # Create confidence range (wider if fewer signals)
-        confidence_width = 2.5 - (len(signals_used) * 0.2)  # More signals = tighter range
-        confidence_width = max(1.5, min(3.0, confidence_width))
+        # Create confidence range (NARROWED: more actionable ranges)
+        # OLD: 1.5-3.0x range (too wide, 9x spread between min/max)
+        # NEW: 1.15-1.35x range (tighter, max 1.82x spread for actionability)
+        confidence_width = 1.35 - (len(signals_used) * 0.025)  # More signals = tighter range
+        confidence_width = max(1.15, min(1.35, confidence_width))
 
-        print(f"Final estimate: {final_estimate:,} (multiplier: {multiplier:.2f}x, signals: {len(signals_used)})")
+        print(f"Final estimate: {final_estimate:,} (multiplier: {multiplier:.2f}x, signals: {len(signals_used)}, confidence_width: {confidence_width:.2f}x)")
 
         return {
             'owners_min': int(final_estimate / confidence_width),
@@ -206,6 +208,7 @@ class SmartEstimator:
             'owners_display': f'{int(final_estimate / confidence_width):,} .. {int(final_estimate * confidence_width):,}',
             'estimation_method': 'multi_signal_intelligence',
             'confidence': self._calculate_confidence(signals_used),
+            'confidence_level_percent': self._confidence_to_percent(len(signals_used)),
             'signals_used': signals_used,
             'base_genre_estimate': base_estimate,
             'total_multiplier': multiplier
@@ -253,10 +256,12 @@ class SmartEstimator:
         # Calculate effective price per sale
         effective_price = price * regional_factor * steam_cut * (1 - refund_rate) * discount_factor
 
-        # Revenue estimates
+        # Revenue estimates (FIXED: removed extra 0.8x/1.2x multipliers for tighter ranges)
+        # OLD: revenue_low * 0.8, revenue_high * 1.2 = 44% wider range
+        # NEW: Use ownership range directly for more actionable estimates
         revenue_estimate = int(owners_avg * effective_price)
-        revenue_low = int(ownership_data['owners_min'] * effective_price * 0.8)  # Conservative
-        revenue_high = int(ownership_data['owners_max'] * effective_price * 1.2)  # Optimistic
+        revenue_low = int(ownership_data['owners_min'] * effective_price)
+        revenue_high = int(ownership_data['owners_max'] * effective_price)
 
         # Format display
         if revenue_estimate < 1000:
@@ -541,6 +546,29 @@ class SmartEstimator:
             return 'low-medium'
         else:
             return 'low'
+
+    def _confidence_to_percent(self, signal_count: int) -> int:
+        """
+        Convert signal count to confidence percentage for clearer reporting
+
+        Args:
+            signal_count: Number of data signals used in estimation
+
+        Returns:
+            Confidence level as percentage (60-95%)
+        """
+        if signal_count >= 8:
+            return 95  # Very high confidence - multiple cross-validating sources
+        elif signal_count >= 6:
+            return 88  # High confidence
+        elif signal_count >= 4:
+            return 80  # Medium-high confidence
+        elif signal_count >= 3:
+            return 72  # Medium confidence
+        elif signal_count >= 2:
+            return 65  # Low-medium confidence
+        else:
+            return 60  # Low confidence - genre baseline only
 
     def _minimal_revenue_estimate(self) -> Dict[str, Any]:
         """Return minimal revenue estimate for edge cases"""

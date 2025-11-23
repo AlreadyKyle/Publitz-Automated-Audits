@@ -335,7 +335,15 @@ class GameSearch:
             # Extract price information
             price_overview = game_data.get('price_overview', {})
             price_formatted = price_overview.get('final_formatted', 'Free')
-            price_raw = price_overview.get('final', 0) / 100 if price_overview.get('final') else 0  # Convert cents to dollars
+
+            # FIX: Safely convert price from cents to dollars
+            price_value = price_overview.get('final', 0)
+            if isinstance(price_value, str):
+                try:
+                    price_value = float(price_value)
+                except ValueError:
+                    price_value = 0
+            price_raw = price_value / 100 if price_value else 0  # Convert cents to dollars
 
             # Analyze Steam Deck readiness
             categories = [c['description'] for c in game_data.get('categories', [])]
@@ -350,11 +358,18 @@ class GameSearch:
             }
 
             # Extract relevant information
+            # FIX: Safely extract first element from developer/publisher lists
+            developers = game_data.get('developers', ['Unknown'])
+            developer = developers[0] if (isinstance(developers, list) and developers) else 'Unknown'
+
+            publishers = game_data.get('publishers', ['Unknown'])
+            publisher = publishers[0] if (isinstance(publishers, list) and publishers) else 'Unknown'
+
             game_details = {
                 'name': game_data.get('name', 'Unknown'),
                 'app_id': app_id,
-                'developer': game_data.get('developers', ['Unknown'])[0] if game_data.get('developers') else 'Unknown',
-                'publisher': game_data.get('publishers', ['Unknown'])[0] if game_data.get('publishers') else 'Unknown',
+                'developer': developer,
+                'publisher': publisher,
                 'release_date': game_data.get('release_date', {}).get('date', 'Unknown'),
                 'genres': [g['description'] for g in game_data.get('genres', [])],
                 'tags': spy_data.get('tags', []),
@@ -506,14 +521,26 @@ class GameSearch:
             potential_competitors = []
 
             # Strategy 1: Find by primary tag (cast wide net)
+            # FIX: Handle normalized tag format (list of strings or list of dicts)
             tags = game_data.get('tags', [])
             if tags:
-                potential_competitors.extend(self._find_by_tag(tags[0], max_competitors * 3))
+                primary_tag = tags[0]
+                if isinstance(primary_tag, dict):
+                    # Normalized format: {'description': 'Tag'}
+                    primary_tag = primary_tag.get('description', '')
+                if primary_tag:
+                    potential_competitors.extend(self._find_by_tag(primary_tag, max_competitors * 3))
 
             # Strategy 2: Find by genre
+            # FIX: Handle normalized genre format (list of dicts with 'description' key)
             genres = game_data.get('genres', [])
             if genres:
-                potential_competitors.extend(self._find_by_genre(genres[0], max_competitors * 3))
+                primary_genre = genres[0]
+                if isinstance(primary_genre, dict):
+                    # Normalized format: {'description': 'Action'}
+                    primary_genre = primary_genre.get('description', '')
+                if primary_genre:
+                    potential_competitors.extend(self._find_by_genre(primary_genre, max_competitors * 3))
 
             # Strategy 3: Broader search if needed
             if len(potential_competitors) < max_competitors * 2:
@@ -535,8 +562,23 @@ class GameSearch:
             for comp in unique_competitors:
                 score = self._calculate_similarity_score(game_data, comp)
                 # IMPROVED: Higher threshold (50) + require at least 1 genre match
-                game_genres = set(game_data.get('genres', []))
-                comp_genres = set(comp.get('genres', []))
+                # FIX: Handle normalized genre format
+                game_genres_raw = game_data.get('genres', [])
+                game_genres = set()
+                for g in game_genres_raw:
+                    if isinstance(g, dict):
+                        game_genres.add(g.get('description', ''))
+                    else:
+                        game_genres.add(str(g))
+
+                comp_genres_raw = comp.get('genres', [])
+                comp_genres = set()
+                for g in comp_genres_raw:
+                    if isinstance(g, dict):
+                        comp_genres.add(g.get('description', ''))
+                    else:
+                        comp_genres.add(str(g))
+
                 has_genre_match = len(game_genres & comp_genres) > 0
 
                 if score >= 50 and has_genre_match:  # Stricter filtering
@@ -575,11 +617,27 @@ class GameSearch:
         """
         score = 0
 
-        # Extract data
-        game_genres = set(game_data.get('genres', []))
-        comp_genres = set(competitor.get('genres', []))
-        game_tags = set(game_data.get('tags', []))
-        comp_tags = set(competitor.get('tags', []))
+        # Extract data - FIX: Handle normalized format for genres/tags
+        # Genres: normalize [{'description': 'Action'}] or ['Action'] → {'Action'}
+        game_genres_raw = game_data.get('genres', [])
+        game_genres = set()
+        for g in game_genres_raw:
+            if isinstance(g, dict):
+                game_genres.add(g.get('description', ''))
+            else:
+                game_genres.add(str(g))
+
+        comp_genres_raw = competitor.get('genres', [])
+        comp_genres = set()
+        for g in comp_genres_raw:
+            if isinstance(g, dict):
+                comp_genres.add(g.get('description', ''))
+            else:
+                comp_genres.add(str(g))
+
+        # Tags: normalize to set of strings
+        game_tags = set(str(t) for t in game_data.get('tags', []))
+        comp_tags = set(str(t) for t in competitor.get('tags', []))
         game_price = game_data.get('price_raw', 0) if 'price_raw' in game_data else 0
         comp_price = competitor.get('price_raw', 0) if 'price_raw' in competitor else 0
         game_categories = set(game_data.get('categories', []))
@@ -677,15 +735,30 @@ class GameSearch:
             all_games = response.json()
 
             # Filter games by similar characteristics
-            game_tags = set(game_data.get('tags', []))
-            game_genres = set(game_data.get('genres', []))
+            # FIX: Handle normalized format for tags and genres
+            game_tags = set(str(t) for t in game_data.get('tags', []))
+
+            game_genres_raw = game_data.get('genres', [])
+            game_genres = set()
+            for g in game_genres_raw:
+                if isinstance(g, dict):
+                    game_genres.add(g.get('description', ''))
+                else:
+                    game_genres.add(str(g))
 
             for app_id, spy_data in list(all_games.items())[:200]:  # Check top 200 games
                 if len(competitors) >= min_competitors * 2:
                     break
 
                 # Get tags for this game
-                game_spy_tags = set(spy_data.get('tags', {}).keys() if isinstance(spy_data.get('tags'), dict) else [])
+                # FIX: Handle tags as both dict and list
+                tags_raw = spy_data.get('tags', [])
+                if isinstance(tags_raw, dict):
+                    game_spy_tags = set(tags_raw.keys())
+                elif isinstance(tags_raw, list):
+                    game_spy_tags = set(tags_raw)
+                else:
+                    game_spy_tags = set()
 
                 # Calculate similarity - require meaningful overlap
                 tag_overlap = len(game_tags & game_spy_tags)

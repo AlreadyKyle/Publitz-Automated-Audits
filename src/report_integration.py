@@ -158,8 +158,13 @@ def create_report_with_ai(game_data: Dict[str, Any],
     """
     logger.info("Creating complete report with structured analysis and AI insights")
 
-    # Generate AI strategic analysis (keep the existing deep analysis)
-    logger.info("Generating AI strategic analysis...")
+    # ENHANCED: Collect Phase 2 data BEFORE AI generation to pass real influencer/community data
+    logger.info("Collecting Phase 2 enrichment data...")
+    phase2_data = collect_phase2_data(game_data)
+    logger.info(f"Phase 2 data collected: {', '.join(phase2_data.keys())}")
+
+    # Generate AI strategic analysis (now with phase2_data for real influencer/community sections)
+    logger.info("Generating AI strategic analysis with Phase 2 data...")
     ai_report, audit_results = ai_generator.generate_report_with_audit(
         game_data,
         sales_data,
@@ -167,21 +172,25 @@ def create_report_with_ai(game_data: Dict[str, Any],
         steamdb_data,
         report_type,
         review_stats,
-        capsule_analysis
+        capsule_analysis,
+        phase2_data=phase2_data  # NEW: Pass phase2_data to AI generator
     )
 
-    # Generate enhanced structured report
+    # Generate enhanced structured report (reuse already-collected phase2_data)
     logger.info("Generating structured analysis...")
     complete_report, structured_data = generate_enhanced_report(
         game_data,
         sales_data,
         competitor_data,
         report_type,
-        ai_report=ai_report
+        ai_report=ai_report,
+        include_phase2=True  # Will reuse cached phase2_data collection
     )
 
     # Add audit results to structured data
     structured_data['audit_results'] = audit_results
+    # Ensure phase2_data is in structured_data
+    structured_data['phase2_data'] = phase2_data
 
     logger.info("Complete report generated successfully")
 

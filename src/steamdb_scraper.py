@@ -85,7 +85,13 @@ class SteamDBScraper:
                 logger.warning("SteamSpy API returned 'Access denied' - IP may be blocked")
                 raise Exception("Access denied by SteamSpy")
 
-            data = response.json()
+            # FIX: Add error handling for JSON decode
+            try:
+                data = response.json()
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.error(f"Invalid JSON response from SteamSpy: {e}")
+                return self._generate_fallback_sales_data(app_id, game_name)
+
             logger.info(f"Successfully got data from SteamSpy API")
 
             # Parse owner data
@@ -151,10 +157,22 @@ class SteamDBScraper:
 
             enhanced_revenue = base_revenue * quality_multiplier
 
-            # Calculate confidence range
-            confidence_low = enhanced_revenue * 0.6   # Conservative
-            confidence_mid = enhanced_revenue          # Best estimate
-            confidence_high = enhanced_revenue * 1.8   # Optimistic
+            # Calculate confidence range (NARROWED: aligned with SmartEstimator for actionable ranges)
+            # OLD: 0.6x-1.8x = 3.0x spread (too wide)
+            # NEW: 1.15x-1.35x = max 1.82x spread (tighter, more actionable)
+            # More reviews = tighter range (better data quality)
+            if total_reviews > 5000:
+                confidence_width = 1.15  # Excellent data
+            elif total_reviews > 1000:
+                confidence_width = 1.20  # Good data
+            elif total_reviews > 100:
+                confidence_width = 1.30  # Medium data
+            else:
+                confidence_width = 1.35  # Limited data
+
+            confidence_low = enhanced_revenue / confidence_width
+            confidence_mid = enhanced_revenue
+            confidence_high = enhanced_revenue * confidence_width
 
             # Format ranges
             if confidence_mid < 1000:
@@ -322,6 +340,12 @@ class SteamDBScraper:
         total_reviews = sales_data.get('reviews_total', 0)
         recent_reviews = recent_data.get('recent_reviews', 0)
 
+        # FIX: Validate that recent_reviews cannot exceed total_reviews
+        # This can happen due to API inconsistencies or timing differences
+        if recent_reviews > total_reviews and total_reviews > 0:
+            logger.warning(f"Recent reviews ({recent_reviews:,}) exceeds total reviews ({total_reviews:,}). Capping at total.")
+            recent_reviews = total_reviews
+
         # Calculate velocity score
         velocity_score = (recent_reviews / total_reviews) if total_reviews > 0 else 0
 
@@ -368,7 +392,13 @@ class SteamDBScraper:
                 timeout=10
             )
             response.raise_for_status()
-            data = response.json()
+
+            # FIX: Add error handling for JSON decode
+            try:
+                data = response.json()
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.error(f"Invalid JSON response from Steam API: {e}")
+                return {'recent_reviews': 0}
 
             query_summary = data.get('query_summary', {})
             recent_reviews = query_summary.get('total_reviews', 0)

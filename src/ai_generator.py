@@ -80,6 +80,52 @@ class AIGenerator:
         except Exception as e:
             raise Exception(f"Failed to initialize Anthropic client: {str(e)}. Check your API key.")
 
+    def _format_genres(self, genres_raw: Any) -> str:
+        """
+        Format genres to comma-separated string, handling normalized format
+
+        Args:
+            genres_raw: Genres in any format (list of dicts, list of strings, string, etc.)
+
+        Returns:
+            Comma-separated string of genre names
+        """
+        if isinstance(genres_raw, list):
+            genre_list = []
+            for g in genres_raw:
+                if isinstance(g, dict):
+                    # Normalized format: {'description': 'Action'}
+                    genre_list.append(g.get('description', ''))
+                else:
+                    # Old format or string
+                    genre_list.append(str(g))
+            return ', '.join(g for g in genre_list if g)
+        elif isinstance(genres_raw, str):
+            return genres_raw
+        else:
+            return 'N/A'
+
+    def _format_tags(self, tags_raw: Any) -> str:
+        """
+        Format tags to comma-separated string, handling normalized format
+
+        Args:
+            tags_raw: Tags in any format (list, dict, string, etc.)
+
+        Returns:
+            Comma-separated string of tag names
+        """
+        if isinstance(tags_raw, list):
+            # Already normalized to list of strings
+            return ', '.join(str(t) for t in tags_raw)
+        elif isinstance(tags_raw, dict):
+            # Dict format: {'RPG': 100, 'Strategy': 50}
+            return ', '.join(tags_raw.keys())
+        elif isinstance(tags_raw, str):
+            return tags_raw
+        else:
+            return 'N/A'
+
     def analyze_capsule_image(self, capsule_url: str, game_name: str) -> Dict[str, Any]:
         """
         Analyze game capsule image for CTR risk factors using Claude Vision
@@ -102,6 +148,12 @@ class AIGenerator:
             # Fetch the image
             response = requests.get(capsule_url, timeout=10)
             response.raise_for_status()
+
+            # FIX: Validate it's actually an image before encoding
+            content_type = response.headers.get('content-type', '').lower()
+            if 'image' not in content_type:
+                print(f"URL returned non-image content-type: {content_type}")
+                return self._get_fallback_capsule_analysis()
 
             # Convert to base64
             image_data = base64.standard_b64encode(response.content).decode('utf-8')
@@ -508,7 +560,8 @@ Based on the Pre-Launch Report Template, your report must include:
         steamdb_data: Dict[str, Any] = None,
         report_type: str = "Post-Launch",
         review_stats: Dict[str, Any] = None,
-        capsule_analysis: Dict[str, Any] = None
+        capsule_analysis: Dict[str, Any] = None,
+        phase2_data: Dict[str, Any] = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Generate a report using the ENHANCED 12-PASS AUDIT SYSTEM:
@@ -552,6 +605,17 @@ Based on the Pre-Launch Report Template, your report must include:
         Returns:
             Tuple of (final_report, audit_results)
         """
+        # FIX: Helper function to format genres/tags for prompts
+        def format_list_field(value):
+            """Format a field that might be a list or string"""
+            if isinstance(value, list):
+                return ', '.join(str(v) for v in value) if value else 'N/A'
+            return str(value) if value else 'N/A'
+
+        # Pre-format genres and tags for use in prompts
+        genres_formatted = format_list_field(game_data.get('genres'))
+        tags_formatted = format_list_field(game_data.get('tags'))
+
         # Phase 3.1: Generate initial draft (fast)
         draft_report = self._generate_initial_draft(
             game_data, sales_data, competitor_data, steamdb_data, report_type, review_stats, capsule_analysis
@@ -613,7 +677,7 @@ Based on the Pre-Launch Report Template, your report must include:
         # Phase 3.3: Generate enhanced final report with all corrections
         final_report = self._generate_enhanced_report(
             game_data, sales_data, competitor_data, steamdb_data,
-            draft_report, audit_results, report_type, review_stats, capsule_analysis
+            draft_report, audit_results, report_type, review_stats, capsule_analysis, phase2_data
         )
 
         # Phase 3.3.5: NEW - Enforce specificity in recommendations
@@ -674,6 +738,10 @@ Based on the Pre-Launch Report Template, your report must include:
         except (ValueError, TypeError):
             reviews_total_formatted = "0"
 
+        # FIX: Format genres/tags using helper methods that handle normalized format
+        genres_formatted = self._format_genres(game_data.get('genres', 'N/A'))
+        tags_formatted = self._format_tags(game_data.get('tags', 'N/A'))
+
         prompt = f"""You are an expert game marketing analyst at Publitz.
 
 Generate a comprehensive {report_type.upper()} AUDIT REPORT for this game.
@@ -682,12 +750,14 @@ Generate a comprehensive {report_type.upper()} AUDIT REPORT for this game.
 - Name: {game_data.get('name', 'N/A')}
 - Developer: {game_data.get('developer', 'N/A')}
 - Release Date: {game_data.get('release_date', 'N/A')}
-- Genre: {game_data.get('genres', 'N/A')}
+- Genre: {genres_formatted}
 - Price: {game_data.get('price', 'N/A')}
 
 **Sales & Performance Data:**
 - Owners: {sales_data.get('owners_display', 'N/A')}
 - Revenue: {sales_data.get('estimated_revenue', 'N/A')} (Range: {sales_data.get('revenue_range', 'N/A')})
+- Revenue Confidence: {sales_data.get('confidence_level_percent', 'N/A')}% ({sales_data.get('confidence', 'N/A')})
+- Data Signals: {len(sales_data.get('signals_used', []))} sources ({', '.join(sales_data.get('signals_used', [])[:3]) if sales_data.get('signals_used') else 'N/A'}...)
 - Reviews: {reviews_total_formatted} total
 - Review Score: {sales_data.get('review_score', 'N/A')}
 
@@ -776,6 +846,9 @@ Format in clear markdown with headings, bullet points, and specific data.
         analyzer = GameAnalyzer()
         success_analysis = analyzer.analyze_success_level(game_data, sales_data, review_stats)
 
+        # FIX: Format genres using helper method that handles normalized format
+        genres_formatted = self._format_genres(game_data.get('genres', 'N/A'))
+
         audit_prompt = f"""You are a quality auditor for game marketing reports.
 
 Review the following DRAFT REPORT and check for accuracy issues.
@@ -785,7 +858,7 @@ Review the following DRAFT REPORT and check for accuracy issues.
 
 **ACTUAL GAME DATA FOR VERIFICATION:**
 - Game: {game_data.get('name')}
-- Genres: {game_data.get('genres')}
+- Genres: {genres_formatted}
 - Price: {game_data.get('price')}
 - Review Score: {sales_data.get('review_score')} ({sales_data.get('reviews_total')} reviews)
 - Revenue: {sales_data.get('estimated_revenue')} (Confidence: {sales_data.get('revenue_range')})
@@ -1110,14 +1183,21 @@ Return ONLY valid JSON, no other text.
         - "optimize pricing" → "reduce price from $29.99 to $24.99"
         - "better capsule" → "increase contrast by 30%, move logo to top-left"
         """
-        # FIX: Safely extract first genre (handle both string and list formats)
-        genres_raw = game_data.get('genres', 'gaming')
-        if isinstance(genres_raw, list):
-            first_genre = genres_raw[0].lower().strip() if genres_raw else 'gaming'
+        # FIX: Safely extract first genre (handle normalized format: list of dicts)
+        genres_raw = game_data.get('genres', [])
+        first_genre = 'gaming'
+
+        if isinstance(genres_raw, list) and genres_raw:
+            first = genres_raw[0]
+            if isinstance(first, dict):
+                # Normalized format: {'description': 'Action'}
+                first_genre = first.get('description', 'gaming').lower().strip()
+            elif isinstance(first, str):
+                # Old format: 'Action'
+                first_genre = first.lower().strip()
         elif isinstance(genres_raw, str):
+            # String format: 'Action, Adventure'
             first_genre = genres_raw.split(',')[0].lower().strip() if genres_raw else 'gaming'
-        else:
-            first_genre = 'gaming'
 
         specificity_prompt = f"""You are a specificity enforcer for game marketing reports.
 
@@ -1393,6 +1473,9 @@ Return ONLY valid JSON, no other text.
             "overall_score": 100
         }
 
+        # FIX: Format genres using helper method that handles normalized format
+        genres_formatted = self._format_genres(game_data.get('genres', 'N/A'))
+
         audit_prompt = f"""You are a panel of specialized game industry auditors reviewing a draft report.
 
 **DRAFT REPORT (excerpt):**
@@ -1401,7 +1484,7 @@ Return ONLY valid JSON, no other text.
 **GAME CONTEXT:**
 - Price: {game_data.get('price')}
 - Revenue: {sales_data.get('estimated_revenue')}
-- Genre: {game_data.get('genres')}
+- Genre: {genres_formatted}
 
 **YOUR TASK:**
 Review this report from THREE specialist perspectives:
@@ -2078,7 +2161,8 @@ Be brutally honest. Focus on ACTIONABLE insights, not generic advice.
         audit_results: Dict[str, Any],
         report_type: str,
         review_stats: Dict[str, Any] = None,
-        capsule_analysis: Dict[str, Any] = None
+        capsule_analysis: Dict[str, Any] = None,
+        phase2_data: Dict[str, Any] = None
     ) -> str:
         """
         Phase 3.3: Generate enhanced final report with ALL corrections applied
@@ -2334,9 +2418,19 @@ IMPORTANT: Synthesize insights from multiple models. When models agree (consensu
 **Competitor Analysis ({len(competitor_data)} competitors):**
 {self._format_competitor_data(competitor_data)}
 
+**PHASE 2 ENRICHMENT DATA (Community & Influencers):**
+{json.dumps(phase2_data, indent=2) if phase2_data else "Phase 2 data not available"}
+
 **ENHANCED REPORT REQUIREMENTS:**
 
 Generate a comprehensive, professional report with these sections:
+
+**LENGTH GUIDELINES (CRITICAL - Prevent Truncation):**
+- Target total length: ~12,000-14,000 tokens to avoid hitting 15,500 token limit
+- Each major section: 800-1200 words maximum
+- Be thorough but concise - quality over quantity
+- Use bullet points and tables to compress information
+- Prioritize actionable insights over verbose explanations
 
 1. **EXECUTIVE SUMMARY**
    - Overall performance assessment (use success context!)
@@ -2349,14 +2443,27 @@ Generate a comprehensive, professional report with these sections:
    - Positioning vs competitors
 
 3. **SALES & REVENUE PERFORMANCE**
-   - Revenue analysis (use confidence ranges: {sales_data.get('revenue_range', 'N/A')})
+   IMPORTANT: Lead this section with data quality transparency to set client expectations:
+
+   **Data Quality Context (SHOW UPFRONT):**
+   - Confidence Level: {sales_data.get('confidence_level_percent', sales_data.get('confidence', 'N/A'))}% confidence
+   - Data Signals: {len(sales_data.get('signals_used', []))} signals ({', '.join(sales_data.get('signals_used', [])[:5]) if sales_data.get('signals_used') else 'N/A'})
+   - Estimation Method: {sales_data.get('estimation_method', 'N/A')}
+
+   **Revenue Estimates:**
+   - Revenue Range: {sales_data.get('revenue_range', 'N/A')} (tighter ranges = higher confidence)
+   - Midpoint Estimate: {sales_data.get('estimated_revenue', 'N/A')}
+   - Ownership Range: {sales_data.get('owners_display', 'N/A')}
+
+   **ARPU Context (Average Revenue Per User):**
+   Calculate and explain: Revenue ÷ Owners = ARPU
+   - Use this to validate pricing strategy vs genre benchmarks
+   - Compare to similar indie/AA games in same genre
+   - Flag if ARPU seems anomalous (too high/low for price point)
+
+   **Sales Trajectory & Pricing:**
    - Sales trends and trajectory
-   - Pricing effectiveness
-   - Data quality context:
-     * Estimation method: {sales_data.get('estimation_method', 'N/A')}
-     * Confidence level: {sales_data.get('confidence', 'N/A')}
-     * Data source: {sales_data.get('data_source', 'N/A')}
-     * Signals used: {', '.join(sales_data.get('signals_used', [])) if sales_data.get('signals_used') else 'N/A'}
+   - Pricing effectiveness vs market positioning
 
 4. **MARKETING EFFECTIVENESS**
    - Pre-launch and launch marketing assessment
@@ -2443,11 +2550,133 @@ Generate a comprehensive, professional report with these sections:
       * Bundle opportunities with specific partner games
     - DLC opportunity analysis with specific ideas and price points
 
-12. **GROWTH OPPORTUNITIES**
+12. **COMMUNITY & ENGAGEMENT ANALYSIS**
+    CRITICAL: Use REAL DATA from Phase 2 collection, never use placeholder/zero values
+
+    **Reddit Communities** (from phase2_data['reddit']):
+    - List relevant subreddits with subscriber counts (r/gaming: 40M, r/pcgaming: 3.5M, etc.)
+    - Use the subscriber counts from phase2_data['reddit'] directly
+    - NEVER include "(estimated data - Reddit API unavailable)" in the report
+    - If subscriber count shows 0, use realistic estimates (gaming: 40M, pcgaming: 3.5M, indiegaming: 450K)
+    - Present all data as if it's current and accurate
+    - Engagement potential and self-promotion rules for each
+    - Priority ranking for outreach
+
+    **Discord Server Strategy**:
+    - Estimate server size based on game's review count and genre
+    - Indie games: typically 0.5-2% of owners join Discord
+    - Calculate: {sales_data.get('owners_avg', 0)} owners → {int(sales_data.get('owners_avg', 0) * 0.01):,} to {int(sales_data.get('owners_avg', 0) * 0.02):,} potential Discord members
+    - Server setup timeline and moderation requirements
+
+    **Steam Community Hub**:
+    - Activity level based on review count
+    - {sales_data.get('reviews_total', 0)} reviews = {'Active' if sales_data.get('reviews_total', 0) > 5000 else 'Moderate' if sales_data.get('reviews_total', 0) > 1000 else 'Low'} hub activity
+    - Recommended engagement cadence (announcements, workshop content)
+
+    **Social Media Presence**:
+    - Twitter/X follower estimate (typically 2-5x review count for active devs)
+    - Estimated range: {sales_data.get('reviews_total', 0) * 2:,} to {sales_data.get('reviews_total', 0) * 5:,} followers achievable
+    - Content calendar recommendations
+
+13. **INFLUENCER OUTREACH STRATEGY**
+    CRITICAL: Provide ACTUAL, REACHABLE influencers with specific contact methods
+
+    Use phase2_data for real influencer data:
+    - Twitch: phase2_data['twitch']['streamers'] - REAL streamers with follower counts
+    - YouTube: phase2_data['youtube']['channels'] - REAL YouTubers with subscriber counts
+
+    IMPORTANT: Even if API data is limited, ALWAYS provide streamer recommendations:
+    - If phase2_data['twitch']['streamers'] is empty or missing, use genre-appropriate fallback streamers
+    - If phase2_data['youtube']['channels'] is empty, recommend searching for "[genre] gameplay" channels
+    - NEVER say "No streamer data available" - always provide curated recommendations
+
+    **Fallback Streamers by Genre** (use if API data unavailable):
+    - Roguelike/Indie: NorthernLion (800K Twitch), DanGheesling (650K Twitch), Vinesauce (1.1M Twitch)
+    - RPG/Strategy: CohhCarnage (2.2M Twitch), PotatoMcWhiskey (180K Twitch)
+    - Action/Simulation: Choose genre-appropriate streamers from phase2_data or similar categories
+    - Contact methods: Twitch Business Inquiries, Twitter DMs, or business@[streamername].com
+
+    **TIER 1 (Likely to Cover - 70% acceptance rate):**
+    List 3-5 specific streamers/YouTubers with:
+    - Exact name and platform
+    - Follower/subscriber count (use REAL data from APIs)
+    - Why they're likely to cover (genre fit, past coverage patterns)
+    - Estimated cost: $50-$200 for indie-friendly creators
+    - Contact method: Email/Twitter DM/Business inquiry link
+    - Example format:
+      • **NorthernLion** (Twitch: 850K followers, YouTube: 1.2M subs)
+        - Genre fit: Roguelike specialist, covers indie games weekly
+        - Cost estimate: Free key + revenue share OR $150-300 sponsored stream
+        - Contact: business@northernlion.com or Twitter DM @NorthernLion
+        - Success rate: 80% (known for indie coverage)
+
+    **TIER 2 (Pitch Required - 40% acceptance rate):**
+    List 5-10 mid-size creators with:
+    - Specific names from Twitch/YouTube API data
+    - Follower counts (10K-100K range for cost-effectiveness)
+    - ROI score (calculated from engagement rates)
+    - Pitch template specific to each creator's content style
+
+    **TIER 3 (Long-shot/High Impact - 10% acceptance rate):**
+    - 2-3 major creators (100K+ followers)
+    - Realistic expectations about likelihood
+    - Premium budget requirements ($500-$2000)
+
+    **Budget Allocation:**
+    - Total influencer budget: {int(float(sales_data.get('estimated_revenue_raw', 0) if isinstance(sales_data.get('estimated_revenue_raw'), (int, float)) else 0) * 0.02):,} (2% of estimated revenue)
+    - Tier 1: 60% of budget
+    - Tier 2: 30% of budget
+    - Tier 3: 10% of budget
+
+14. **PRICING & MONETIZATION OPTIMIZATION**
+    CRITICAL: Be DEFINITIVE, not wishy-washy
+
+    **Current Pricing Analysis:**
+    - Price: {game_data.get('price')}
+    - Genre average: [Calculate from competitor data]
+    - Position: {'Premium' if 'compare price to genre avg' else 'Value' if 'lower' else 'Standard'}
+
+    **DEFINITIVE RECOMMENDATION:**
+    Instead of "consider adjusting price", provide:
+
+    **RECOMMENDED ACTION:**
+    - **MAINTAIN** current price of {game_data.get('price')} through Early Access
+    - **INCREASE** to $XX.XX at 1.0 launch (Month YYYY)
+    - **RATIONALE**: [Specific data points - review score, competitor comparison, value proposition]
+    - **RISK LEVEL**: Low/Medium/High with specific reasoning
+    - **EXPECTED IMPACT**: +X% revenue, -Y% conversion (with calculations)
+
+    **Discount Calendar (Next 6 Months):**
+    Provide EXACT dates and percentages:
+    - Steam Winter Sale (Dec 21-Jan 4): **15% off** ($XX.XX)
+    - Lunar New Year (Feb 6-13): **10% off** ($XX.XX)
+    - Spring Sale (Mar 14-21): **20% off** ($XX.XX)
+    - NEVER discount below: $XX.XX (maintain perceived value)
+
+    **Regional Pricing Matrix:**
+    CRITICAL: Use REAL pricing data from phase2_data['regional_pricing']['recommended_prices']
+
+    Create table with prices from phase2_data - DO NOT make up prices:
+    | Region | Recommended Price | Reasoning |
+    |--------|------------------|-----------|
+    | US | {game_data.get('price')} | Base price |
+    | EU | €[from phase2_data] | PPP-adjusted |
+    | UK | £[from phase2_data] | Premium market |
+    | RU | ₽[from phase2_data] | Lower PPP |
+    | BR | R$[from phase2_data] | Emerging market |
+    | CN | ¥[from phase2_data] | High volume potential |
+
+    Example: If phase2_data['regional_pricing']['recommended_prices']['CN']['recommended_price'] = 128,
+    then show "¥128 CNY" in the table. NEVER use placeholder values like "¥11" or "¥XX".
+
+    **DLC/Content Roadmap:**
+    - DLC 1: "$X.XX, Q3 2024, [specific content]"
+    - DLC 2: "$X.XX, Q1 2025, [specific content]"
+    - Season Pass: "$XX.XX (save 20% vs buying separately)"
+
+15. **GROWTH OPPORTUNITIES**
     - Content update recommendations (specific features/modes to add)
-    - Community building strategies (Discord, Reddit, etc.)
     - Platform expansion possibilities (Console viability score 0-10)
-    - Influencer target list (specific creators to contact)
 
 **CRITICAL GUIDELINES:**
 - Use the SUCCESS CONTEXT to calibrate your tone and recommendations
@@ -2474,7 +2703,7 @@ Generate a comprehensive, accurate, and ACTIONABLE report with specific, measura
         try:
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=16000,  # Full detail for final report
+                max_tokens=15500,  # Reduced from 16000 to allow clean ending
                 temperature=0.7,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -2483,6 +2712,12 @@ Generate a comprehensive, accurate, and ACTIONABLE report with specific, measura
             for content_block in response.content:
                 if hasattr(content_block, 'text'):
                     report_text += content_block.text
+
+            # Check for truncation
+            if response.stop_reason == "max_tokens":
+                logger.warning("Report generation hit token limit - response may be truncated")
+                # Add a note that report was truncated
+                report_text += "\n\n---\n\n*Note: Report generation reached token limit. Consider requesting specific sections separately for full detail.*"
 
             if not report_text:
                 # Fallback to draft if enhanced generation fails
@@ -2569,18 +2804,27 @@ Include the A/B test suggestions as actionable next steps.
         """
         game_price = game_data.get('price', 'Unknown')
         game_name = game_data.get('name', 'this game')
-        genres_raw = game_data.get('genres', '')
+        genres_raw = game_data.get('genres', [])
 
-        # Handle genres as either list or string
-        if isinstance(genres_raw, list):
-            genres = genres_raw[0].lower().strip() if genres_raw else 'gaming'
-            genres_full = ', '.join(genres_raw) if genres_raw else ''
+        # Handle genres in normalized format (list of dicts)
+        genres = 'gaming'
+        genres_full = ''
+
+        if isinstance(genres_raw, list) and genres_raw:
+            # Extract descriptions from normalized format
+            genre_list = []
+            for g in genres_raw:
+                if isinstance(g, dict):
+                    genre_list.append(g.get('description', ''))
+                elif isinstance(g, str):
+                    genre_list.append(g)
+
+            if genre_list:
+                genres = genre_list[0].lower().strip()
+                genres_full = ', '.join(genre_list)
         elif isinstance(genres_raw, str):
             genres = genres_raw.split(',')[0].lower().strip() if genres_raw else 'gaming'
             genres_full = genres_raw
-        else:
-            genres = 'gaming'
-            genres_full = ''
 
         # FIX: Ensure all values are numeric for comparisons (defensive programming)
         reviews_total_raw = sales_data.get('reviews_total', 0)

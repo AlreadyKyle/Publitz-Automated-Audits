@@ -12,6 +12,7 @@ from src.twitch_collector import get_twitch_analysis
 from src.curator_collector import get_curator_analysis
 from src.youtube_api import get_youtube_outreach_analysis
 from src.regional_pricing import get_regional_pricing_analysis
+from src.external_apis_collector import collect_external_game_data
 
 logger = get_logger(__name__)
 
@@ -43,8 +44,31 @@ class Phase2DataCollector:
 
         # Extract game info
         game_name = game_data.get('name', 'Unknown Game')
-        genres = [g.get('description', '') for g in game_data.get('genres', [])]
-        tags = game_data.get('tags', [])
+
+        # FIX: Handle genres as string, list of strings, or list of dicts
+        genres_raw = game_data.get('genres', [])
+        if isinstance(genres_raw, str):
+            genres = [genres_raw] if genres_raw else []
+        elif isinstance(genres_raw, list):
+            genres = []
+            for g in genres_raw:
+                if isinstance(g, dict):
+                    genres.append(g.get('description', ''))
+                else:
+                    genres.append(str(g))
+        else:
+            genres = []
+
+        # FIX: Handle tags as string, list, or dict
+        tags_raw = game_data.get('tags', [])
+        if isinstance(tags_raw, str):
+            tags = [tags_raw] if tags_raw else []
+        elif isinstance(tags_raw, dict):
+            tags = list(tags_raw.keys())
+        elif isinstance(tags_raw, list):
+            tags = [str(t) for t in tags_raw]
+        else:
+            tags = []
         base_price = game_data.get('price_overview', {}).get('final', 1999) / 100  # Convert to dollars
         supported_languages = game_data.get('supported_languages', [])
 
@@ -74,11 +98,11 @@ class Phase2DataCollector:
                 lambda: get_reddit_analysis(genres, tags)
             )
 
-            # Twitch analysis
+            # Twitch analysis (pass game_name for real API lookup)
             tasks['twitch'] = executor.submit(
                 self._safe_collect,
                 'Twitch',
-                lambda: get_twitch_analysis(genres, tags)
+                lambda: get_twitch_analysis(genres, tags, game_name=game_name)
             )
 
             # YouTube analysis
@@ -102,6 +126,13 @@ class Phase2DataCollector:
                 lambda: get_regional_pricing_analysis(base_price, current_languages)
             )
 
+            # External APIs (RAWG + IGDB)
+            tasks['external_apis'] = executor.submit(
+                self._safe_collect,
+                'External APIs (RAWG/IGDB)',
+                lambda: collect_external_game_data(game_name)
+            )
+
             # Collect results
             results = {}
             for name, future in tasks.items():
@@ -118,7 +149,8 @@ class Phase2DataCollector:
             'youtube': results.get('youtube', {}),
             'curators': results.get('curators', {}),
             'regional_pricing': results.get('pricing', {}).get('pricing', {}),
-            'localization': results.get('pricing', {}).get('localization', {})
+            'localization': results.get('pricing', {}).get('localization', {}),
+            'external_apis': results.get('external_apis', {})  # RAWG + IGDB data
         }
 
         logger.info("Phase 2 data collection complete")

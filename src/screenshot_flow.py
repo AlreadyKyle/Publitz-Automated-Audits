@@ -90,8 +90,18 @@ class ScreenshotFlowAnalyzer:
         Returns:
             Flow analysis with recommendations
         """
-        genres = game_data.get('genres', '').lower()
-        tags = game_data.get('tags', '').lower()
+        # FIX: Handle genres/tags as both list and string
+        genres_raw = game_data.get('genres', '')
+        if isinstance(genres_raw, list):
+            genres = ' '.join(str(g) for g in genres_raw).lower()
+        else:
+            genres = str(genres_raw).lower()
+
+        tags_raw = game_data.get('tags', '')
+        if isinstance(tags_raw, list):
+            tags = ' '.join(str(t) for t in tags_raw).lower()
+        else:
+            tags = str(tags_raw).lower()
 
         # Identify primary genre
         primary_genre = self._identify_primary_genre(genres, tags)
@@ -396,8 +406,18 @@ class ScreenshotFlowAnalyzer:
         screenshot_count: int = 5
     ) -> str:
         """Generate a screenshot capture brief for developers"""
-        genres = game_data.get('genres', '').lower()
-        tags = game_data.get('tags', '').lower()
+        # FIX: Handle genres/tags as both list and string
+        genres_raw = game_data.get('genres', '')
+        if isinstance(genres_raw, list):
+            genres = ' '.join(str(g) for g in genres_raw).lower()
+        else:
+            genres = str(genres_raw).lower()
+
+        tags_raw = game_data.get('tags', '')
+        if isinstance(tags_raw, list):
+            tags = ' '.join(str(t) for t in tags_raw).lower()
+        else:
+            tags = str(tags_raw).lower()
         primary_genre = self._identify_primary_genre(genres, tags)
 
         ideal_sequence = self._generate_ideal_sequence(primary_genre, screenshot_count)

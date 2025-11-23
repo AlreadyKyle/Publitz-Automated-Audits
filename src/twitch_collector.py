@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Twitch Collector - Streaming Data and Influencer Discovery
-Analyzes Twitch viewership and finds relevant streamers
+Twitch Collector - Real Streaming Data and Influencer Discovery
+Analyzes Twitch viewership and finds relevant streamers using Twitch Helix API
 """
 
 from typing import Dict, List, Any, Optional
 import os
+import requests
+import time
 from src.logger import get_logger
 from src.cache_manager import get_cache
 
@@ -14,238 +16,309 @@ logger = get_logger(__name__)
 
 class TwitchCollector:
     """
-    Collect streaming data from Twitch
-
-    Note: Full implementation requires Twitch API credentials.
-    This version provides genre-based analysis and streamer recommendations.
+    Collect real streaming data from Twitch Helix API
+    Requires TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET environment variables
     """
 
-    # Genre viewership data (industry benchmarks)
-    GENRE_VIEWERSHIP = {
-        'roguelike': {
-            'avg_viewers': 15000,
-            'peak_viewers': 45000,
-            'channel_count': 850,
-            'growth_trend': 'High',
-            'streamability_score': 85,
-            'popular_games': ['Hades', 'Dead Cells', 'Binding of Isaac', 'Slay the Spire']
-        },
-        'strategy': {
-            'avg_viewers': 45000,
-            'peak_viewers': 150000,
-            'channel_count': 1200,
-            'growth_trend': 'Stable',
-            'streamability_score': 75,
-            'popular_games': ['Civilization VI', 'Age of Empires', 'Total War', 'Stellaris']
-        },
-        'rpg': {
-            'avg_viewers': 80000,
-            'peak_viewers': 250000,
-            'channel_count': 2500,
-            'growth_trend': 'High',
-            'streamability_score': 90,
-            'popular_games': ['Baldurs Gate 3', 'Elden Ring', 'Final Fantasy', 'Skyrim']
-        },
-        'action': {
-            'avg_viewers': 120000,
-            'peak_viewers': 400000,
-            'channel_count': 3500,
-            'growth_trend': 'Very High',
-            'streamability_score': 95,
-            'popular_games': ['Fortnite', 'Valorant', 'Apex Legends', 'Call of Duty']
-        },
-        'indie': {
-            'avg_viewers': 25000,
-            'peak_viewers': 80000,
-            'channel_count': 1500,
-            'growth_trend': 'High',
-            'streamability_score': 70,
-            'popular_games': ['Terraria', 'Stardew Valley', 'Hollow Knight', 'Celeste']
-        },
-        'simulation': {
-            'avg_viewers': 35000,
-            'peak_viewers': 100000,
-            'channel_count': 900,
-            'growth_trend': 'Stable',
-            'streamability_score': 65,
-            'popular_games': ['Cities Skylines', 'Planet Zoo', 'Farming Simulator']
-        }
-    }
-
-    # Example streamers by genre (curated list for recommendations)
-    GENRE_STREAMERS = {
-        'roguelike': [
-            {'name': 'NorthernLion', 'followers': 800000, 'avg_viewers': 5000, 'contact': 'Business inquiries via Twitch'},
-            {'name': 'DanGheesling', 'followers': 650000, 'avg_viewers': 4000, 'contact': 'Business email on Twitch'},
-            {'name': 'Baertaffy', 'followers': 250000, 'avg_viewers': 2000, 'contact': 'DM on Twitch'}
-        ],
-        'strategy': [
-            {'name': 'MontanaBlack', 'followers': 3500000, 'avg_viewers': 15000, 'contact': 'Management email'},
-            {'name': 'PotatoMcWhiskey', 'followers': 180000, 'avg_viewers': 3500, 'contact': 'Business email'},
-            {'name': 'Quill18', 'followers': 425000, 'avg_viewers': 2500, 'contact': 'Via YouTube'}
-        ],
-        'rpg': [
-            {'name': 'CohhCarnage', 'followers': 2200000, 'avg_viewers': 12000, 'contact': 'Business email'},
-            {'name': 'itmeJP', 'followers': 850000, 'avg_viewers': 3000, 'contact': 'Via Twitter'},
-            {'name': 'dansgaming', 'followers': 1200000, 'avg_viewers': 4500, 'contact': 'Business email'}
-        ],
-        'indie': [
-            {'name': 'itsHafu', 'followers': 2800000, 'avg_viewers': 8000, 'contact': 'Management'},
-            {'name': 'Vinesauce', 'followers': 1100000, 'avg_viewers': 5000, 'contact': 'Via website'},
-            {'name': 'WoolieVersus', 'followers': 180000, 'avg_viewers': 1500, 'contact': 'Via Twitter'}
-        ]
-    }
+    API_BASE = "https://api.twitch.tv/helix"
+    AUTH_URL = "https://id.twitch.tv/oauth2/token"
 
     def __init__(self):
         self.cache = get_cache()
         self.client_id = os.getenv('TWITCH_CLIENT_ID')
         self.client_secret = os.getenv('TWITCH_CLIENT_SECRET')
-        logger.info("TwitchCollector initialized")
+        self.access_token = None
 
-    def get_genre_viewership(self, genres: List[str], game_name: str = None) -> Dict[str, Any]:
+        if not self.client_id or not self.client_secret:
+            logger.warning("Twitch API credentials not configured. Using fallback data.")
+            self.api_available = False
+        else:
+            self.api_available = True
+            logger.info("TwitchCollector initialized with API credentials")
+
+    def _get_access_token(self) -> Optional[str]:
+        """Get OAuth access token from Twitch"""
+        # Check cache first - FIX: CacheManager requires (namespace, identifier)
+        cached_token = self.cache.get('twitch_tokens', 'access_token')
+        if cached_token:
+            return cached_token
+
+        if not self.api_available:
+            return None
+
+        try:
+            response = requests.post(
+                self.AUTH_URL,
+                params={
+                    'client_id': self.client_id,
+                    'client_secret': self.client_secret,
+                    'grant_type': 'client_credentials'
+                },
+                timeout=10
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            token = data.get('access_token')
+            expires_in = data.get('expires_in', 3600)
+
+            # Cache token (expires in ~60 days, default cache TTL is 24h which is fine)
+            # FIX: CacheManager.set() signature is (namespace, identifier, data)
+            self.cache.set('twitch_tokens', 'access_token', token)
+
+            logger.info("Successfully obtained Twitch access token")
+            return token
+
+        except Exception as e:
+            logger.error(f"Failed to get Twitch access token: {e}")
+            return None
+
+    def _make_request(self, endpoint: str, params: Dict = None) -> Optional[Dict]:
+        """Make authenticated request to Twitch API"""
+        if not self.api_available:
+            return None
+
+        token = self._get_access_token()
+        if not token:
+            return None
+
+        try:
+            headers = {
+                'Client-ID': self.client_id,
+                'Authorization': f'Bearer {token}'
+            }
+
+            response = requests.get(
+                f"{self.API_BASE}/{endpoint}",
+                headers=headers,
+                params=params or {},
+                timeout=10
+            )
+            response.raise_for_status()
+            return response.json()
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Twitch API request failed: {e}")
+            return None
+
+    def search_game(self, game_name: str) -> Optional[Dict[str, Any]]:
         """
-        Get viewership data for genre
+        Search for a game on Twitch
 
         Args:
-            genres: List of game genres
-            game_name: Optional game name
+            game_name: Name of the game
 
         Returns:
-            Viewership analysis
+            Game data including ID and viewer count
         """
-        logger.info(f"Analyzing Twitch viewership for genres: {genres}")
+        cache_key = f"game_{game_name.lower().replace(' ', '_')}"
+        # FIX: CacheManager requires (namespace, identifier)
+        cached = self.cache.get('twitch_games', cache_key)
+        if cached:
+            return cached
 
-        # Use primary genre
-        primary_genre = genres[0] if genres else 'indie'
-        genre_lower = primary_genre.lower()
+        result = self._make_request('games', {'name': game_name})
 
-        # Find matching genre data
-        viewership_data = None
-        for key, data in self.GENRE_VIEWERSHIP.items():
-            if key in genre_lower:
-                viewership_data = data
-                break
+        if result and result.get('data'):
+            game_data = result['data'][0]
+            # FIX: CacheManager.set() signature is (namespace, identifier, data)
+            self.cache.set('twitch_games', cache_key, game_data)
+            return game_data
 
-        if not viewership_data:
-            # Default to indie data
-            viewership_data = self.GENRE_VIEWERSHIP['indie']
+        return None
 
-        return {
-            'genre': primary_genre,
-            'current_viewers': viewership_data['avg_viewers'],
-            'avg_viewers': viewership_data['avg_viewers'],
-            'peak_viewers': viewership_data['peak_viewers'],
-            'channel_count': viewership_data['channel_count'],
-            'growth_trend': viewership_data['growth_trend'],
-            'streamability_score': viewership_data['streamability_score'],
-            'popular_games': viewership_data['popular_games'],
-            'analysis': self._generate_viewership_analysis(viewership_data)
-        }
-
-    def find_streamers_for_genre(self, genres: List[str], min_followers: int = 10000) -> List[Dict[str, Any]]:
+    def get_game_streams(self, game_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """
-        Find streamers who cover this genre
+        Get current streams for a game
 
         Args:
-            genres: Game genres
+            game_id: Twitch game ID
+            limit: Maximum number of streams to return
+
+        Returns:
+            List of stream data
+        """
+        result = self._make_request('streams', {
+            'game_id': game_id,
+            'first': limit
+        })
+
+        if result and result.get('data'):
+            return result['data']
+
+        return []
+
+    def get_streamer_info(self, user_login: str) -> Optional[Dict[str, Any]]:
+        """
+        Get information about a streamer
+
+        Args:
+            user_login: Twitch username
+
+        Returns:
+            Streamer data
+        """
+        result = self._make_request('users', {'login': user_login})
+
+        if result and result.get('data'):
+            user_data = result['data'][0]
+
+            # Get follower count
+            user_id = user_data['id']
+            followers_result = self._make_request('channels/followers', {'broadcaster_id': user_id})
+
+            if followers_result and 'total' in followers_result:
+                user_data['follower_count'] = followers_result['total']
+            else:
+                user_data['follower_count'] = 0
+
+            return user_data
+
+        return None
+
+    def analyze_game_viewership(self, game_name: str) -> Dict[str, Any]:
+        """
+        Get real viewership data for a game
+
+        Args:
+            game_name: Name of the game
+
+        Returns:
+            Viewership analysis with current data
+        """
+        logger.info(f"Analyzing Twitch viewership for: {game_name}")
+
+        # Try to get real data first
+        game_data = self.search_game(game_name)
+
+        if game_data:
+            game_id = game_data['id']
+            streams = self.get_game_streams(game_id, limit=100)
+
+            # Calculate metrics from real stream data
+            total_viewers = sum(s.get('viewer_count', 0) for s in streams)
+            channel_count = len(streams)
+            avg_viewers_per_channel = total_viewers // channel_count if channel_count > 0 else 0
+
+            # Get top streamers
+            top_streamers = sorted(streams, key=lambda x: x.get('viewer_count', 0), reverse=True)[:10]
+
+            return {
+                'game_name': game_name,
+                'game_id': game_id,
+                'current_viewers': total_viewers,
+                'channel_count': channel_count,
+                'avg_viewers_per_channel': avg_viewers_per_channel,
+                'top_streamers': [
+                    {
+                        'name': s['user_name'],
+                        'login': s['user_login'],
+                        'current_viewers': s['viewer_count'],
+                        'title': s['title']
+                    }
+                    for s in top_streamers
+                ],
+                'data_source': 'twitch_api',
+                'streamability_score': self._calculate_streamability_score(total_viewers, channel_count)
+            }
+
+        # Fallback to estimated data if API unavailable
+        return self._get_fallback_analysis(game_name)
+
+    def find_streamers_for_outreach(self, genres: List[str], min_followers: int = 10000, max_results: int = 20) -> List[Dict[str, Any]]:
+        """
+        Find streamers who might be interested in the game
+
+        Args:
+            genres: Game genres to match
             min_followers: Minimum follower count
+            max_results: Maximum streamers to return
 
         Returns:
-            List of relevant streamers
+            List of streamers with contact info
         """
         logger.info(f"Finding streamers for genres: {genres}")
 
-        primary_genre = genres[0] if genres else 'indie'
-        genre_lower = primary_genre.lower()
+        # Map genres to Twitch game categories
+        similar_games = self._get_similar_games_by_genre(genres)
 
-        # Find matching streamers
-        streamers = []
-        for key, streamer_list in self.GENRE_STREAMERS.items():
-            if key in genre_lower:
-                streamers = [s for s in streamer_list if s['followers'] >= min_followers]
+        streamers_found = {}
+
+        for game_name in similar_games[:5]:  # Check top 5 similar games
+            game_data = self.search_game(game_name)
+            if not game_data:
+                continue
+
+            streams = self.get_game_streams(game_data['id'], limit=50)
+
+            for stream in streams:
+                user_login = stream['user_login']
+
+                # Skip if already found
+                if user_login in streamers_found:
+                    continue
+
+                # Get detailed user info
+                user_info = self.get_streamer_info(user_login)
+                if not user_info:
+                    continue
+
+                follower_count = user_info.get('follower_count', 0)
+
+                if follower_count >= min_followers:
+                    streamers_found[user_login] = {
+                        'name': user_info['display_name'],
+                        'login': user_login,
+                        'followers': follower_count,
+                        'description': user_info.get('description', ''),
+                        'profile_image': user_info.get('profile_image_url', ''),
+                        'twitch_url': f"https://twitch.tv/{user_login}",
+                        'current_viewers': stream.get('viewer_count', 0),
+                        'plays': game_name,
+                        'estimated_cost': self._estimate_sponsorship_cost(follower_count),
+                        'roi_score': self._calculate_roi_score(follower_count, stream.get('viewer_count', 0))
+                    }
+
+                if len(streamers_found) >= max_results:
+                    break
+
+            if len(streamers_found) >= max_results:
                 break
 
-        if not streamers:
-            # Return indie streamers as fallback
-            streamers = [s for s in self.GENRE_STREAMERS['indie'] if s['followers'] >= min_followers]
-
-        # Add estimated ROI data
-        for streamer in streamers:
-            streamer['estimated_reach'] = int(streamer['avg_viewers'] * 0.7)  # 70% conversion to views
-            streamer['cost_estimate'] = self._estimate_sponsorship_cost(streamer['followers'])
-            streamer['roi_score'] = self._calculate_roi_score(streamer)
-
         # Sort by ROI score
-        streamers.sort(key=lambda x: x['roi_score'], reverse=True)
+        streamers_list = list(streamers_found.values())
+        streamers_list.sort(key=lambda x: x['roi_score'], reverse=True)
 
-        return streamers
+        # If API didn't work or not enough found, add fallback data
+        if len(streamers_list) < 3:
+            logger.warning("Using fallback streamer data")
+            return self._get_fallback_streamers(genres, min_followers)
 
-    def analyze_streaming_potential(self, game_tags: List[str], genres: List[str]) -> Dict[str, Any]:
-        """
-        Determine if game is "streamable"
+        return streamers_list[:max_results]
 
-        Args:
-            game_tags: Game tags
-            genres: Game genres
+    def _calculate_streamability_score(self, viewers: int, channels: int) -> int:
+        """Calculate streamability score based on viewership metrics"""
+        if channels == 0:
+            return 30
 
-        Returns:
-            Streaming potential assessment
-        """
-        logger.debug("Analyzing streaming potential")
+        avg_per_channel = viewers // channels
 
-        # Factors that increase streamability
-        positive_factors = []
-        negative_factors = []
-        score = 50  # Base score
-
-        # Check tags
-        streamable_tags = ['multiplayer', 'co-op', 'pvp', 'roguelike', 'procedural',
-                          'difficult', 'action', 'fast-paced']
-        for tag in game_tags:
-            if any(st in tag.lower() for st in streamable_tags):
-                positive_factors.append(f"Tag: {tag}")
-                score += 5
-
-        # Check genres
-        primary_genre = genres[0] if genres else 'indie'
-        genre_data = self.get_genre_viewership(genres)
-        streamability_score = genre_data['streamability_score']
-
-        if streamability_score >= 80:
-            positive_factors.append(f"High-streamability genre ({primary_genre})")
-            score += 15
-        elif streamability_score >= 65:
-            positive_factors.append(f"Moderate-streamability genre ({primary_genre})")
-            score += 5
+        # Score based on average viewers per channel
+        if avg_per_channel >= 1000:
+            return 95
+        elif avg_per_channel >= 500:
+            return 85
+        elif avg_per_channel >= 100:
+            return 75
+        elif avg_per_channel >= 50:
+            return 65
+        elif avg_per_channel >= 10:
+            return 50
         else:
-            negative_factors.append(f"Lower-streamability genre ({primary_genre})")
-            score -= 5
-
-        # Cap score
-        score = min(100, max(0, score))
-
-        return {
-            'score': score,
-            'rating': 'Excellent' if score >= 80 else 'Good' if score >= 60 else 'Fair' if score >= 40 else 'Poor',
-            'positive_factors': positive_factors,
-            'negative_factors': negative_factors if negative_factors else ['None identified'],
-            'recommendation': self._generate_streaming_recommendation(score)
-        }
-
-    def _generate_viewership_analysis(self, data: Dict[str, Any]) -> str:
-        """Generate analysis text for viewership data"""
-        trend = data['growth_trend']
-        score = data['streamability_score']
-
-        if score >= 80 and trend in ['High', 'Very High']:
-            return "Excellent streaming potential. Genre has strong viewership and growing audience."
-        elif score >= 65:
-            return "Good streaming potential. Genre has established viewership base."
-        else:
-            return "Moderate streaming potential. Consider emphasizing streamable features."
+            return 35
 
     def _estimate_sponsorship_cost(self, followers: int) -> str:
-        """Estimate sponsorship cost based on followers"""
+        """Estimate sponsorship cost based on follower count"""
         if followers >= 1000000:
             return "$2,000-5,000 per sponsored stream"
         elif followers >= 500000:
@@ -254,63 +327,125 @@ class TwitchCollector:
             return "$500-1,000 per sponsored stream"
         elif followers >= 50000:
             return "$200-500 per sponsored stream"
+        elif followers >= 10000:
+            return "$50-200 per sponsored stream"
         else:
             return "Free key + revenue share"
 
-    def _calculate_roi_score(self, streamer: Dict[str, Any]) -> float:
-        """Calculate ROI score (reach / cost estimate)"""
-        reach = streamer['estimated_reach']
-        followers = streamer['followers']
+    def _calculate_roi_score(self, followers: int, current_viewers: int) -> float:
+        """Calculate ROI score for streamer outreach"""
+        # Engagement rate
+        engagement = (current_viewers / followers * 100) if followers > 0 else 0
 
-        # Simple scoring: smaller streamers have better ROI
-        if followers < 50000:
+        # Sweet spot: 10k-100k followers with good engagement
+        if 10000 <= followers <= 100000 and engagement >= 3:
             return 90
-        elif followers < 100000:
+        elif 100000 <= followers <= 500000 and engagement >= 2:
             return 80
-        elif followers < 500000:
+        elif followers < 10000 and engagement >= 5:
+            return 75
+        elif followers >= 500000 and engagement >= 1:
             return 70
         else:
-            return 60
+            return 50 + (engagement * 5)
 
-    def _generate_streaming_recommendation(self, score: int) -> str:
-        """Generate recommendation based on streaming score"""
-        if score >= 80:
-            return "Strongly recommend streamer outreach. Budget $500-1,500 for 3-5 sponsored streams."
-        elif score >= 60:
-            return "Recommend streamer outreach. Start with free key distribution to 10-15 streamers."
-        elif score >= 40:
-            return "Consider streamer outreach. Focus on niche/indie game streamers who accept free keys."
-        else:
-            return "Lower priority for streaming. Focus on other marketing channels first."
+    def _get_similar_games_by_genre(self, genres: List[str]) -> List[str]:
+        """Get similar games based on genre"""
+        genre_games = {
+            'roguelike': ['Hades', 'Dead Cells', 'The Binding of Isaac: Rebirth', 'Slay the Spire', 'Risk of Rain 2'],
+            'strategy': ['Age of Empires IV', 'Civilization VI', 'Total War', 'Stellaris', 'Europa Universalis IV'],
+            'rpg': ["Baldur's Gate 3", 'Elden Ring', 'Cyberpunk 2077', 'The Witcher 3', 'Skyrim'],
+            'action': ['Fortnite', 'Valorant', 'Apex Legends', 'Call of Duty', 'Overwatch 2'],
+            'indie': ['Terraria', 'Stardew Valley', 'Hollow Knight', 'Celeste', 'Undertale'],
+            'simulation': ['Cities: Skylines', 'Planet Zoo', 'Farming Simulator 22', 'The Sims 4'],
+            'adventure': ['The Last of Us', 'Uncharted', 'Tomb Raider', 'Horizon Zero Dawn'],
+            'survival': ['Rust', 'ARK: Survival Evolved', 'Valheim', 'The Forest', 'Subnautica']
+        }
+
+        # Get primary genre
+        primary_genre = genres[0].lower() if genres else 'indie'
+
+        # Find matching games
+        for genre_key, games in genre_games.items():
+            if genre_key in primary_genre:
+                return games
+
+        # Default to indie
+        return genre_games['indie']
+
+    def _get_fallback_analysis(self, game_name: str) -> Dict[str, Any]:
+        """Fallback analysis when API is unavailable"""
+        logger.warning("Using fallback Twitch analysis (API unavailable)")
+
+        return {
+            'game_name': game_name,
+            'current_viewers': 0,
+            'channel_count': 0,
+            'streamability_score': 50,
+            'data_source': 'fallback',
+            'note': 'Twitch API credentials not configured. Add TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET to environment.'
+        }
+
+    def _get_fallback_streamers(self, genres: List[str], min_followers: int) -> List[Dict[str, Any]]:
+        """Fallback streamer recommendations when API unavailable"""
+        # Curated list of known indie-friendly streamers
+        fallback_streamers = [
+            {'name': 'NorthernLion', 'login': 'northernlion', 'followers': 800000, 'genre': 'roguelike'},
+            {'name': 'CohhCarnage', 'login': 'cohhcarnage', 'followers': 2200000, 'genre': 'rpg'},
+            {'name': 'Vinesauce', 'login': 'vinesauce', 'followers': 1100000, 'genre': 'indie'},
+            {'name': 'PotatoMcWhiskey', 'login': 'potatomcwhiskey', 'followers': 180000, 'genre': 'strategy'},
+            {'name': 'DanGheesling', 'login': 'dangheesling', 'followers': 650000, 'genre': 'roguelike'},
+        ]
+
+        # Filter by genre and followers
+        primary_genre = genres[0].lower() if genres else 'indie'
+
+        matches = [
+            {
+                **s,
+                'twitch_url': f"https://twitch.tv/{s['login']}",
+                'estimated_cost': self._estimate_sponsorship_cost(s['followers']),
+                'roi_score': 75,
+                'note': 'Fallback data - configure Twitch API for real-time data'
+            }
+            for s in fallback_streamers
+            if s['followers'] >= min_followers and primary_genre in s['genre'].lower()
+        ]
+
+        return matches if matches else fallback_streamers[:3]
 
 
 # Convenience function
 def get_twitch_analysis(genres: List[str], tags: List[str], game_name: str = None) -> Dict[str, Any]:
     """
-    Get complete Twitch analysis
+    Get complete Twitch analysis with real API data
 
     Args:
         genres: Game genres
         tags: Game tags
-        game_name: Optional game name
+        game_name: Game name for direct lookup
 
     Returns:
         Complete Twitch analysis
     """
     collector = TwitchCollector()
 
-    viewership = collector.get_genre_viewership(genres, game_name)
-    streamers = collector.find_streamers_for_genre(genres, min_followers=50000)
-    potential = collector.analyze_streaming_potential(tags, genres)
+    # Get real viewership data if game name provided
+    if game_name:
+        viewership = collector.analyze_game_viewership(game_name)
+    else:
+        viewership = {'streamability_score': 50, 'current_viewers': 0, 'channel_count': 0}
+
+    # Find real streamers for outreach
+    streamers = collector.find_streamers_for_outreach(genres, min_followers=10000, max_results=15)
 
     return {
         'viewership': viewership,
         'streamers': streamers,
-        'streaming_potential': potential,
         'summary': {
-            'avg_viewers': viewership['avg_viewers'],
-            'streamability_score': viewership['streamability_score'],
+            'current_viewers': viewership.get('current_viewers', 0),
+            'streamability_score': viewership.get('streamability_score', 50),
             'recommended_streamers': len(streamers),
-            'estimated_budget': '$500-1,500 for sponsored streams'
+            'data_source': viewership.get('data_source', 'unknown')
         }
     }

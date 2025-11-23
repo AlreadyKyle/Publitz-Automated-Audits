@@ -281,9 +281,21 @@ class AlternativeDataSource:
         # Use conservative 1.5% review rate for estimation
         estimated_owners = int(review_count / 0.015)
 
-        # Create ranges
-        owners_min = int(estimated_owners * 0.7)
-        owners_max = int(estimated_owners * 1.5)
+        # Create ranges (NARROWED: aligned with SmartEstimator for actionable ranges)
+        # OLD: 0.7x-1.5x = 2.14x spread (too wide)
+        # NEW: 1.15x-1.35x = max 1.82x spread (tighter, more actionable)
+        # More reviews = tighter confidence range
+        if review_count > 5000:
+            confidence_width = 1.15  # Excellent data
+        elif review_count > 1000:
+            confidence_width = 1.20  # Good data
+        elif review_count > 100:
+            confidence_width = 1.30  # Medium data
+        else:
+            confidence_width = 1.35  # Limited data
+
+        owners_min = int(estimated_owners / confidence_width)
+        owners_max = int(estimated_owners * confidence_width)
 
         return {
             'owners_min': owners_min,
@@ -319,8 +331,13 @@ class AlternativeDataSource:
         effective_price = price_raw * regional_multiplier * steam_cut * (1 - refund_rate) * discount_factor
 
         revenue_estimate = int(owners_avg * effective_price)
-        revenue_low = int(revenue_estimate * 0.6)
-        revenue_high = int(revenue_estimate * 1.8)
+
+        # NARROWED: aligned with SmartEstimator for actionable ranges
+        # OLD: 0.6x-1.8x = 3.0x spread (too wide)
+        # NEW: Use 1.25x default confidence width (midpoint of SmartEstimator's 1.15-1.35x range)
+        confidence_width = 1.25
+        revenue_low = int(revenue_estimate / confidence_width)
+        revenue_high = int(revenue_estimate * confidence_width)
 
         return {
             'estimated_revenue': f'${revenue_estimate:,}',

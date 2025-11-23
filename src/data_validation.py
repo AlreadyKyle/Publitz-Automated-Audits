@@ -98,6 +98,99 @@ def safe_format_number(value: Any, default: str = "0") -> str:
         return default
 
 
+def normalize_steam_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize Steam API data inconsistencies at the entry point
+
+    Steam API returns the same fields in different formats depending on the game/endpoint.
+    This function normalizes all fields to consistent types to prevent crashes throughout the app.
+
+    Args:
+        data: Raw game data from Steam API
+
+    Returns:
+        Normalized dictionary with consistent types
+    """
+    normalized = data.copy()
+
+    # === GENRES: Normalize to list of dicts with 'description' key ===
+    genres_raw = normalized.get('genres', [])
+    if isinstance(genres_raw, str):
+        # "Action, Adventure" -> [{'description': 'Action'}, {'description': 'Adventure'}]
+        normalized['genres'] = [{'description': g.strip()} for g in genres_raw.split(',') if g.strip()]
+    elif isinstance(genres_raw, list):
+        if not genres_raw:
+            normalized['genres'] = []
+        elif isinstance(genres_raw[0], str):
+            # ['Action', 'Adventure'] -> [{'description': 'Action'}, {'description': 'Adventure'}]
+            normalized['genres'] = [{'description': g} for g in genres_raw]
+        elif isinstance(genres_raw[0], dict):
+            # Already correct format
+            normalized['genres'] = genres_raw
+    else:
+        normalized['genres'] = []
+
+    # === TAGS: Normalize to list of strings ===
+    tags_raw = normalized.get('tags', [])
+    if isinstance(tags_raw, str):
+        # "RPG, Strategy" -> ['RPG', 'Strategy']
+        normalized['tags'] = [t.strip() for t in tags_raw.split(',') if t.strip()]
+    elif isinstance(tags_raw, dict):
+        # {'RPG': 100, 'Strategy': 50} -> ['RPG', 'Strategy']
+        normalized['tags'] = list(tags_raw.keys())
+    elif isinstance(tags_raw, list):
+        # Ensure all elements are strings
+        normalized['tags'] = [str(t) for t in tags_raw]
+    else:
+        normalized['tags'] = []
+
+    # === DEVELOPERS: Normalize to list of strings ===
+    devs_raw = normalized.get('developers', [])
+    if isinstance(devs_raw, str):
+        normalized['developers'] = [devs_raw]
+    elif not isinstance(devs_raw, list):
+        normalized['developers'] = []
+
+    # === PUBLISHERS: Normalize to list of strings ===
+    pubs_raw = normalized.get('publishers', [])
+    if isinstance(pubs_raw, str):
+        normalized['publishers'] = [pubs_raw]
+    elif not isinstance(pubs_raw, list):
+        normalized['publishers'] = []
+
+    # === PRICE_OVERVIEW: Ensure it exists and 'final' is numeric ===
+    if 'price_overview' not in normalized or normalized['price_overview'] is None:
+        normalized['price_overview'] = {'final': 0, 'currency': 'USD'}
+    else:
+        price_final = normalized['price_overview'].get('final', 0)
+        normalized['price_overview']['final'] = safe_int(price_final, 0)
+
+    # === RECOMMENDATIONS: Ensure it exists ===
+    if 'recommendations' not in normalized or normalized['recommendations'] is None:
+        normalized['recommendations'] = {'total': 0}
+    elif isinstance(normalized['recommendations'], dict):
+        total = normalized['recommendations'].get('total', 0)
+        normalized['recommendations']['total'] = safe_int(total, 0)
+
+    # === CATEGORIES: Ensure it's a list ===
+    if 'categories' not in normalized or not isinstance(normalized.get('categories'), list):
+        normalized['categories'] = []
+
+    # === SCREENSHOTS: Ensure it's a list ===
+    if 'screenshots' not in normalized or not isinstance(normalized.get('screenshots'), list):
+        normalized['screenshots'] = []
+
+    # === MOVIES: Ensure it's a list ===
+    if 'movies' not in normalized or not isinstance(normalized.get('movies'), list):
+        normalized['movies'] = []
+
+    # === SUPPORTED_LANGUAGES: Ensure it exists ===
+    if 'supported_languages' not in normalized:
+        normalized['supported_languages'] = []
+
+    return normalized
+
+
 def validate_game_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Validate and sanitize game data to ensure consistent types
@@ -114,7 +207,8 @@ def validate_game_data(data: Dict[str, Any]) -> Dict[str, Any]:
         - price_raw is always float
         - owners_avg is always int
     """
-    validated = data.copy()
+    # First normalize Steam API inconsistencies
+    validated = normalize_steam_data(data)
 
     # Ensure review score is numeric
     if 'review_score_raw' in validated:
