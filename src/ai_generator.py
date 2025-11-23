@@ -561,7 +561,8 @@ Based on the Pre-Launch Report Template, your report must include:
         report_type: str = "Post-Launch",
         review_stats: Dict[str, Any] = None,
         capsule_analysis: Dict[str, Any] = None,
-        phase2_data: Dict[str, Any] = None
+        phase2_data: Dict[str, Any] = None,
+        tier_framework: Any = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Generate a report using the ENHANCED 12-PASS AUDIT SYSTEM:
@@ -618,7 +619,7 @@ Based on the Pre-Launch Report Template, your report must include:
 
         # Phase 3.1: Generate initial draft (fast)
         draft_report = self._generate_initial_draft(
-            game_data, sales_data, competitor_data, steamdb_data, report_type, review_stats, capsule_analysis
+            game_data, sales_data, competitor_data, steamdb_data, report_type, review_stats, capsule_analysis, tier_framework
         )
 
         # Phase 3.2: Audit the draft for accuracy issues
@@ -677,7 +678,7 @@ Based on the Pre-Launch Report Template, your report must include:
         # Phase 3.3: Generate enhanced final report with all corrections
         final_report = self._generate_enhanced_report(
             game_data, sales_data, competitor_data, steamdb_data,
-            draft_report, audit_results, report_type, review_stats, capsule_analysis, phase2_data
+            draft_report, audit_results, report_type, review_stats, capsule_analysis, phase2_data, tier_framework
         )
 
         # Phase 3.3.5: NEW - Enforce specificity in recommendations
@@ -718,7 +719,8 @@ Based on the Pre-Launch Report Template, your report must include:
         steamdb_data: Dict[str, Any],
         report_type: str,
         review_stats: Dict[str, Any] = None,
-        capsule_analysis: Dict[str, Any] = None
+        capsule_analysis: Dict[str, Any] = None,
+        tier_framework: Any = None
     ) -> str:
         """
         Phase 3.1: Generate fast initial draft
@@ -803,6 +805,47 @@ Examples:
 ❌ BAD: "Consider adjusting pricing to be more competitive"
 
 Format in clear markdown with headings, bullet points, and specific data.
+"""
+
+        # Add tier-specific strategic framework if available
+        if tier_framework:
+            prompt += f"""
+
+**STRATEGIC FRAMEWORK FOR THIS TIER ({tier_framework.tier_name.upper()}):**
+
+**Performance Tier:** {tier_framework.score_range}
+**Strategic Frame:** {tier_framework.primary_frame}
+**Key Question:** {tier_framework.key_question}
+
+**TONE REQUIREMENTS:**
+{tier_framework.tone}
+
+**LANGUAGE GUIDELINES - YOU MUST FOLLOW THESE:**
+"""
+            for guideline in tier_framework.language_guidelines:
+                prompt += f"\n- {guideline}"
+
+            prompt += f"""
+
+**SECTION PRIORITIES (focus analysis on these areas):**
+"""
+            for section in tier_framework.priority_sections[:5]:
+                prompt += f"\n- {section}"
+
+            prompt += f"""
+
+**SECTIONS TO INCLUDE:**
+{', '.join(tier_framework.included_sections)}
+
+**SECTIONS TO EXCLUDE/DE-EMPHASIZE:**
+{', '.join(tier_framework.excluded_sections) if tier_framework.excluded_sections else 'None'}
+
+**EXAMPLE TONE AND APPROACH (from similar tier):**
+Here's how to write the Market Positioning section for this tier:
+
+{tier_framework.section_rewrites.get('Market Positioning', 'Focus on data-driven market analysis.')}
+
+Apply this same tone and approach throughout the entire report. The strategic frame "{tier_framework.primary_frame}" should guide ALL your analysis and recommendations.
 """
 
         try:
@@ -2162,7 +2205,8 @@ Be brutally honest. Focus on ACTIONABLE insights, not generic advice.
         report_type: str,
         review_stats: Dict[str, Any] = None,
         capsule_analysis: Dict[str, Any] = None,
-        phase2_data: Dict[str, Any] = None
+        phase2_data: Dict[str, Any] = None,
+        tier_framework: Any = None
     ) -> str:
         """
         Phase 3.3: Generate enhanced final report with ALL corrections applied
@@ -3034,6 +3078,48 @@ Generate a comprehensive, professional report with these sections:
 - ALWAYS provide the 30/60/90 day action plan with specific tasks
 
 Generate a comprehensive, accurate, and ACTIONABLE report with specific, measurable recommendations.
+"""
+
+        # Add tier-specific strategic framework if available
+        if tier_framework:
+            prompt += f"""
+
+**🎯 STRATEGIC FRAMEWORK FOR THIS TIER ({tier_framework.tier_name.upper()}) - CRITICAL INSTRUCTIONS:**
+
+**Performance Tier:** {tier_framework.score_range}
+**Strategic Frame:** {tier_framework.primary_frame}
+**Key Question:** {tier_framework.key_question}
+
+**TONE REQUIREMENTS (YOU MUST FOLLOW THIS EXACTLY):**
+{tier_framework.tone}
+
+**LANGUAGE GUIDELINES - MANDATORY RULES FOR THIS TIER:**
+"""
+            for guideline in tier_framework.language_guidelines:
+                prompt += f"\n- {guideline}"
+
+            prompt += f"""
+
+**SECTION PRIORITIES (focus your analysis here):**
+"""
+            for section in tier_framework.priority_sections[:7]:
+                prompt += f"\n- {section}"
+
+            prompt += f"""
+
+**SECTIONS TO INCLUDE IN THIS TIER:**
+{', '.join(tier_framework.included_sections)}
+
+**SECTIONS TO EXCLUDE OR DE-EMPHASIZE:**
+{', '.join(tier_framework.excluded_sections) if tier_framework.excluded_sections else 'None - include all standard sections'}
+
+**EXAMPLE TONE AND STYLE (apply this throughout the entire report):**
+
+Here's how the Market Positioning section should sound for this tier:
+
+{tier_framework.section_rewrites.get('Market Positioning', 'Focus on data-driven market analysis.')}
+
+**CRITICAL:** The strategic frame "{tier_framework.primary_frame}" must guide ALL your analysis, recommendations, and tone throughout this entire report. Every section should reflect the tone and priorities appropriate for a {tier_framework.tier_name} tier game.
 """
 
         try:
