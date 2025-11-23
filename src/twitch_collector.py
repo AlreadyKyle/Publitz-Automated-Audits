@@ -38,8 +38,8 @@ class TwitchCollector:
 
     def _get_access_token(self) -> Optional[str]:
         """Get OAuth access token from Twitch"""
-        # Check cache first
-        cached_token = self.cache.get('twitch_access_token')
+        # Check cache first - FIX: CacheManager requires (namespace, identifier)
+        cached_token = self.cache.get('twitch_tokens', 'access_token')
         if cached_token:
             return cached_token
 
@@ -62,8 +62,9 @@ class TwitchCollector:
             token = data.get('access_token')
             expires_in = data.get('expires_in', 3600)
 
-            # Cache token (expires in ~60 days but we'll cache for 1 day)
-            self.cache.set('twitch_access_token', token, ttl=min(expires_in - 300, 86400))
+            # Cache token (expires in ~60 days, default cache TTL is 24h which is fine)
+            # FIX: CacheManager.set() signature is (namespace, identifier, data)
+            self.cache.set('twitch_tokens', 'access_token', token)
 
             logger.info("Successfully obtained Twitch access token")
             return token
@@ -110,8 +111,9 @@ class TwitchCollector:
         Returns:
             Game data including ID and viewer count
         """
-        cache_key = f"twitch_game_{game_name.lower().replace(' ', '_')}"
-        cached = self.cache.get(cache_key)
+        cache_key = f"game_{game_name.lower().replace(' ', '_')}"
+        # FIX: CacheManager requires (namespace, identifier)
+        cached = self.cache.get('twitch_games', cache_key)
         if cached:
             return cached
 
@@ -119,7 +121,8 @@ class TwitchCollector:
 
         if result and result.get('data'):
             game_data = result['data'][0]
-            self.cache.set(cache_key, game_data, ttl=3600)
+            # FIX: CacheManager.set() signature is (namespace, identifier, data)
+            self.cache.set('twitch_games', cache_key, game_data)
             return game_data
 
         return None
