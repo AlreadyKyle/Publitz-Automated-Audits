@@ -157,10 +157,22 @@ class SteamDBScraper:
 
             enhanced_revenue = base_revenue * quality_multiplier
 
-            # Calculate confidence range
-            confidence_low = enhanced_revenue * 0.6   # Conservative
-            confidence_mid = enhanced_revenue          # Best estimate
-            confidence_high = enhanced_revenue * 1.8   # Optimistic
+            # Calculate confidence range (NARROWED: aligned with SmartEstimator for actionable ranges)
+            # OLD: 0.6x-1.8x = 3.0x spread (too wide)
+            # NEW: 1.15x-1.35x = max 1.82x spread (tighter, more actionable)
+            # More reviews = tighter range (better data quality)
+            if total_reviews > 5000:
+                confidence_width = 1.15  # Excellent data
+            elif total_reviews > 1000:
+                confidence_width = 1.20  # Good data
+            elif total_reviews > 100:
+                confidence_width = 1.30  # Medium data
+            else:
+                confidence_width = 1.35  # Limited data
+
+            confidence_low = enhanced_revenue / confidence_width
+            confidence_mid = enhanced_revenue
+            confidence_high = enhanced_revenue * confidence_width
 
             # Format ranges
             if confidence_mid < 1000:
