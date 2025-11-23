@@ -13,6 +13,7 @@ from src.curator_collector import get_curator_analysis
 from src.youtube_api import get_youtube_outreach_analysis
 from src.regional_pricing import get_regional_pricing_analysis
 from src.external_apis_collector import collect_external_game_data
+from src.review_sentiment_analyzer import get_review_sentiment_analysis
 
 logger = get_logger(__name__)
 
@@ -87,10 +88,23 @@ class Phase2DataCollector:
         if 'spanish' in str(supported_languages).lower():
             current_languages.append('es')
 
+        # Extract app_id and review data for sentiment analysis
+        app_id = game_data.get('app_id')
+        review_score_raw = game_data.get('review_score_raw', 0)
+        reviews_total = game_data.get('reviews_total', 0)
+
+        # Calculate positive/negative percentages
+        try:
+            total_positive_pct = float(review_score_raw) if review_score_raw else 0
+            total_negative_pct = 100 - total_positive_pct
+        except (ValueError, TypeError):
+            total_positive_pct = 0
+            total_negative_pct = 0
+
         # Define collection tasks
         tasks = {}
 
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        with ThreadPoolExecutor(max_workers=6) as executor:
             # Reddit analysis
             tasks['reddit'] = executor.submit(
                 self._safe_collect,
@@ -133,6 +147,21 @@ class Phase2DataCollector:
                 lambda: collect_external_game_data(game_name)
             )
 
+            # Review Sentiment Analysis (real Steam reviews + Claude API)
+            if app_id:
+                tasks['sentiment'] = executor.submit(
+                    self._safe_collect,
+                    'Review Sentiment Analysis',
+                    lambda: get_review_sentiment_analysis(
+                        app_id,
+                        sample_size=200,
+                        total_positive_pct=total_positive_pct,
+                        total_negative_pct=total_negative_pct
+                    )
+                )
+            else:
+                logger.warning("No app_id available - skipping sentiment analysis")
+
             # Collect results
             results = {}
             for name, future in tasks.items():
@@ -150,7 +179,8 @@ class Phase2DataCollector:
             'curators': results.get('curators', {}),
             'regional_pricing': results.get('pricing', {}).get('pricing', {}),
             'localization': results.get('pricing', {}).get('localization', {}),
-            'external_apis': results.get('external_apis', {})  # RAWG + IGDB data
+            'external_apis': results.get('external_apis', {}),  # RAWG + IGDB data
+            'sentiment': results.get('sentiment', {})  # Real review sentiment analysis
         }
 
         logger.info("Phase 2 data collection complete")

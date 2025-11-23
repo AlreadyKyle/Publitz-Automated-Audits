@@ -2492,12 +2492,129 @@ Generate a comprehensive, professional report with these sections:
    2. Prioritize Quick Wins from implementation matrix
    3. Schedule follow-up review timeline
 
-2. **MARKET POSITIONING ANALYSIS**
+---
+
+## **HOW TO USE THIS REPORT**
+
+   Insert this navigation section immediately after the Executive Summary:
+
+   This audit is structured in three tiers based on your available time:
+
+   **### ⚡ Tier 1: Executive Brief (15 minutes)**
+   **Pages 1-3** | For founders who need the essentials
+
+   - Executive Summary
+   - Top 3 Opportunities with ROI calculations
+   - Top 3 Risks with mitigation strategies
+   - 30-Day Quick Wins checklist
+
+   **👉 Start here if**: You need actionable insights for your next team meeting or board update.
+
+   **### 📊 Tier 2: Strategic Overview (45 minutes)**
+   **Pages 4-12** | For strategic planning and resource allocation
+
+   - Market Position & Competitive Landscape
+   - Revenue Performance & Projections
+   - Marketing Effectiveness Assessment
+   - Growth Opportunity Analysis
+   - Prioritization Matrix (Impact vs. Effort)
+
+   **👉 Read this if**: You're planning quarterly roadmap or allocating marketing budget.
+
+   **### 🔬 Tier 3: Deep-Dive Analysis (2+ hours)**
+   **Pages 13-40** | For comprehensive market intelligence
+
+   - Detailed Competitive Comparison
+   - Store Asset Optimization Analysis
+   - Sentiment & Review Analysis (granular)
+   - Complete Influencer Outreach Database
+   - Data Methodology & Limitations
+   - Regional Market Breakdowns
+
+   **👉 Reference this when**: You need detailed data for specific decisions or want to validate our recommendations.
+
+   ---
+
+   **## Quick Navigation**
+
+   **I need to...**
+
+   - See my overall score and top priorities → **Executive Summary** (Section 1)
+   - Understand competitive positioning → **Market Positioning Analysis** (Section 3)
+   - Get revenue projections → **Sales & Revenue Performance** (Section 4)
+   - Find influencer contacts → **Influencer Outreach Strategy** (Section 14)
+   - Plan next 30 days → **Action Plan & Prioritization** (Section 11)
+   - Understand data quality → **Data Confidence Assessment** (Section 2)
+   - Optimize pricing → **Pricing & Monetization Optimization** (Section 15)
+   - Review store assets → **Capsule & Store Asset Optimization** (Section 9)
+
+   ---
+
+   **TIER MARKERS (use HTML comments to mark content tiers):**
+
+   Add these markers throughout the report:
+   ```
+   <!-- TIER 1: EXECUTIVE BRIEF START -->
+   [Executive Summary + Top Opportunities + Top Risks]
+   <!-- TIER 1: EXECUTIVE BRIEF END -->
+
+   <!-- TIER 2: STRATEGIC OVERVIEW START -->
+   [Market Positioning, Revenue Performance, Marketing, Growth Opportunities, Action Plan]
+   <!-- TIER 2: STRATEGIC OVERVIEW END -->
+
+   <!-- TIER 3: DEEP-DIVE ANALYSIS START -->
+   [Competitor Comparison, Store Optimization, Sentiment Analysis, Influencer Database, Regional Breakdowns]
+   <!-- TIER 3: DEEP-DIVE ANALYSIS END -->
+   ```
+
+---
+
+2. **DATA CONFIDENCE ASSESSMENT**
+
+   This report uses multiple data sources with varying reliability. Understanding confidence levels helps you weight recommendations appropriately.
+
+   **Create this table:**
+
+   | Data Category | Confidence | Source | Notes |
+   |--------------|------------|---------|-------|
+   | Review Scores & Sentiment | ✅ **High** | Steam API (direct) | Real-time, verified Steam data |
+   | Review Volume & Velocity | ✅ **High** | Steam API (direct) | Accurate review counts and timestamps |
+   | Owner Counts (Range) | ⚠️ **Medium** | SteamSpy API (estimated) | Range provided; midpoint used for calculations |
+   | Revenue Estimates | ⚠️ **Medium** | Calculated from SteamSpy | Based on owner estimates × price × regional factors |
+   | Regional Revenue Split | ❌ **Low** | Industry averages | No actual regional sales data; based on typical distributions |
+   | Sentiment Theme Analysis | [Check phase2_data['sentiment']] | If available: ✅ **High** (200 reviews analyzed with Claude API) | If unavailable: ❌ **Low** (Genre patterns only) |
+   | Competitor Comparisons | ✅ **High** | Steam API + SteamSpy | Direct comparison of public metrics |
+   | Influencer Database | ✅ **High** | Twitch/YouTube APIs | Real-time follower counts and engagement rates |
+   | Regional Pricing Recommendations | ⚠️ **Medium** | PPP data + market research | Based on purchasing power parity calculations |
+
+   **### How to Interpret Confidence Levels:**
+
+   **✅ High Confidence** - Use for strategic decisions; data is verified and current
+   **⚠️ Medium Confidence** - Useful for directional insights; verify before major investment
+   **❌ Low Confidence** - Illustrative only; seek additional validation before acting
+
+   **### Recommendations by Confidence:**
+
+   **Act immediately on High Confidence insights:**
+   - Review score marketing amplification (score is verified)
+   - Influencer outreach (contact database is current)
+   - Tag effectiveness (engagement metrics are real)
+
+   **Validate Medium Confidence insights before major spend:**
+   - Revenue projections (use conservative estimates)
+   - Regional pricing adjustments (test in 1-2 markets first)
+   - Owner-based calculations (treat as directional)
+
+   **Use Low Confidence insights as hypotheses only:**
+   - Regional revenue splits (illustrative, not predictive)
+   - Sentiment themes IF using genre-based estimates (when real review analysis unavailable)
+
+3. **MARKET POSITIONING ANALYSIS**
    - Competitive landscape overview
    - Market share analysis
    - Positioning vs competitors
 
-3. **SALES & REVENUE PERFORMANCE**
+4. **SALES & REVENUE PERFORMANCE**
    CRITICAL: Show confidence scoring on ALL estimates to build client trust
 
    **Data Quality & Confidence Scoring:**
@@ -2535,28 +2652,97 @@ Generate a comprehensive, professional report with these sections:
    - Sales trends and trajectory
    - Pricing effectiveness vs market positioning
 
-4. **MARKETING EFFECTIVENESS**
+5. **MARKETING EFFECTIVENESS**
    - Pre-launch and launch marketing assessment
    - Community engagement metrics
    - Review velocity and sentiment
 
-5. **COMPETITOR COMPARISON**
+6. **COMPETITOR COMPARISON**
    - Direct competitor analysis (ensure genre/type matches!)
    - Feature and pricing comparison
    - Market positioning insights
 
-6. **REVIEW & SENTIMENT ANALYSIS**
-   - Steam review score analysis: {sales_data.get('review_score')}
-   - {reviews_total_formatted} total reviews - context for engagement level
-   - User sentiment breakdown
+7. **REVIEW & SENTIMENT ANALYSIS**
 
-7. **VISIBILITY & DISCOVERABILITY**
+   **CRITICAL: Use REAL review sentiment data from phase2_data['sentiment'] when available**
+
+   **Overall Review Performance:**
+   - Steam Review Score: {sales_data.get('review_score')} ({sales_data.get('review_score_raw')}% positive)
+   - Total Reviews: {reviews_total_formatted}
+   - Confidence Level: If phase2_data['sentiment'] exists and has data → ✅ **HIGH** (based on actual review analysis)
+                       If no sentiment data → ❌ **LOW** (estimated from genre patterns)
+
+   **Sentiment Theme Breakdown:**
+
+   If phase2_data['sentiment']['sentiment_data'] exists:
+   - Use ACTUAL analyzed sentiment themes from phase2_data['sentiment']['sentiment_data']
+   - Show sample size: "Based on analysis of {phase2_data['sentiment']['sentiment_data']['sample_size']['positive'] + phase2_data['sentiment']['sentiment_data']['sample_size']['negative']} reviews"
+   - Display positive themes table with percentages from phase2_data['sentiment']['sentiment_data']['positive_themes']
+   - Display negative themes table with percentages from phase2_data['sentiment']['sentiment_data']['negative_themes']
+   - Include 1-2 representative quotes per top theme from 'example_quotes'
+   - Mark with badge: "✅ Data Source: Real Steam reviews analyzed with Claude API"
+
+   **Positive Sentiment ({sales_data.get('review_score_raw', 0)}% of reviews):**
+
+   Create a table showing theme distribution from phase2_data['sentiment']['sentiment_data']['positive_themes']:
+
+   | Theme | % of Positive Reviews | Representative Quote |
+   |-------|----------------------|---------------------|
+   | [Theme 1 Name] | [percentage]% | "[First quote from example_quotes, max 100 chars]" |
+   | [Theme 2 Name] | [percentage]% | "[First quote]" |
+   | ... | ... | ... |
+
+   Themes to look for in the data:
+   - gameplay_loop (Combat, Progression, Core Mechanics)
+   - narrative_characters (Story, Dialogue, Worldbuilding)
+   - art_audio (Visuals, Graphics, Music, Atmosphere)
+   - progression_systems (Meta-progression, Unlocks, Builds)
+   - replayability (Variety, Build Diversity, Longevity)
+   - polish_technical (Performance, Optimization, UI/UX)
+
+   **Negative Sentiment ({100 - sales_data.get('review_score_raw', 0)}% of reviews):**
+
+   Create a table showing issue distribution from phase2_data['sentiment']['sentiment_data']['negative_themes']:
+
+   | Issue Category | % of Negative Reviews | Key Complaint |
+   |----------------|----------------------|---------------|
+   | [Theme 1 Name] | [percentage]% | "[First quote from example_quotes, max 100 chars]" |
+   | [Theme 2 Name] | [percentage]% | "[First quote]" |
+   | ... | ... | ... |
+
+   Themes to look for in the data:
+   - technical_issues (Bugs, Crashes, Performance, Compatibility)
+   - difficulty_balance (Too Hard/Easy, Frustrating Mechanics)
+   - content_volume (Lacks Content, Repetitive, Low Variety)
+   - price_sensitivity (Too Expensive, Not Worth Price)
+   - comparison_issues (Worse Than Predecessor/Competitors)
+   - design_choices (Controversial Mechanics, Missing Features)
+
+   **Key Insights from Review Analysis:**
+
+   Identify the top 3 positive drivers (highest percentages from positive_themes) and explain what this means:
+   - What players love most about the game
+   - Which aspects to highlight in marketing
+   - What to double-down on in updates
+
+   Identify the top 3 negative issues (highest percentages from negative_themes) and explain:
+   - Most common player frustrations
+   - Which issues are fixable vs fundamental design choices
+   - Priority order for addressing complaints
+
+   **FALLBACK (if no phase2_data['sentiment'] available):**
+   If phase2_data['sentiment'] is empty or missing, use genre-based estimates but CLEARLY mark:
+   - "❌ Confidence: LOW - Estimated from genre patterns (actual review analysis unavailable)"
+   - Provide generic sentiment breakdown based on game genre
+   - Recommend: "Consider analyzing actual Steam reviews for accurate sentiment distribution"
+
+8. **VISIBILITY & DISCOVERABILITY**
    - Tag effectiveness (remember: high engagement = tags working!)
    - **Tag Opportunity Analysis**: Specific tags to ADD or REMOVE
    - Steam search and visibility
    - Discoverability assessment
 
-8. **CAPSULE & STORE ASSET OPTIMIZATION**
+9. **CAPSULE & STORE ASSET OPTIMIZATION**
    Based on capsule analysis scores and competitor comparison:
 
    **Capsule Redesign Brief:**
@@ -2576,42 +2762,119 @@ Generate a comprehensive, professional report with these sections:
    - Hook timing and retention recommendations
    - CTA (Call-to-Action) placement and clarity
 
-9. **STORE PAGE MESSAGING ANALYSIS (Boxleiter Framework)**
-   Evaluate the game's store page copy and messaging for conversion effectiveness:
+10. **STORE PAGE MESSAGING ANALYSIS (Boxleiter Framework)**
+    Evaluate the game's store page copy and messaging for conversion effectiveness:
 
-   - **Value Proposition Clarity**: Does the description immediately communicate what makes this game unique?
-   - **Target Audience Clarity**: Is it clear who this game is for?
-   - **Feature vs Benefit Balance**: Are features translated into player benefits?
-   - **Conversion Focus**: Does the copy compel action or just describe?
-   - **Clarity Score**: Is the messaging jargon-free and instantly understandable?
+    - **Value Proposition Clarity**: Does the description immediately communicate what makes this game unique?
+    - **Target Audience Clarity**: Is it clear who this game is for?
+    - **Feature vs Benefit Balance**: Are features translated into player benefits?
+    - **Conversion Focus**: Does the copy compel action or just describe?
+    - **Clarity Score**: Is the messaging jargon-free and instantly understandable?
 
-   Based on the game description: "{game_data.get('description', 'No description available')[:200]}..."
+    Based on the game description: "{game_data.get('description', 'No description available')[:200]}..."
 
-   Rate each dimension (1-10) and provide specific improvements for weak areas.
+    Rate each dimension (1-10) and provide specific improvements for weak areas.
 
-10. **ACTION PLAN & PRIORITIZATION**
-    Create a prioritized roadmap with SPECIFIC action items:
+11. **ACTION PLAN & PRIORITIZATION**
+    Create a prioritized roadmap with DETAILED ROI calculations for each action:
 
     **30-Day Action Plan (Immediate Wins):**
-    - List 3-5 specific tasks with owners (e.g., "Marketing: Update capsule by May 15")
-    - Expected impact and effort level for each
+
+    For EACH action (3-5 total), use this EXACT format:
+
+    ---
+    ### Action [N]: [Action Name]
+
+    **Current State**: [Brief description of gap/problem]
+    **Opportunity**: [What success looks like]
+    **Implementation**:
+    1. [Specific step 1]
+    2. [Specific step 2]
+    3. [Specific step 3]
+    4. [Specific step 4]
+
+    **📊 Investment & Returns**
+
+    | Metric | Value | Calculation Basis |
+    |--------|-------|-------------------|
+    | **Time Investment** | [X hours] | [Breakdown: research Y hrs, execution Z hrs] |
+    | **Financial Investment** | $[Amount] | [Itemized: tools, services, etc.] |
+    | **Expected Revenue Impact** | $[Low] - $[High] | [Conservative to optimistic range with formula] |
+    | **ROI** | [X]x | [Return ÷ Investment, show calculation] |
+    | **Payback Period** | [X weeks/months] | [Time to recover investment] |
+    | **Confidence Level** | ✅ High / ⚠️ Medium / ❌ Low | [Based on Data Confidence Scorecard] |
+
+    **Success Metrics**:
+    - [Metric 1]: [Current] → [Target] ([+X% improvement])
+    - [Metric 2]: [Current] → [Target] ([+X% improvement])
+    - [Metric 3]: [Current] → [Target] ([+X% improvement])
+
+    **Risk Factors**:
+    - ⚠️ [Risk 1]: [Description] → Mitigation: [Strategy]
+    - ⚠️ [Risk 2]: [Description] → Mitigation: [Strategy]
+
+    ---
+
+    **EXAMPLE ACTION (use as template):**
+
+    ### Action 1: Amplify 96.5% Review Score in Marketing
+
+    **Current State**: Exceptional review score (96.5% - Top 5%) not prominently featured in paid advertising
+    **Opportunity**: Leverage social proof to increase ad conversion rates and reduce customer acquisition cost
+    **Implementation**:
+    1. Create "96% Overwhelmingly Positive" badge graphics (3 formats: square, banner, mobile)
+    2. Update all active ad creative across Google Ads, Facebook, Reddit
+    3. Add review score callout to email marketing templates
+    4. Pitch gaming media with "Top 5% Review Score" angle
+
+    **📊 Investment & Returns**
+
+    | Metric | Value | Calculation Basis |
+    |--------|-------|-------------------|
+    | **Time Investment** | 3 hours | Design: 1.5 hrs, Implementation: 1 hr, QA: 0.5 hrs |
+    | **Financial Investment** | $500 | Graphic design: $200, Ad spend boost: $300 |
+    | **Expected Revenue Impact** | $5,000 - $7,500 | 15-20% conversion lift × $1,500/day current ad spend × 30 days |
+    | **ROI** | 10-15x | ($5,000-7,500) ÷ $500 investment |
+    | **Payback Period** | 2-3 weeks | Based on typical A/B test convergence time |
+    | **Confidence Level** | ✅ High | Review score verified; conversion lift based on industry benchmarks |
+
+    **Success Metrics**:
+    - Ad CTR: 2.1% → 2.4-2.5% (+15-20% improvement)
+    - Conversion Rate: 3.2% → 3.7-3.8% (+15-20% improvement)
+    - Cost Per Acquisition: $28 → $23-24 (-15-18% reduction)
+    - Social Media Engagement: +25% (likes, shares, comments on review announcements)
+
+    **Risk Factors**:
+    - ⚠️ **Ad Fatigue**: Review score messaging may decrease effectiveness over time → Mitigation: Rotate creative every 4-6 weeks
+    - ⚠️ **Review Score Decline**: If score drops below 95%, messaging loses credibility → Mitigation: Monitor daily, have backup creative ready
+
+    ---
+
+    **CRITICAL REQUIREMENTS for 30-Day Actions:**
+    - Use conservative estimates for low-end, optimistic for high-end
+    - Show your work in "Calculation Basis" column (formulas, assumptions)
+    - Base confidence levels on Section 2 (Data Confidence Scorecard)
+    - Include 3-4 specific success metrics with before/after targets
+    - List 2-3 risk factors with concrete mitigation strategies
+    - Make all numbers specific (no "some," "many," "significant")
+    - Calculate ROI as: (Revenue Impact ÷ Total Investment)
 
     **60-Day Action Plan (Short-term):**
-    - List 3-5 medium-effort initiatives
+    - List 3-5 medium-effort initiatives with similar ROI format (can be abbreviated)
     - Resource requirements (time, budget, skills needed)
 
     **90-Day Action Plan (Strategic):**
-    - List 3-5 longer-term strategies
+    - List 3-5 longer-term strategies with ROI ranges
     - Success metrics for each initiative
 
     **Prioritization Matrix:**
-    Create a 2x2 grid categorizing recommendations:
-    - Quick Wins (High Impact, Low Effort)
-    - Major Projects (High Impact, High Effort)
-    - Fill-ins (Low Impact, Low Effort)
-    - Time Sinks (Low Impact, High Effort) - avoid these
+    Create a 2x2 grid categorizing ALL recommendations:
+    - Quick Wins (High Impact, Low Effort) - DO THESE FIRST
+    - Major Projects (High Impact, High Effort) - Schedule carefully
+    - Fill-ins (Low Impact, Low Effort) - Do if time permits
+    - Time Sinks (Low Impact, High Effort) - AVOID THESE
 
-11. **PRICING & MONETIZATION OPTIMIZATION**
+12. **PRICING & MONETIZATION OPTIMIZATION**
     - Current pricing analysis
     - **Regional Pricing Calculator**: Specific $ amounts for top 10 markets
     - **Discount Calendar**: Exact dates and %off for next 6 months
@@ -2620,7 +2883,7 @@ Generate a comprehensive, professional report with these sections:
       * Bundle opportunities with specific partner games
     - DLC opportunity analysis with specific ideas and price points
 
-12. **COMMUNITY & ENGAGEMENT ANALYSIS**
+13. **COMMUNITY & ENGAGEMENT ANALYSIS**
     CRITICAL: Use REAL DATA from Phase 2 collection, never use placeholder/zero values
 
     **Reddit Communities** (from phase2_data['reddit']):
@@ -2648,7 +2911,7 @@ Generate a comprehensive, professional report with these sections:
     - Estimated range: {sales_data.get('reviews_total', 0) * 2:,} to {sales_data.get('reviews_total', 0) * 5:,} followers achievable
     - Content calendar recommendations
 
-13. **INFLUENCER OUTREACH STRATEGY**
+14. **INFLUENCER OUTREACH STRATEGY**
     CRITICAL: Provide ACTUAL, REACHABLE influencers with specific contact methods
 
     Use phase2_data for real influencer data:
@@ -2699,7 +2962,7 @@ Generate a comprehensive, professional report with these sections:
     - Tier 2: 30% of budget (${int(float(sales_data.get('estimated_revenue_raw', 0) if isinstance(sales_data.get('estimated_revenue_raw'), (int, float)) else 0) * 0.006):,})
     - Tier 3: 10% of budget (${int(float(sales_data.get('estimated_revenue_raw', 0) if isinstance(sales_data.get('estimated_revenue_raw'), (int, float)) else 0) * 0.002):,})
 
-14. **PRICING & MONETIZATION OPTIMIZATION**
+15. **PRICING & MONETIZATION OPTIMIZATION**
     CRITICAL: Be DEFINITIVE, not wishy-washy
 
     **Current Pricing Analysis:**
@@ -2745,7 +3008,7 @@ Generate a comprehensive, professional report with these sections:
     - DLC 2: "$X.XX, Q1 2025, [specific content]"
     - Season Pass: "$XX.XX (save 20% vs buying separately)"
 
-15. **GROWTH OPPORTUNITIES**
+16. **GROWTH OPPORTUNITIES**
     - Content update recommendations (specific features/modes to add)
     - Platform expansion possibilities (Console viability score 0-10)
     - **Show confidence on all projections**: ROI estimates, growth projections, conversion rates
