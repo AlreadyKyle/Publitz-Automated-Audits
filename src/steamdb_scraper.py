@@ -328,6 +328,12 @@ class SteamDBScraper:
         total_reviews = sales_data.get('reviews_total', 0)
         recent_reviews = recent_data.get('recent_reviews', 0)
 
+        # FIX: Validate that recent_reviews cannot exceed total_reviews
+        # This can happen due to API inconsistencies or timing differences
+        if recent_reviews > total_reviews and total_reviews > 0:
+            logger.warning(f"Recent reviews ({recent_reviews:,}) exceeds total reviews ({total_reviews:,}). Capping at total.")
+            recent_reviews = total_reviews
+
         # Calculate velocity score
         velocity_score = (recent_reviews / total_reviews) if total_reviews > 0 else 0
 
