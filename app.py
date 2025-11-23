@@ -75,6 +75,12 @@ def main():
     # Header
     st.title("📊 Publitz Automated Game Audits")
 
+    # IMPORTANT: Preserve report state during reruns (e.g., after download button clicks)
+    # If we have report data but report_generated flag is somehow False, restore it
+    if not st.session_state.report_generated and st.session_state.report_data:
+        st.session_state.report_generated = True
+        logger.info("Restored report_generated state after rerun")
+
     # If report is generated, show it prominently and collapse input form
     if st.session_state.report_generated:
         col_title, col_button = st.columns([4, 1])
@@ -711,7 +717,11 @@ def main():
             )
 
         # CSV Exports & Templates Section
-        if st.session_state.structured_data and st.session_state.structured_data.get('phase2_data'):
+        # IMPORTANT: Check that we have the required data before showing download sections
+        if (st.session_state.report_generated and
+            st.session_state.structured_data and
+            st.session_state.structured_data.get('phase2_data')):
+
             st.markdown("---")
             st.markdown("### 📦 Additional Resources")
 
@@ -723,41 +733,45 @@ def main():
                 st.markdown("**Download structured data for your project management tools:**")
 
                 try:
-                    csv_exports = create_csv_exports(st.session_state.structured_data)
-
-                    if csv_exports:
-                        # Display available exports
-                        col1, col2 = st.columns(2)
-
-                        with col1:
-                            st.markdown("#### Contact Lists")
-                            for filename, csv_content in csv_exports.items():
-                                if 'curator' in filename or 'streamer' in filename or 'youtube' in filename or 'reddit' in filename:
-                                    st.download_button(
-                                        label=f"📥 {filename}",
-                                        data=csv_content,
-                                        file_name=filename,
-                                        mime="text/csv",
-                                        key=f"csv_{filename}",
-                                        use_container_width=True
-                                    )
-
-                        with col2:
-                            st.markdown("#### Analysis Data")
-                            for filename, csv_content in csv_exports.items():
-                                if 'pricing' in filename or 'localization' in filename:
-                                    st.download_button(
-                                        label=f"📥 {filename}",
-                                        data=csv_content,
-                                        file_name=filename,
-                                        mime="text/csv",
-                                        key=f"csv_{filename}_analysis",
-                                        use_container_width=True
-                                    )
-
-                        st.info("💡 **Tip**: Import these CSV files into spreadsheet tools for tracking outreach progress")
+                    # Safely get structured data
+                    if not st.session_state.structured_data:
+                        st.warning("Structured data not available")
                     else:
-                        st.info("No CSV exports available for this report")
+                        csv_exports = create_csv_exports(st.session_state.structured_data)
+
+                        if csv_exports:
+                            # Display available exports
+                            col1, col2 = st.columns(2)
+
+                            with col1:
+                                st.markdown("#### Contact Lists")
+                                for filename, csv_content in csv_exports.items():
+                                    if 'curator' in filename or 'streamer' in filename or 'youtube' in filename or 'reddit' in filename:
+                                        st.download_button(
+                                            label=f"📥 {filename}",
+                                            data=csv_content,
+                                            file_name=filename,
+                                            mime="text/csv",
+                                            key=f"csv_{filename}",
+                                            use_container_width=True
+                                        )
+
+                            with col2:
+                                st.markdown("#### Analysis Data")
+                                for filename, csv_content in csv_exports.items():
+                                    if 'pricing' in filename or 'localization' in filename:
+                                        st.download_button(
+                                            label=f"📥 {filename}",
+                                            data=csv_content,
+                                            file_name=filename,
+                                            mime="text/csv",
+                                            key=f"csv_{filename}_analysis",
+                                            use_container_width=True
+                                        )
+
+                            st.info("💡 **Tip**: Import these CSV files into spreadsheet tools for tracking outreach progress")
+                        else:
+                            st.info("No CSV exports available for this report")
 
                 except Exception as e:
                     logger.error(f"CSV export error: {e}")
@@ -768,28 +782,32 @@ def main():
                 st.markdown("**Customizable email templates for your outreach campaigns:**")
 
                 try:
-                    templates = generate_outreach_templates(st.session_state.game_data)
-
-                    if templates:
-                        template_cols = st.columns(3)
-
-                        idx = 0
-                        for template_name, template_content in templates.items():
-                            with template_cols[idx % 3]:
-                                display_name = template_name.replace('_template.txt', '').replace('_', ' ').title()
-                                st.download_button(
-                                    label=f"📧 {display_name}",
-                                    data=template_content,
-                                    file_name=template_name,
-                                    mime="text/plain",
-                                    key=f"template_{template_name}",
-                                    use_container_width=True
-                                )
-                            idx += 1
-
-                        st.info("💡 **Tip**: Customize these templates with game-specific details and personal touches")
+                    # Safely get game data for templates
+                    if not st.session_state.game_data:
+                        st.warning("Game data not available for template generation")
                     else:
-                        st.info("Templates temporarily unavailable")
+                        templates = generate_outreach_templates(st.session_state.game_data)
+
+                        if templates:
+                            template_cols = st.columns(3)
+
+                            idx = 0
+                            for template_name, template_content in templates.items():
+                                with template_cols[idx % 3]:
+                                    display_name = template_name.replace('_template.txt', '').replace('_', ' ').title()
+                                    st.download_button(
+                                        label=f"📧 {display_name}",
+                                        data=template_content,
+                                        file_name=template_name,
+                                        mime="text/plain",
+                                        key=f"template_{template_name}",
+                                        use_container_width=True
+                                    )
+                                idx += 1
+
+                            st.info("💡 **Tip**: Customize these templates with game-specific details and personal touches")
+                        else:
+                            st.info("Templates temporarily unavailable")
 
                 except Exception as e:
                     logger.error(f"Template generation error: {e}")
