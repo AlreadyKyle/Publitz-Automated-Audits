@@ -560,7 +560,8 @@ Based on the Pre-Launch Report Template, your report must include:
         steamdb_data: Dict[str, Any] = None,
         report_type: str = "Post-Launch",
         review_stats: Dict[str, Any] = None,
-        capsule_analysis: Dict[str, Any] = None
+        capsule_analysis: Dict[str, Any] = None,
+        phase2_data: Dict[str, Any] = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Generate a report using the ENHANCED 12-PASS AUDIT SYSTEM:
@@ -676,7 +677,7 @@ Based on the Pre-Launch Report Template, your report must include:
         # Phase 3.3: Generate enhanced final report with all corrections
         final_report = self._generate_enhanced_report(
             game_data, sales_data, competitor_data, steamdb_data,
-            draft_report, audit_results, report_type, review_stats, capsule_analysis
+            draft_report, audit_results, report_type, review_stats, capsule_analysis, phase2_data
         )
 
         # Phase 3.3.5: NEW - Enforce specificity in recommendations
@@ -2160,7 +2161,8 @@ Be brutally honest. Focus on ACTIONABLE insights, not generic advice.
         audit_results: Dict[str, Any],
         report_type: str,
         review_stats: Dict[str, Any] = None,
-        capsule_analysis: Dict[str, Any] = None
+        capsule_analysis: Dict[str, Any] = None,
+        phase2_data: Dict[str, Any] = None
     ) -> str:
         """
         Phase 3.3: Generate enhanced final report with ALL corrections applied
@@ -2416,6 +2418,9 @@ IMPORTANT: Synthesize insights from multiple models. When models agree (consensu
 **Competitor Analysis ({len(competitor_data)} competitors):**
 {self._format_competitor_data(competitor_data)}
 
+**PHASE 2 ENRICHMENT DATA (Community & Influencers):**
+{json.dumps(phase2_data, indent=2) if phase2_data else "Phase 2 data not available"}
+
 **ENHANCED REPORT REQUIREMENTS:**
 
 Generate a comprehensive, professional report with these sections:
@@ -2538,11 +2543,115 @@ Generate a comprehensive, professional report with these sections:
       * Bundle opportunities with specific partner games
     - DLC opportunity analysis with specific ideas and price points
 
-12. **GROWTH OPPORTUNITIES**
+12. **COMMUNITY & ENGAGEMENT ANALYSIS**
+    CRITICAL: Use REAL DATA from Phase 2 collection, never use placeholder/zero values
+
+    **Reddit Communities** (from phase2_data['reddit']):
+    - List relevant subreddits with ACTUAL subscriber counts (r/gaming: 40M, r/pcgaming: 3.5M, etc.)
+    - If subscriber count shows 0, flag as data error - use estimated_subscribers fallback
+    - Engagement potential and self-promotion rules for each
+    - Priority ranking for outreach
+
+    **Discord Server Strategy**:
+    - Estimate server size based on game's review count and genre
+    - Indie games: typically 0.5-2% of owners join Discord
+    - Calculate: {sales_data.get('owners_avg', 0)} owners → {int(sales_data.get('owners_avg', 0) * 0.01):,} to {int(sales_data.get('owners_avg', 0) * 0.02):,} potential Discord members
+    - Server setup timeline and moderation requirements
+
+    **Steam Community Hub**:
+    - Activity level based on review count
+    - {sales_data.get('reviews_total', 0)} reviews = {'Active' if sales_data.get('reviews_total', 0) > 5000 else 'Moderate' if sales_data.get('reviews_total', 0) > 1000 else 'Low'} hub activity
+    - Recommended engagement cadence (announcements, workshop content)
+
+    **Social Media Presence**:
+    - Twitter/X follower estimate (typically 2-5x review count for active devs)
+    - Estimated range: {sales_data.get('reviews_total', 0) * 2:,} to {sales_data.get('reviews_total', 0) * 5:,} followers achievable
+    - Content calendar recommendations
+
+13. **INFLUENCER OUTREACH STRATEGY**
+    CRITICAL: Provide ACTUAL, REACHABLE influencers with specific contact methods
+
+    Use phase2_data for real influencer data:
+    - Twitch: phase2_data['twitch']['streamers'] - REAL streamers with follower counts
+    - YouTube: phase2_data['youtube']['channels'] - REAL YouTubers with subscriber counts
+
+    **TIER 1 (Likely to Cover - 70% acceptance rate):**
+    List 3-5 specific streamers/YouTubers with:
+    - Exact name and platform
+    - Follower/subscriber count (use REAL data from APIs)
+    - Why they're likely to cover (genre fit, past coverage patterns)
+    - Estimated cost: $50-$200 for indie-friendly creators
+    - Contact method: Email/Twitter DM/Business inquiry link
+    - Example format:
+      • **NorthernLion** (Twitch: 850K followers, YouTube: 1.2M subs)
+        - Genre fit: Roguelike specialist, covers indie games weekly
+        - Cost estimate: Free key + revenue share OR $150-300 sponsored stream
+        - Contact: business@northernlion.com or Twitter DM @NorthernLion
+        - Success rate: 80% (known for indie coverage)
+
+    **TIER 2 (Pitch Required - 40% acceptance rate):**
+    List 5-10 mid-size creators with:
+    - Specific names from Twitch/YouTube API data
+    - Follower counts (10K-100K range for cost-effectiveness)
+    - ROI score (calculated from engagement rates)
+    - Pitch template specific to each creator's content style
+
+    **TIER 3 (Long-shot/High Impact - 10% acceptance rate):**
+    - 2-3 major creators (100K+ followers)
+    - Realistic expectations about likelihood
+    - Premium budget requirements ($500-$2000)
+
+    **Budget Allocation:**
+    - Total influencer budget: {int(float(sales_data.get('estimated_revenue_raw', 0) if isinstance(sales_data.get('estimated_revenue_raw'), (int, float)) else 0) * 0.02):,} (2% of estimated revenue)
+    - Tier 1: 60% of budget
+    - Tier 2: 30% of budget
+    - Tier 3: 10% of budget
+
+14. **PRICING & MONETIZATION OPTIMIZATION**
+    CRITICAL: Be DEFINITIVE, not wishy-washy
+
+    **Current Pricing Analysis:**
+    - Price: {game_data.get('price')}
+    - Genre average: [Calculate from competitor data]
+    - Position: {'Premium' if 'compare price to genre avg' else 'Value' if 'lower' else 'Standard'}
+
+    **DEFINITIVE RECOMMENDATION:**
+    Instead of "consider adjusting price", provide:
+
+    **RECOMMENDED ACTION:**
+    - **MAINTAIN** current price of {game_data.get('price')} through Early Access
+    - **INCREASE** to $XX.XX at 1.0 launch (Month YYYY)
+    - **RATIONALE**: [Specific data points - review score, competitor comparison, value proposition]
+    - **RISK LEVEL**: Low/Medium/High with specific reasoning
+    - **EXPECTED IMPACT**: +X% revenue, -Y% conversion (with calculations)
+
+    **Discount Calendar (Next 6 Months):**
+    Provide EXACT dates and percentages:
+    - Steam Winter Sale (Dec 21-Jan 4): **15% off** ($XX.XX)
+    - Lunar New Year (Feb 6-13): **10% off** ($XX.XX)
+    - Spring Sale (Mar 14-21): **20% off** ($XX.XX)
+    - NEVER discount below: $XX.XX (maintain perceived value)
+
+    **Regional Pricing Matrix:**
+    Provide SPECIFIC prices for top 10 markets:
+    | Region | Recommended Price | Reasoning |
+    |--------|------------------|-----------|
+    | US | {game_data.get('price')} | Base price |
+    | EU | €XX.XX | PPP-adjusted |
+    | UK | £XX.XX | Premium market |
+    | RU | ₽XXX | Lower PPP |
+    | BR | R$XX | Emerging market |
+    | CN | ¥XX | High volume potential |
+    | etc. | | |
+
+    **DLC/Content Roadmap:**
+    - DLC 1: "$X.XX, Q3 2024, [specific content]"
+    - DLC 2: "$X.XX, Q1 2025, [specific content]"
+    - Season Pass: "$XX.XX (save 20% vs buying separately)"
+
+15. **GROWTH OPPORTUNITIES**
     - Content update recommendations (specific features/modes to add)
-    - Community building strategies (Discord, Reddit, etc.)
     - Platform expansion possibilities (Console viability score 0-10)
-    - Influencer target list (specific creators to contact)
 
 **CRITICAL GUIDELINES:**
 - Use the SUCCESS CONTEXT to calibrate your tone and recommendations
