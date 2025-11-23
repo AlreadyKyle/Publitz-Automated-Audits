@@ -2432,10 +2432,18 @@ Generate a comprehensive, professional report with these sections:
 - Use bullet points and tables to compress information
 - Prioritize actionable insights over verbose explanations
 
+**CONFIDENCE SCORING (CRITICAL - Data Transparency):**
+- Show confidence badges on ALL estimates: revenue, ownership, budgets, projections
+- Format: [Confidence: HIGH ✅ / MEDIUM ⚠️ / LOW ⚡]
+- Include accuracy ranges (±XX%) based on confidence level
+- Explain data sources and signal quality
+- Build client trust through transparency about data limitations
+
 1. **EXECUTIVE SUMMARY**
    - Overall performance assessment (use success context!)
+   - **Data Quality Badge**: Show overall confidence level upfront (e.g., "Report Confidence: MEDIUM ⚠️")
    - Key findings and insights
-   - Critical recommendations
+   - Critical recommendations with confidence indicators where relevant
 
 2. **MARKET POSITIONING ANALYSIS**
    - Competitive landscape overview
@@ -2443,17 +2451,32 @@ Generate a comprehensive, professional report with these sections:
    - Positioning vs competitors
 
 3. **SALES & REVENUE PERFORMANCE**
-   IMPORTANT: Lead this section with data quality transparency to set client expectations:
+   CRITICAL: Show confidence scoring on ALL estimates to build client trust
 
-   **Data Quality Context (SHOW UPFRONT):**
-   - Confidence Level: {sales_data.get('confidence_level_percent', sales_data.get('confidence', 'N/A'))}% confidence
-   - Data Signals: {len(sales_data.get('signals_used', []))} signals ({', '.join(sales_data.get('signals_used', [])[:5]) if sales_data.get('signals_used') else 'N/A'})
+   **Data Quality & Confidence Scoring:**
+
+   Use this confidence badge format for ALL estimates:
+   ```
+   Revenue Estimate: {sales_data.get('estimated_revenue', 'N/A')} [Confidence: MEDIUM ⚠️]
+   Source: {sales_data.get('estimation_method', 'N/A')} + {len(sales_data.get('signals_used', []))} data signals
+   Accuracy: ±30% based on {sales_data.get('confidence', 'N/A')} confidence
+   ```
+
+   **Confidence Level Guide (show client what this means):**
+   - HIGH (85%+ confidence) ✅: ±15-20% accuracy - Multiple direct data sources
+   - MEDIUM (65-85% confidence) ⚠️: ±25-35% accuracy - Good data with some gaps
+   - LOW (<65% confidence) ⚡: ±40-50% accuracy - Limited data, more assumptions
+
+   **Current Data Quality:**
+   - Confidence Score: {sales_data.get('confidence_level_percent', sales_data.get('confidence', 'N/A'))}% → [Map to HIGH/MEDIUM/LOW]
+   - Data Signals: {len(sales_data.get('signals_used', []))} sources ({', '.join(sales_data.get('signals_used', [])[:5]) if sales_data.get('signals_used') else 'N/A'})
    - Estimation Method: {sales_data.get('estimation_method', 'N/A')}
 
-   **Revenue Estimates:**
-   - Revenue Range: {sales_data.get('revenue_range', 'N/A')} (tighter ranges = higher confidence)
-   - Midpoint Estimate: {sales_data.get('estimated_revenue', 'N/A')}
-   - Ownership Range: {sales_data.get('owners_display', 'N/A')}
+   **Revenue Estimates [CONFIDENCE BADGE REQUIRED]:**
+   - Revenue Range: {sales_data.get('revenue_range', 'N/A')} [Confidence: X]
+   - Midpoint Estimate: {sales_data.get('estimated_revenue', 'N/A')} [Confidence: X]
+   - Ownership Range: {sales_data.get('owners_display', 'N/A')} [Confidence: X]
+   - Show accuracy range (±XX%) based on confidence level
 
    **ARPU Context (Average Revenue Per User):**
    Calculate and explain: Revenue ÷ Owners = ARPU
@@ -2622,11 +2645,12 @@ Generate a comprehensive, professional report with these sections:
     - Realistic expectations about likelihood
     - Premium budget requirements ($500-$2000)
 
-    **Budget Allocation:**
-    - Total influencer budget: {int(float(sales_data.get('estimated_revenue_raw', 0) if isinstance(sales_data.get('estimated_revenue_raw'), (int, float)) else 0) * 0.02):,} (2% of estimated revenue)
-    - Tier 1: 60% of budget
-    - Tier 2: 30% of budget
-    - Tier 3: 10% of budget
+    **Budget Allocation [CONFIDENCE INDICATOR REQUIRED]:**
+    - Total influencer budget: ${int(float(sales_data.get('estimated_revenue_raw', 0) if isinstance(sales_data.get('estimated_revenue_raw'), (int, float)) else 0) * 0.02):,} (2% of estimated revenue) [Confidence: X]
+    - Note: Budget scales with revenue confidence - adjust if actual revenue differs
+    - Tier 1: 60% of budget (${int(float(sales_data.get('estimated_revenue_raw', 0) if isinstance(sales_data.get('estimated_revenue_raw'), (int, float)) else 0) * 0.012):,})
+    - Tier 2: 30% of budget (${int(float(sales_data.get('estimated_revenue_raw', 0) if isinstance(sales_data.get('estimated_revenue_raw'), (int, float)) else 0) * 0.006):,})
+    - Tier 3: 10% of budget (${int(float(sales_data.get('estimated_revenue_raw', 0) if isinstance(sales_data.get('estimated_revenue_raw'), (int, float)) else 0) * 0.002):,})
 
 14. **PRICING & MONETIZATION OPTIMIZATION**
     CRITICAL: Be DEFINITIVE, not wishy-washy
@@ -2677,6 +2701,7 @@ Generate a comprehensive, professional report with these sections:
 15. **GROWTH OPPORTUNITIES**
     - Content update recommendations (specific features/modes to add)
     - Platform expansion possibilities (Console viability score 0-10)
+    - **Show confidence on all projections**: ROI estimates, growth projections, conversion rates
 
 **CRITICAL GUIDELINES:**
 - Use the SUCCESS CONTEXT to calibrate your tone and recommendations
@@ -2688,7 +2713,8 @@ Generate a comprehensive, professional report with these sections:
   * Instead of "consider discounts", say "20% off during Steam Summer Sale (June 27-July 11, 2024)"
 - Include CONCRETE numbers, dates, and specific action items
 - Assign tasks to teams/roles where applicable (Marketing, Development, Community)
-- Provide success metrics for each recommendation (e.g., "Expected +15% wishlist conversion")
+- **Provide success metrics with confidence**: "Expected +15% wishlist conversion [Confidence: MEDIUM ⚠️]"
+- Show uncertainty on projections: "Estimated $50K additional revenue [±35% accuracy]"
 - Recommendations should match the game's actual performance level
 - Format in professional markdown with clear sections, bullet points, and tables
 - DO NOT list competitors at the beginning of the report
