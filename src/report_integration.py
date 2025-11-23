@@ -13,6 +13,7 @@ from src.phase2_integration import collect_phase2_data
 from src.confidence_scorecard_generator import generate_confidence_scorecard
 from src.executive_summary_generator import generate_executive_summary
 from src.quick_start_generator import generate_quick_start
+from src.tier_strategic_frameworks import get_framework, get_tier_from_score
 
 logger = get_logger(__name__)
 
@@ -479,8 +480,30 @@ def create_report_with_ai(game_data: Dict[str, Any],
     phase2_data = collect_phase2_data(game_data)
     logger.info(f"Phase 2 data collected: {', '.join(phase2_data.keys())}")
 
-    # Generate AI strategic analysis (now with phase2_data for real influencer/community sections)
-    logger.info("Generating AI strategic analysis with Phase 2 data...")
+    # CALCULATE OVERALL SCORE to determine tier framework
+    logger.info("Calculating overall score to determine strategic tier...")
+    review_score_raw = float(game_data.get('review_score_raw', 70))
+    owners_avg = sales_data.get('owners_avg', 0)
+
+    # Simple scoring: weight review score heavily, add bonus for high owners
+    overall_score = review_score_raw * 0.7
+    if owners_avg > 100000:
+        overall_score += 15
+    elif owners_avg > 50000:
+        overall_score += 10
+    elif owners_avg > 10000:
+        overall_score += 5
+
+    overall_score = min(100, max(0, overall_score))
+
+    # Get tier framework
+    tier_name = get_tier_from_score(overall_score)
+    tier_framework = get_framework(overall_score)
+    logger.info(f"Game score: {overall_score:.1f}/100 → Tier: {tier_name.upper()} ({tier_framework.score_range})")
+    logger.info(f"Strategic frame: {tier_framework.primary_frame}")
+
+    # Generate AI strategic analysis (now with phase2_data + tier framework for adaptive tone/focus)
+    logger.info("Generating AI strategic analysis with Phase 2 data and tier framework...")
     ai_report, audit_results = ai_generator.generate_report_with_audit(
         game_data,
         sales_data,
@@ -489,7 +512,8 @@ def create_report_with_ai(game_data: Dict[str, Any],
         report_type,
         review_stats,
         capsule_analysis,
-        phase2_data=phase2_data  # NEW: Pass phase2_data to AI generator
+        phase2_data=phase2_data,  # Pass phase2_data to AI generator
+        tier_framework=tier_framework  # NEW: Pass tier framework for adaptive analysis
     )
 
     # GENERATE DYNAMIC SECTIONS: Executive Summary, Confidence Scorecard, Quick Start
