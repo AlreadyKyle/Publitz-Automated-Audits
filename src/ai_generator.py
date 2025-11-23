@@ -2707,26 +2707,103 @@ Generate a comprehensive, professional report with these sections:
     Rate each dimension (1-10) and provide specific improvements for weak areas.
 
 11. **ACTION PLAN & PRIORITIZATION**
-    Create a prioritized roadmap with SPECIFIC action items:
+    Create a prioritized roadmap with DETAILED ROI calculations for each action:
 
     **30-Day Action Plan (Immediate Wins):**
-    - List 3-5 specific tasks with owners (e.g., "Marketing: Update capsule by May 15")
-    - Expected impact and effort level for each
+
+    For EACH action (3-5 total), use this EXACT format:
+
+    ---
+    ### Action [N]: [Action Name]
+
+    **Current State**: [Brief description of gap/problem]
+    **Opportunity**: [What success looks like]
+    **Implementation**:
+    1. [Specific step 1]
+    2. [Specific step 2]
+    3. [Specific step 3]
+    4. [Specific step 4]
+
+    **📊 Investment & Returns**
+
+    | Metric | Value | Calculation Basis |
+    |--------|-------|-------------------|
+    | **Time Investment** | [X hours] | [Breakdown: research Y hrs, execution Z hrs] |
+    | **Financial Investment** | $[Amount] | [Itemized: tools, services, etc.] |
+    | **Expected Revenue Impact** | $[Low] - $[High] | [Conservative to optimistic range with formula] |
+    | **ROI** | [X]x | [Return ÷ Investment, show calculation] |
+    | **Payback Period** | [X weeks/months] | [Time to recover investment] |
+    | **Confidence Level** | ✅ High / ⚠️ Medium / ❌ Low | [Based on Data Confidence Scorecard] |
+
+    **Success Metrics**:
+    - [Metric 1]: [Current] → [Target] ([+X% improvement])
+    - [Metric 2]: [Current] → [Target] ([+X% improvement])
+    - [Metric 3]: [Current] → [Target] ([+X% improvement])
+
+    **Risk Factors**:
+    - ⚠️ [Risk 1]: [Description] → Mitigation: [Strategy]
+    - ⚠️ [Risk 2]: [Description] → Mitigation: [Strategy]
+
+    ---
+
+    **EXAMPLE ACTION (use as template):**
+
+    ### Action 1: Amplify 96.5% Review Score in Marketing
+
+    **Current State**: Exceptional review score (96.5% - Top 5%) not prominently featured in paid advertising
+    **Opportunity**: Leverage social proof to increase ad conversion rates and reduce customer acquisition cost
+    **Implementation**:
+    1. Create "96% Overwhelmingly Positive" badge graphics (3 formats: square, banner, mobile)
+    2. Update all active ad creative across Google Ads, Facebook, Reddit
+    3. Add review score callout to email marketing templates
+    4. Pitch gaming media with "Top 5% Review Score" angle
+
+    **📊 Investment & Returns**
+
+    | Metric | Value | Calculation Basis |
+    |--------|-------|-------------------|
+    | **Time Investment** | 3 hours | Design: 1.5 hrs, Implementation: 1 hr, QA: 0.5 hrs |
+    | **Financial Investment** | $500 | Graphic design: $200, Ad spend boost: $300 |
+    | **Expected Revenue Impact** | $5,000 - $7,500 | 15-20% conversion lift × $1,500/day current ad spend × 30 days |
+    | **ROI** | 10-15x | ($5,000-7,500) ÷ $500 investment |
+    | **Payback Period** | 2-3 weeks | Based on typical A/B test convergence time |
+    | **Confidence Level** | ✅ High | Review score verified; conversion lift based on industry benchmarks |
+
+    **Success Metrics**:
+    - Ad CTR: 2.1% → 2.4-2.5% (+15-20% improvement)
+    - Conversion Rate: 3.2% → 3.7-3.8% (+15-20% improvement)
+    - Cost Per Acquisition: $28 → $23-24 (-15-18% reduction)
+    - Social Media Engagement: +25% (likes, shares, comments on review announcements)
+
+    **Risk Factors**:
+    - ⚠️ **Ad Fatigue**: Review score messaging may decrease effectiveness over time → Mitigation: Rotate creative every 4-6 weeks
+    - ⚠️ **Review Score Decline**: If score drops below 95%, messaging loses credibility → Mitigation: Monitor daily, have backup creative ready
+
+    ---
+
+    **CRITICAL REQUIREMENTS for 30-Day Actions:**
+    - Use conservative estimates for low-end, optimistic for high-end
+    - Show your work in "Calculation Basis" column (formulas, assumptions)
+    - Base confidence levels on Section 2 (Data Confidence Scorecard)
+    - Include 3-4 specific success metrics with before/after targets
+    - List 2-3 risk factors with concrete mitigation strategies
+    - Make all numbers specific (no "some," "many," "significant")
+    - Calculate ROI as: (Revenue Impact ÷ Total Investment)
 
     **60-Day Action Plan (Short-term):**
-    - List 3-5 medium-effort initiatives
+    - List 3-5 medium-effort initiatives with similar ROI format (can be abbreviated)
     - Resource requirements (time, budget, skills needed)
 
     **90-Day Action Plan (Strategic):**
-    - List 3-5 longer-term strategies
+    - List 3-5 longer-term strategies with ROI ranges
     - Success metrics for each initiative
 
     **Prioritization Matrix:**
-    Create a 2x2 grid categorizing recommendations:
-    - Quick Wins (High Impact, Low Effort)
-    - Major Projects (High Impact, High Effort)
-    - Fill-ins (Low Impact, Low Effort)
-    - Time Sinks (Low Impact, High Effort) - avoid these
+    Create a 2x2 grid categorizing ALL recommendations:
+    - Quick Wins (High Impact, Low Effort) - DO THESE FIRST
+    - Major Projects (High Impact, High Effort) - Schedule carefully
+    - Fill-ins (Low Impact, Low Effort) - Do if time permits
+    - Time Sinks (Low Impact, High Effort) - AVOID THESE
 
 12. **PRICING & MONETIZATION OPTIMIZATION**
     - Current pricing analysis
