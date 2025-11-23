@@ -755,6 +755,8 @@ Generate a comprehensive {report_type.upper()} AUDIT REPORT for this game.
 **Sales & Performance Data:**
 - Owners: {sales_data.get('owners_display', 'N/A')}
 - Revenue: {sales_data.get('estimated_revenue', 'N/A')} (Range: {sales_data.get('revenue_range', 'N/A')})
+- Revenue Confidence: {sales_data.get('confidence_level_percent', 'N/A')}% ({sales_data.get('confidence', 'N/A')})
+- Data Signals: {len(sales_data.get('signals_used', []))} sources ({', '.join(sales_data.get('signals_used', [])[:3]) if sales_data.get('signals_used') else 'N/A'}...)
 - Reviews: {reviews_total_formatted} total
 - Review Score: {sales_data.get('review_score', 'N/A')}
 
@@ -2429,14 +2431,27 @@ Generate a comprehensive, professional report with these sections:
    - Positioning vs competitors
 
 3. **SALES & REVENUE PERFORMANCE**
-   - Revenue analysis (use confidence ranges: {sales_data.get('revenue_range', 'N/A')})
+   IMPORTANT: Lead this section with data quality transparency to set client expectations:
+
+   **Data Quality Context (SHOW UPFRONT):**
+   - Confidence Level: {sales_data.get('confidence_level_percent', sales_data.get('confidence', 'N/A'))}% confidence
+   - Data Signals: {len(sales_data.get('signals_used', []))} signals ({', '.join(sales_data.get('signals_used', [])[:5]) if sales_data.get('signals_used') else 'N/A'})
+   - Estimation Method: {sales_data.get('estimation_method', 'N/A')}
+
+   **Revenue Estimates:**
+   - Revenue Range: {sales_data.get('revenue_range', 'N/A')} (tighter ranges = higher confidence)
+   - Midpoint Estimate: {sales_data.get('estimated_revenue', 'N/A')}
+   - Ownership Range: {sales_data.get('owners_display', 'N/A')}
+
+   **ARPU Context (Average Revenue Per User):**
+   Calculate and explain: Revenue ÷ Owners = ARPU
+   - Use this to validate pricing strategy vs genre benchmarks
+   - Compare to similar indie/AA games in same genre
+   - Flag if ARPU seems anomalous (too high/low for price point)
+
+   **Sales Trajectory & Pricing:**
    - Sales trends and trajectory
-   - Pricing effectiveness
-   - Data quality context:
-     * Estimation method: {sales_data.get('estimation_method', 'N/A')}
-     * Confidence level: {sales_data.get('confidence', 'N/A')}
-     * Data source: {sales_data.get('data_source', 'N/A')}
-     * Signals used: {', '.join(sales_data.get('signals_used', [])) if sales_data.get('signals_used') else 'N/A'}
+   - Pricing effectiveness vs market positioning
 
 4. **MARKETING EFFECTIVENESS**
    - Pre-launch and launch marketing assessment
