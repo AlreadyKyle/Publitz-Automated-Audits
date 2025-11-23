@@ -2492,12 +2492,52 @@ Generate a comprehensive, professional report with these sections:
    2. Prioritize Quick Wins from implementation matrix
    3. Schedule follow-up review timeline
 
-2. **MARKET POSITIONING ANALYSIS**
+2. **DATA CONFIDENCE ASSESSMENT**
+
+   This report uses multiple data sources with varying reliability. Understanding confidence levels helps you weight recommendations appropriately.
+
+   **Create this table:**
+
+   | Data Category | Confidence | Source | Notes |
+   |--------------|------------|---------|-------|
+   | Review Scores & Sentiment | ✅ **High** | Steam API (direct) | Real-time, verified Steam data |
+   | Review Volume & Velocity | ✅ **High** | Steam API (direct) | Accurate review counts and timestamps |
+   | Owner Counts (Range) | ⚠️ **Medium** | SteamSpy API (estimated) | Range provided; midpoint used for calculations |
+   | Revenue Estimates | ⚠️ **Medium** | Calculated from SteamSpy | Based on owner estimates × price × regional factors |
+   | Regional Revenue Split | ❌ **Low** | Industry averages | No actual regional sales data; based on typical distributions |
+   | Sentiment Breakdown | ❌ **Low** | Genre patterns | Estimated themes without actual review text analysis |
+   | Competitor Comparisons | ✅ **High** | Steam API + SteamSpy | Direct comparison of public metrics |
+   | Influencer Database | ✅ **High** | Twitch/YouTube APIs | Real-time follower counts and engagement rates |
+   | Regional Pricing Recommendations | ⚠️ **Medium** | PPP data + market research | Based on purchasing power parity calculations |
+
+   **### How to Interpret Confidence Levels:**
+
+   **✅ High Confidence** - Use for strategic decisions; data is verified and current
+   **⚠️ Medium Confidence** - Useful for directional insights; verify before major investment
+   **❌ Low Confidence** - Illustrative only; seek additional validation before acting
+
+   **### Recommendations by Confidence:**
+
+   **Act immediately on High Confidence insights:**
+   - Review score marketing amplification (score is verified)
+   - Influencer outreach (contact database is current)
+   - Tag effectiveness (engagement metrics are real)
+
+   **Validate Medium Confidence insights before major spend:**
+   - Revenue projections (use conservative estimates)
+   - Regional pricing adjustments (test in 1-2 markets first)
+   - Owner-based calculations (treat as directional)
+
+   **Use Low Confidence insights as hypotheses only:**
+   - Regional revenue splits (illustrative, not predictive)
+   - Sentiment themes (validate with actual review analysis)
+
+3. **MARKET POSITIONING ANALYSIS**
    - Competitive landscape overview
    - Market share analysis
    - Positioning vs competitors
 
-3. **SALES & REVENUE PERFORMANCE**
+4. **SALES & REVENUE PERFORMANCE**
    CRITICAL: Show confidence scoring on ALL estimates to build client trust
 
    **Data Quality & Confidence Scoring:**
@@ -2535,28 +2575,28 @@ Generate a comprehensive, professional report with these sections:
    - Sales trends and trajectory
    - Pricing effectiveness vs market positioning
 
-4. **MARKETING EFFECTIVENESS**
+5. **MARKETING EFFECTIVENESS**
    - Pre-launch and launch marketing assessment
    - Community engagement metrics
    - Review velocity and sentiment
 
-5. **COMPETITOR COMPARISON**
+6. **COMPETITOR COMPARISON**
    - Direct competitor analysis (ensure genre/type matches!)
    - Feature and pricing comparison
    - Market positioning insights
 
-6. **REVIEW & SENTIMENT ANALYSIS**
+7. **REVIEW & SENTIMENT ANALYSIS**
    - Steam review score analysis: {sales_data.get('review_score')}
    - {reviews_total_formatted} total reviews - context for engagement level
    - User sentiment breakdown
 
-7. **VISIBILITY & DISCOVERABILITY**
+8. **VISIBILITY & DISCOVERABILITY**
    - Tag effectiveness (remember: high engagement = tags working!)
    - **Tag Opportunity Analysis**: Specific tags to ADD or REMOVE
    - Steam search and visibility
    - Discoverability assessment
 
-8. **CAPSULE & STORE ASSET OPTIMIZATION**
+9. **CAPSULE & STORE ASSET OPTIMIZATION**
    Based on capsule analysis scores and competitor comparison:
 
    **Capsule Redesign Brief:**
@@ -2576,20 +2616,20 @@ Generate a comprehensive, professional report with these sections:
    - Hook timing and retention recommendations
    - CTA (Call-to-Action) placement and clarity
 
-9. **STORE PAGE MESSAGING ANALYSIS (Boxleiter Framework)**
-   Evaluate the game's store page copy and messaging for conversion effectiveness:
+10. **STORE PAGE MESSAGING ANALYSIS (Boxleiter Framework)**
+    Evaluate the game's store page copy and messaging for conversion effectiveness:
 
-   - **Value Proposition Clarity**: Does the description immediately communicate what makes this game unique?
-   - **Target Audience Clarity**: Is it clear who this game is for?
-   - **Feature vs Benefit Balance**: Are features translated into player benefits?
-   - **Conversion Focus**: Does the copy compel action or just describe?
-   - **Clarity Score**: Is the messaging jargon-free and instantly understandable?
+    - **Value Proposition Clarity**: Does the description immediately communicate what makes this game unique?
+    - **Target Audience Clarity**: Is it clear who this game is for?
+    - **Feature vs Benefit Balance**: Are features translated into player benefits?
+    - **Conversion Focus**: Does the copy compel action or just describe?
+    - **Clarity Score**: Is the messaging jargon-free and instantly understandable?
 
-   Based on the game description: "{game_data.get('description', 'No description available')[:200]}..."
+    Based on the game description: "{game_data.get('description', 'No description available')[:200]}..."
 
-   Rate each dimension (1-10) and provide specific improvements for weak areas.
+    Rate each dimension (1-10) and provide specific improvements for weak areas.
 
-10. **ACTION PLAN & PRIORITIZATION**
+11. **ACTION PLAN & PRIORITIZATION**
     Create a prioritized roadmap with SPECIFIC action items:
 
     **30-Day Action Plan (Immediate Wins):**
@@ -2611,7 +2651,7 @@ Generate a comprehensive, professional report with these sections:
     - Fill-ins (Low Impact, Low Effort)
     - Time Sinks (Low Impact, High Effort) - avoid these
 
-11. **PRICING & MONETIZATION OPTIMIZATION**
+12. **PRICING & MONETIZATION OPTIMIZATION**
     - Current pricing analysis
     - **Regional Pricing Calculator**: Specific $ amounts for top 10 markets
     - **Discount Calendar**: Exact dates and %off for next 6 months
@@ -2620,7 +2660,7 @@ Generate a comprehensive, professional report with these sections:
       * Bundle opportunities with specific partner games
     - DLC opportunity analysis with specific ideas and price points
 
-12. **COMMUNITY & ENGAGEMENT ANALYSIS**
+13. **COMMUNITY & ENGAGEMENT ANALYSIS**
     CRITICAL: Use REAL DATA from Phase 2 collection, never use placeholder/zero values
 
     **Reddit Communities** (from phase2_data['reddit']):
@@ -2648,7 +2688,7 @@ Generate a comprehensive, professional report with these sections:
     - Estimated range: {sales_data.get('reviews_total', 0) * 2:,} to {sales_data.get('reviews_total', 0) * 5:,} followers achievable
     - Content calendar recommendations
 
-13. **INFLUENCER OUTREACH STRATEGY**
+14. **INFLUENCER OUTREACH STRATEGY**
     CRITICAL: Provide ACTUAL, REACHABLE influencers with specific contact methods
 
     Use phase2_data for real influencer data:
@@ -2699,7 +2739,7 @@ Generate a comprehensive, professional report with these sections:
     - Tier 2: 30% of budget (${int(float(sales_data.get('estimated_revenue_raw', 0) if isinstance(sales_data.get('estimated_revenue_raw'), (int, float)) else 0) * 0.006):,})
     - Tier 3: 10% of budget (${int(float(sales_data.get('estimated_revenue_raw', 0) if isinstance(sales_data.get('estimated_revenue_raw'), (int, float)) else 0) * 0.002):,})
 
-14. **PRICING & MONETIZATION OPTIMIZATION**
+15. **PRICING & MONETIZATION OPTIMIZATION**
     CRITICAL: Be DEFINITIVE, not wishy-washy
 
     **Current Pricing Analysis:**
@@ -2745,7 +2785,7 @@ Generate a comprehensive, professional report with these sections:
     - DLC 2: "$X.XX, Q1 2025, [specific content]"
     - Season Pass: "$XX.XX (save 20% vs buying separately)"
 
-15. **GROWTH OPPORTUNITIES**
+16. **GROWTH OPPORTUNITIES**
     - Content update recommendations (specific features/modes to add)
     - Platform expansion possibilities (Console viability score 0-10)
     - **Show confidence on all projections**: ROI estimates, growth projections, conversion rates
