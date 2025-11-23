@@ -58,6 +58,46 @@ if hasattr(st, 'secrets'):
         pass  # Secrets may not be configured yet
 
 
+def clean_currency_formatting(text: str) -> str:
+    """
+    Clean corrupted currency formatting artifacts from AI-generated text.
+
+    Fixes patterns like:
+    - "$59.99AAAvs" → "$59.99 vs"
+    - "$29.99now," → "$29.99 now,"
+    - "$23.1M−23.1M−" → "$23.1M"
+    - Unicode minus (−) → ASCII hyphen (-)
+
+    Args:
+        text: Text that may contain corrupted currency formatting
+
+    Returns:
+        Text with cleaned currency formatting
+    """
+    if not text:
+        return text
+
+    # Fix unicode minus signs (− U+2212) to ASCII hyphen/minus (-)
+    text = text.replace('−', '-')
+
+    # Fix corrupted patterns like "$59.99AAAvs" → "$59.99 vs"
+    text = re.sub(r'\$(\d+(?:,\d{3})*(?:\.\d{2})?(?:[KMB])?)AAA(\w+)', r'$\1 \2', text)
+
+    # Fix patterns like "$29.99now," → "$29.99 now,"
+    text = re.sub(r'\$(\d+(?:,\d{3})*(?:\.\d{2})?(?:[KMB])?)([a-z]+)', r'$\1 \2', text)
+
+    # Fix duplicate currency amounts like "$23.1M-$23.1M-" → "$23.1M"
+    text = re.sub(r'\$(\d+(?:,\d{3})*(?:\.\d{1,2})?[KMB]?)-\$\1-', r'$\1', text)
+
+    # Fix standalone duplicate patterns "$X.XM-$X.XM" → "$X.XM"
+    text = re.sub(r'\$(\d+(?:,\d{3})*(?:\.\d{1,2})?[KMB]?)\s*-\s*\$\1(?!\d)', r'$\1', text)
+
+    # Clean up extra spaces around currency
+    text = re.sub(r'\$\s+(\d)', r'$\1', text)
+
+    return text
+
+
 def escape_latex_chars(text: str) -> str:
     """
     Escape LaTeX special characters in markdown text to prevent rendering errors.
@@ -684,8 +724,9 @@ def main():
 
         # Report in expandable container
         with st.container():
-            # FIX: Escape LaTeX special chars ($ triggers math mode and breaks currency formatting)
-            escaped_report = escape_latex_chars(st.session_state.report_data)
+            # FIX: Clean currency formatting artifacts, then escape LaTeX special chars
+            cleaned_report = clean_currency_formatting(st.session_state.report_data)
+            escaped_report = escape_latex_chars(cleaned_report)
             st.markdown(escaped_report)
 
         # Download buttons at bottom
