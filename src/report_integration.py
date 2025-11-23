@@ -5,10 +5,12 @@ Bridges the new modular report system with existing AI generation
 """
 
 from typing import Dict, List, Any, Tuple
+import re
 from src.logger import get_logger
 from src.report_builder import ReportBuilder, CommunitySection, InfluencerSection, GlobalReachSection
 from src.models import create_report_data, ReportType
 from src.phase2_integration import collect_phase2_data
+from src.confidence_scorecard_generator import generate_confidence_scorecard
 
 logger = get_logger(__name__)
 
@@ -130,6 +132,168 @@ def _extract_ai_strategic_sections(ai_report: str) -> str:
 """
 
 
+def _extract_data_sources_info(
+    game_data: Dict[str, Any],
+    sales_data: Dict[str, Any],
+    phase2_data: Dict[str, Any],
+    steamdb_data: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Extract information about which data sources were used for confidence scorecard.
+
+    Args:
+        game_data: Game data from Steam
+        sales_data: Sales/market data
+        phase2_data: Phase 2 enrichment data
+        steamdb_data: SteamDB scraper data
+
+    Returns:
+        Dict with data source availability information
+    """
+    # Review data - always available from Steam API
+    review_data_available = bool(game_data.get('reviews_total', 0) > 0 or game_data.get('review_score'))
+
+    # SteamSpy data - check if owner counts are available
+    steamspy_available = bool(sales_data.get('owners_avg') or sales_data.get('owners_min'))
+
+    # Revenue calculation method
+    if sales_data.get('estimation_method') == 'enhanced':
+        revenue_method = 'calculated'
+    elif sales_data.get('estimated_revenue'):
+        revenue_method = 'calculated'
+    else:
+        revenue_method = 'estimated'
+
+    # Regional revenue - always industry average unless we have actual data
+    regional_revenue_source = 'industry_average'
+
+    # Sentiment analysis - check if we have real analyzed reviews
+    sentiment_analyzed = False
+    sentiment_sample_size = 0
+    if phase2_data and 'sentiment' in phase2_data:
+        sentiment_data = phase2_data['sentiment']
+        if sentiment_data and 'sentiment_data' in sentiment_data:
+            sentiment_analyzed = True
+            sample_data = sentiment_data['sentiment_data'].get('sample_size', {})
+            if isinstance(sample_data, dict):
+                sentiment_sample_size = sample_data.get('positive', 0) + sample_data.get('negative', 0)
+            else:
+                sentiment_sample_size = 0
+
+    # Competitor data - assume available if we have competitors
+    competitor_data_available = True  # Usually available from Steam
+
+    # Influencer data - check Phase 2 data
+    influencer_data_available = False
+    if phase2_data:
+        twitch_data = phase2_data.get('twitch', {})
+        youtube_data = phase2_data.get('youtube', {})
+        # Check if we have real influencer data (not just fallback)
+        if (twitch_data and twitch_data.get('streamers')) or (youtube_data and youtube_data.get('channels')):
+            influencer_data_available = True
+
+    # Regional pricing - check if we have PPP-based pricing
+    regional_pricing_method = 'ppp'  # Default to PPP calculations
+    if phase2_data and 'regional_pricing' in phase2_data:
+        regional_pricing_method = 'ppp'  # We use PPP calculations in phase2
+
+    return {
+        'review_data_available': review_data_available,
+        'steamspy_available': steamspy_available,
+        'revenue_method': revenue_method,
+        'regional_revenue_source': regional_revenue_source,
+        'sentiment_analyzed': sentiment_analyzed,
+        'sentiment_sample_size': sentiment_sample_size,
+        'competitor_data_available': competitor_data_available,
+        'influencer_data_available': influencer_data_available,
+        'regional_pricing_method': regional_pricing_method
+    }
+
+
+def _inject_confidence_scorecard(ai_report: str, scorecard: str) -> str:
+    """
+    Inject confidence scorecard after Section 1 (Executive Summary) in AI report.
+
+    Args:
+        ai_report: The AI-generated report markdown
+        scorecard: The confidence scorecard markdown
+
+    Returns:
+        Modified report with scorecard injected
+    """
+    # Find the end of Section 1 (Executive Summary)
+    # Look for patterns like "## 2." or "2. **" or "##2." indicating Section 2
+    pattern = r'((?:^|\n)(?:##\s*2\.|2\.\s*\*\*|##2\.))'
+
+    match = re.search(pattern, ai_report, re.MULTILINE)
+
+    if match:
+        # Inject scorecard before Section 2
+        insertion_point = match.start()
+        modified_report = (
+            ai_report[:insertion_point] +
+            "\n\n" + scorecard + "\n\n" +
+            ai_report[insertion_point:]
+        )
+        logger.info("Confidence scorecard injected after Executive Summary")
+
+        # Now renumber sections 2 onwards to 3 onwards
+        modified_report = _renumber_sections(modified_report)
+
+        return modified_report
+    else:
+        # If we can't find Section 2, append at the end
+        logger.warning("Could not find Section 2 in AI report, appending scorecard at end")
+        return ai_report + "\n\n" + scorecard
+
+
+def _renumber_sections(report: str) -> str:
+    """
+    Renumber sections starting from Section 2 onwards (shift by 1).
+    Since we injected the scorecard as Section 2, we need to shift
+    the original Section 2 to Section 3, Section 3 to Section 4, etc.
+
+    Args:
+        report: Report markdown with sections
+
+    Returns:
+        Report with renumbered sections
+    """
+    lines = report.split('\n')
+    modified_lines = []
+    section_shifted = False  # Track if we've passed the confidence scorecard
+
+    for line in lines:
+        # Check if this line contains "## 2. DATA CONFIDENCE ASSESSMENT"
+        if '## 2. DATA CONFIDENCE ASSESSMENT' in line or 'DATA CONFIDENCE ASSESSMENT' in line:
+            section_shifted = True
+            modified_lines.append(line)
+            continue
+
+        # If we've shifted and this is a section header, renumber it
+        if section_shifted:
+            # Match patterns like "## 2." or "2. **" or "##2." (original section numbers)
+            # We want to increment numbers >= 2
+            match = re.match(r'^(##\s*)(\d+)(\.\s*.*)$', line)
+            if match:
+                prefix = match.group(1)
+                section_num = int(match.group(2))
+                suffix = match.group(3)
+
+                # Increment section numbers >= 2 (the original Section 2 becomes Section 3, etc.)
+                if section_num >= 2:
+                    new_num = section_num + 1
+                    modified_lines.append(f"{prefix}{new_num}{suffix}")
+                else:
+                    modified_lines.append(line)
+            else:
+                modified_lines.append(line)
+        else:
+            modified_lines.append(line)
+
+    return '\n'.join(modified_lines)
+
+
 def create_report_with_ai(game_data: Dict[str, Any],
                          sales_data: Dict[str, Any],
                          competitor_data: List[Dict[str, Any]],
@@ -176,6 +340,17 @@ def create_report_with_ai(game_data: Dict[str, Any],
         phase2_data=phase2_data  # NEW: Pass phase2_data to AI generator
     )
 
+    # INJECT CONFIDENCE SCORECARD: Extract data sources and generate scorecard
+    logger.info("Generating confidence scorecard...")
+    data_sources_info = _extract_data_sources_info(
+        game_data, sales_data, phase2_data, steamdb_data
+    )
+    confidence_scorecard = generate_confidence_scorecard(data_sources_info)
+
+    # Inject scorecard into AI report as Section 2 (after Executive Summary)
+    logger.info("Injecting confidence scorecard into report...")
+    ai_report = _inject_confidence_scorecard(ai_report, confidence_scorecard)
+
     # Generate enhanced structured report (reuse already-collected phase2_data)
     logger.info("Generating structured analysis...")
     complete_report, structured_data = generate_enhanced_report(
@@ -191,8 +366,10 @@ def create_report_with_ai(game_data: Dict[str, Any],
     structured_data['audit_results'] = audit_results
     # Ensure phase2_data is in structured_data
     structured_data['phase2_data'] = phase2_data
+    # Add confidence scorecard metadata
+    structured_data['confidence_info'] = data_sources_info
 
-    logger.info("Complete report generated successfully")
+    logger.info("Complete report generated successfully with confidence scorecard")
 
     return complete_report, structured_data
 
