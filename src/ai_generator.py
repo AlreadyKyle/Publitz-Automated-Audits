@@ -2582,7 +2582,7 @@ Generate a comprehensive, professional report with these sections:
    | Owner Counts (Range) | ⚠️ **Medium** | SteamSpy API (estimated) | Range provided; midpoint used for calculations |
    | Revenue Estimates | ⚠️ **Medium** | Calculated from SteamSpy | Based on owner estimates × price × regional factors |
    | Regional Revenue Split | ❌ **Low** | Industry averages | No actual regional sales data; based on typical distributions |
-   | Sentiment Breakdown | ❌ **Low** | Genre patterns | Estimated themes without actual review text analysis |
+   | Sentiment Theme Analysis | [Check phase2_data['sentiment']] | If available: ✅ **High** (200 reviews analyzed with Claude API) | If unavailable: ❌ **Low** (Genre patterns only) |
    | Competitor Comparisons | ✅ **High** | Steam API + SteamSpy | Direct comparison of public metrics |
    | Influencer Database | ✅ **High** | Twitch/YouTube APIs | Real-time follower counts and engagement rates |
    | Regional Pricing Recommendations | ⚠️ **Medium** | PPP data + market research | Based on purchasing power parity calculations |
@@ -2607,7 +2607,7 @@ Generate a comprehensive, professional report with these sections:
 
    **Use Low Confidence insights as hypotheses only:**
    - Regional revenue splits (illustrative, not predictive)
-   - Sentiment themes (validate with actual review analysis)
+   - Sentiment themes IF using genre-based estimates (when real review analysis unavailable)
 
 3. **MARKET POSITIONING ANALYSIS**
    - Competitive landscape overview
@@ -2663,9 +2663,78 @@ Generate a comprehensive, professional report with these sections:
    - Market positioning insights
 
 7. **REVIEW & SENTIMENT ANALYSIS**
-   - Steam review score analysis: {sales_data.get('review_score')}
-   - {reviews_total_formatted} total reviews - context for engagement level
-   - User sentiment breakdown
+
+   **CRITICAL: Use REAL review sentiment data from phase2_data['sentiment'] when available**
+
+   **Overall Review Performance:**
+   - Steam Review Score: {sales_data.get('review_score')} ({sales_data.get('review_score_raw')}% positive)
+   - Total Reviews: {reviews_total_formatted} - {self._format_review_volume(sales_data.get('reviews_total', 0))}
+   - Confidence Level: If phase2_data['sentiment'] exists and has data → ✅ **HIGH** (based on actual review analysis)
+                       If no sentiment data → ❌ **LOW** (estimated from genre patterns)
+
+   **Sentiment Theme Breakdown:**
+
+   If phase2_data['sentiment']['sentiment_data'] exists:
+   - Use ACTUAL analyzed sentiment themes from phase2_data['sentiment']['sentiment_data']
+   - Show sample size: "Based on analysis of {phase2_data['sentiment']['sentiment_data']['sample_size']['positive'] + phase2_data['sentiment']['sentiment_data']['sample_size']['negative']} reviews"
+   - Display positive themes table with percentages from phase2_data['sentiment']['sentiment_data']['positive_themes']
+   - Display negative themes table with percentages from phase2_data['sentiment']['sentiment_data']['negative_themes']
+   - Include 1-2 representative quotes per top theme from 'example_quotes'
+   - Mark with badge: "✅ Data Source: Real Steam reviews analyzed with Claude API"
+
+   **Positive Sentiment ({sales_data.get('review_score_raw', 0)}% of reviews):**
+
+   Create a table showing theme distribution from phase2_data['sentiment']['sentiment_data']['positive_themes']:
+
+   | Theme | % of Positive Reviews | Representative Quote |
+   |-------|----------------------|---------------------|
+   | [Theme 1 Name] | [percentage]% | "[First quote from example_quotes, max 100 chars]" |
+   | [Theme 2 Name] | [percentage]% | "[First quote]" |
+   | ... | ... | ... |
+
+   Themes to look for in the data:
+   - gameplay_loop (Combat, Progression, Core Mechanics)
+   - narrative_characters (Story, Dialogue, Worldbuilding)
+   - art_audio (Visuals, Graphics, Music, Atmosphere)
+   - progression_systems (Meta-progression, Unlocks, Builds)
+   - replayability (Variety, Build Diversity, Longevity)
+   - polish_technical (Performance, Optimization, UI/UX)
+
+   **Negative Sentiment ({100 - sales_data.get('review_score_raw', 0)}% of reviews):**
+
+   Create a table showing issue distribution from phase2_data['sentiment']['sentiment_data']['negative_themes']:
+
+   | Issue Category | % of Negative Reviews | Key Complaint |
+   |----------------|----------------------|---------------|
+   | [Theme 1 Name] | [percentage]% | "[First quote from example_quotes, max 100 chars]" |
+   | [Theme 2 Name] | [percentage]% | "[First quote]" |
+   | ... | ... | ... |
+
+   Themes to look for in the data:
+   - technical_issues (Bugs, Crashes, Performance, Compatibility)
+   - difficulty_balance (Too Hard/Easy, Frustrating Mechanics)
+   - content_volume (Lacks Content, Repetitive, Low Variety)
+   - price_sensitivity (Too Expensive, Not Worth Price)
+   - comparison_issues (Worse Than Predecessor/Competitors)
+   - design_choices (Controversial Mechanics, Missing Features)
+
+   **Key Insights from Review Analysis:**
+
+   Identify the top 3 positive drivers (highest percentages from positive_themes) and explain what this means:
+   - What players love most about the game
+   - Which aspects to highlight in marketing
+   - What to double-down on in updates
+
+   Identify the top 3 negative issues (highest percentages from negative_themes) and explain:
+   - Most common player frustrations
+   - Which issues are fixable vs fundamental design choices
+   - Priority order for addressing complaints
+
+   **FALLBACK (if no phase2_data['sentiment'] available):**
+   If phase2_data['sentiment'] is empty or missing, use genre-based estimates but CLEARLY mark:
+   - "❌ Confidence: LOW - Estimated from genre patterns (actual review analysis unavailable)"
+   - Provide generic sentiment breakdown based on game genre
+   - Recommend: "Consider analyzing actual Steam reviews for accurate sentiment distribution"
 
 8. **VISIBILITY & DISCOVERABILITY**
    - Tag effectiveness (remember: high engagement = tags working!)
