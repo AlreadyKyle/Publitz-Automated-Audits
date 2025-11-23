@@ -49,6 +49,29 @@ if hasattr(st, 'secrets'):
     except Exception:
         pass  # Secrets may not be configured yet
 
+
+def escape_latex_chars(text: str) -> str:
+    """
+    Escape LaTeX special characters in markdown text to prevent rendering errors.
+
+    In Streamlit markdown, $ triggers LaTeX math mode which causes currency formatting to break.
+    This function escapes dollar signs and other LaTeX special chars.
+
+    Args:
+        text: Markdown text that may contain currency symbols
+
+    Returns:
+        Text with escaped LaTeX special characters
+    """
+    if not text:
+        return text
+
+    # Escape dollar signs to prevent LaTeX math mode interpretation
+    # Replace $ with \$ but avoid double-escaping already escaped ones
+    text = re.sub(r'(?<!\\)\$', r'\\$', text)
+
+    return text
+
 # Initialize session state
 if 'report_generated' not in st.session_state:
     st.session_state.report_generated = False
@@ -653,7 +676,9 @@ def main():
 
         # Report in expandable container
         with st.container():
-            st.markdown(st.session_state.report_data)
+            # FIX: Escape LaTeX special chars ($ triggers math mode and breaks currency formatting)
+            escaped_report = escape_latex_chars(st.session_state.report_data)
+            st.markdown(escaped_report)
 
         # Download buttons at bottom
         st.markdown("---")
