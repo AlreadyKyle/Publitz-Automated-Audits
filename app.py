@@ -7,7 +7,15 @@ from dotenv import load_dotenv
 from src.ai_generator import AIGenerator
 from src.game_search import GameSearch
 from src.steamdb_scraper import SteamDBScraper
-from src.pdf_generator import create_downloadable_pdf
+
+# PDF generation - optional dependency (fpdf2 may not be available on all platforms)
+try:
+    from src.pdf_generator import create_downloadable_pdf
+    PDF_GENERATION_AVAILABLE = True
+except (ModuleNotFoundError, ImportError) as e:
+    PDF_GENERATION_AVAILABLE = False
+    print(f"Warning: PDF generation unavailable - fpdf2 not installed ({e})")
+
 from src.logger import get_logger, setup_logger
 from src.export_system import create_csv_exports
 from src.outreach_templates import generate_outreach_templates
@@ -692,40 +700,50 @@ def main():
         with dl_col1_bottom:
             # PDF Download
             try:
-                # Enhance audit results with section scores if available
-                enhanced_audit_results = st.session_state.audit_results.copy() if st.session_state.audit_results else {}
+                # Check if PDF generation is available (fpdf2 installed)
+                if not PDF_GENERATION_AVAILABLE:
+                    st.warning("📄 **PDF Generation Unavailable**")
+                    st.caption("The fpdf2 library is not installed. Contact support or use the Markdown download below.")
+                else:
+                    # Enhance audit results with section scores if available
+                    enhanced_audit_results = st.session_state.audit_results.copy() if st.session_state.audit_results else {}
 
-                if st.session_state.structured_data and 'sections' in st.session_state.structured_data:
-                    sections = st.session_state.structured_data['sections']
-                    section_scores = {s['name']: {'score': s['score'], 'rating': s['rating']}
-                                    for s in sections if 'name' in s and 'score' in s}
+                    if st.session_state.structured_data and 'sections' in st.session_state.structured_data:
+                        sections = st.session_state.structured_data['sections']
+                        section_scores = {s['name']: {'score': s['score'], 'rating': s['rating']}
+                                        for s in sections if 'name' in s and 'score' in s}
 
-                    if section_scores:
-                        enhanced_audit_results['section_scores'] = section_scores
-                        enhanced_audit_results['overall_score'] = st.session_state.structured_data.get('overall_score', 0)
+                        if section_scores:
+                            enhanced_audit_results['section_scores'] = section_scores
+                            enhanced_audit_results['overall_score'] = st.session_state.structured_data.get('overall_score', 0)
 
-                pdf_bytes, pdf_filename = create_downloadable_pdf(
-                    st.session_state.report_data,
-                    st.session_state.game_name,
-                    st.session_state.report_type,
-                    enhanced_audit_results
-                )
+                    pdf_bytes, pdf_filename = create_downloadable_pdf(
+                        st.session_state.report_data,
+                        st.session_state.game_name,
+                        st.session_state.report_type,
+                        enhanced_audit_results
+                    )
 
-                st.download_button(
-                    label="📄 Download as PDF",
-                    data=pdf_bytes,
-                    file_name=pdf_filename,
-                    mime="application/pdf",
-                    type="primary",
-                    use_container_width=True,
-                    key="download_pdf_bottom"
-                )
+                    st.download_button(
+                        label="📄 Download as PDF",
+                        data=pdf_bytes,
+                        file_name=pdf_filename,
+                        mime="application/pdf",
+                        type="primary",
+                        use_container_width=True,
+                        key="download_pdf_bottom"
+                    )
             except PDFGenerationError as e:
                 logger.error(f"PDF generation failed (bottom): {e.message}")
                 st.error(f"📄 {e.user_message}")
+            except ModuleNotFoundError as e:
+                logger.error(f"fpdf2 module not found: {e}")
+                st.warning("📄 **PDF Generation Unavailable**")
+                st.caption("The fpdf2 library is not installed. Please contact support or use the Markdown download below.")
             except Exception as e:
                 logger.error(f"Unexpected PDF error (bottom): {e}", exc_info=True)
-                st.warning("📄 PDF generation unavailable. You can still download the Markdown version.")
+                st.warning("📄 **PDF Generation Error**")
+                st.caption(f"An error occurred during PDF generation. Use the Markdown download as an alternative.\n\n**Error**: {str(e)}")
 
         with dl_col2_bottom:
             # Markdown Download
