@@ -2668,7 +2668,7 @@ Generate a comprehensive, professional report with these sections:
 
    **Overall Review Performance:**
    - Steam Review Score: {sales_data.get('review_score')} ({sales_data.get('review_score_raw')}% positive)
-   - Total Reviews: {reviews_total_formatted} - {self._format_review_volume(sales_data.get('reviews_total', 0))}
+   - Total Reviews: {reviews_total_formatted}
    - Confidence Level: If phase2_data['sentiment'] exists and has data → ✅ **HIGH** (based on actual review analysis)
                        If no sentiment data → ❌ **LOW** (estimated from genre patterns)
 
