@@ -24,7 +24,7 @@ from src.roi_calculator import ROICalculator
 from src.comparable_games_analyzer import ComparableGamesAnalyzer
 from src.negative_review_analyzer import NegativeReviewAnalyzer
 from src.game_search import GameSearch
-from src.game_success_analyzer import GameAnalyzer
+from src.game_analyzer import GameAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -74,16 +74,28 @@ class ReportOrchestrator:
     appropriate tiers based on game performance.
     """
 
-    def __init__(self, hourly_rate: float = 50.0):
+    def __init__(self, hourly_rate: float = 50.0, claude_api_key: Optional[str] = None):
         """
         Initialize orchestrator with all component generators.
 
         Args:
             hourly_rate: Developer hourly rate for ROI calculations
+            claude_api_key: Optional Claude API key for negative review analysis.
+                          If not provided, will try to load from environment.
         """
+        import os
+
         self.roi_calculator = ROICalculator(hourly_rate=hourly_rate)
         self.comparable_analyzer = ComparableGamesAnalyzer()
-        self.negative_analyzer = NegativeReviewAnalyzer()
+
+        # Initialize negative analyzer with API key
+        api_key = claude_api_key or os.getenv('ANTHROPIC_API_KEY')
+        if api_key:
+            self.negative_analyzer = NegativeReviewAnalyzer(claude_api_key=api_key)
+        else:
+            logger.warning("No Claude API key provided - negative review analysis will be unavailable")
+            self.negative_analyzer = None
+
         self.game_search = GameSearch()
         self.game_analyzer = GameAnalyzer()
 
