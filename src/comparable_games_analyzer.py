@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import time
 
 from src.game_search import GameSearch
-from src.game_success_analyzer import GameAnalyzer
+from src.game_analyzer import GameAnalyzer
 
 logger = logging.getLogger(__name__)
 

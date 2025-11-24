@@ -92,12 +92,12 @@ class ROICalculation:
     # Optional: additional context
     success_metrics: List[str] = None
     risk_factors: List[str] = None
+    hourly_rate: float = 50.0  # Hourly rate for developer time
 
     @property
     def total_investment(self) -> float:
         """Total investment (time cost + financial cost)"""
-        # Assume $50/hour for indie dev time (conservative)
-        time_cost = self.time_investment.total_hours * 50
+        time_cost = self.time_investment.total_hours * self.hourly_rate
         return time_cost + self.financial_investment.total_cost
 
     @property
@@ -227,7 +227,8 @@ class ROICalculator:
             risk_factors=[
                 "Some regions may underperform if pricing too high",
                 "Exchange rate fluctuations"
-            ]
+            ],
+            hourly_rate=self.hourly_rate
         )
 
     def calculate_price_reduction_roi(
@@ -305,7 +306,8 @@ class ROICalculator:
                 "Revenue may decrease if elasticity is low",
                 "Hard to raise price back up later",
                 "May devalue brand perception"
-            ]
+            ],
+            hourly_rate=self.hourly_rate
         )
 
     def calculate_content_update_roi(
@@ -376,7 +378,8 @@ class ROICalculator:
                 "Content may not resonate with players",
                 "Development may take longer than estimated",
                 "Marketing effectiveness varies"
-            ]
+            ],
+            hourly_rate=self.hourly_rate
         )
 
     def calculate_bug_fix_roi(
@@ -439,7 +442,8 @@ class ROICalculator:
             ],
             risk_factors=[
                 "Fix may introduce new bugs" if bug_severity != "minor" else "Low risk"
-            ]
+            ],
+            hourly_rate=self.hourly_rate
         )
 
     def calculate_review_score_marketing_roi(
@@ -514,7 +518,8 @@ class ROICalculator:
             risk_factors=[
                 "Only works if review score is genuinely good (>75%)",
                 "May attract wrong audience if not targeted properly"
-            ]
+            ],
+            hourly_rate=self.hourly_rate
         )
 
     def calculate_store_page_optimization_roi(
@@ -593,7 +598,8 @@ class ROICalculator:
                 "Changes may need A/B testing to validate",
                 "Traffic quality matters - low-quality traffic won't convert regardless",
                 "Seasonal variations in conversion"
-            ]
+            ],
+            hourly_rate=self.hourly_rate
         )
 
     def calculate_influencer_campaign_roi(
@@ -669,7 +675,8 @@ class ROICalculator:
                 "Influencer audience may not match your game",
                 "Conversion rates vary significantly",
                 "Timing matters - avoid competitive releases"
-            ]
+            ],
+            hourly_rate=self.hourly_rate
         )
 
     def generate_roi_table(self, calculations: List[ROICalculation]) -> str:
