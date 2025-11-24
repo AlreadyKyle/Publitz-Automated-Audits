@@ -25,6 +25,7 @@ from src.comparable_games_analyzer import ComparableGamesAnalyzer
 from src.negative_review_analyzer import NegativeReviewAnalyzer
 from src.game_search import GameSearch
 from src.game_analyzer import GameAnalyzer
+from src.api_verifier import APIVerifier, APIStatus
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,9 @@ class ReportOrchestrator:
         self.game_search = GameSearch()
         self.game_analyzer = GameAnalyzer()
 
+        # Initialize API verifier for tracking data sources
+        self.api_verifier = APIVerifier()
+
         logger.info("Report orchestrator initialized")
 
     def generate_complete_report(self, game_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -125,10 +129,17 @@ class ReportOrchestrator:
                 'tier_2_strategic': str (8-12 pages),
                 'tier_3_deepdive': str (30-40 pages),
                 'metadata': ReportMetadata,
-                'components': ReportComponents
+                'components': ReportComponents,
+                'api_status': Dict with API verification results
             }
         """
         logger.info(f"Generating complete report for {game_data.get('name', 'Unknown')}")
+
+        # Reset API verifier for this report
+        self.api_verifier.reset()
+
+        # Track data sources used in game_data input
+        self._track_input_data_sources(game_data)
 
         # Step 1: Calculate overall score
         score = self._calculate_overall_score(game_data)
@@ -170,12 +181,17 @@ class ReportOrchestrator:
                    f"T2: {metadata.word_count['tier_2']} words, "
                    f"T3: {metadata.word_count['tier_3']} words")
 
+        # Get API status summary
+        api_status = self.api_verifier.get_summary_dict()
+        logger.info(f"API Status: {api_status['successful']}/{api_status['total_calls']} successful")
+
         return {
             'tier_1_executive': tier_1_report,
             'tier_2_strategic': tier_2_report,
             'tier_3_deepdive': tier_3_report,
             'metadata': metadata,
-            'components': components
+            'components': components,
+            'api_status': api_status
         }
 
     def _calculate_overall_score(self, game_data: Dict[str, Any]) -> float:
@@ -366,6 +382,10 @@ class ReportOrchestrator:
             report += "\n\n## Growth Opportunity Summary\n\n"
             report += self._generate_growth_summary(game_data)
 
+        # Add API status section (compact version for executive brief)
+        report += "\n\n---\n\n"
+        report += self.api_verifier.generate_compact_status()
+
         report += self._generate_report_footer("executive")
 
         return report
@@ -407,6 +427,10 @@ class ReportOrchestrator:
         if tier >= 3 and components.market_expansion:
             report += "\n\n## Market Expansion Opportunities\n\n"
             report += components.market_expansion
+
+        # Add full API status section
+        report += "\n\n---\n\n"
+        report += self.api_verifier.generate_status_section(include_timing=False, detailed=True)
 
         report += self._generate_report_footer("strategic")
 
@@ -455,6 +479,10 @@ class ReportOrchestrator:
         # Add appendices
         report += "\n\n---\n\n# Appendices\n\n"
         report += self._generate_appendices(game_data)
+
+        # Add detailed API status section with timing
+        report += "\n\n---\n\n"
+        report += self.api_verifier.generate_status_section(include_timing=True, detailed=True)
 
         report += self._generate_report_footer("deepdive")
 
@@ -616,16 +644,42 @@ class ReportOrchestrator:
             owners = game_data.get('owners', 0)
 
             if not app_id or not genres:
+                self.api_verifier.record_skipped(
+                    "Comparable Games API",
+                    "Steam search",
+                    "Insufficient data (missing app_id or genres)"
+                )
                 return "## Comparable Games\n\n*Insufficient data for comparison*"
 
-            comparable_games = self.comparable_analyzer.find_comparable_games(
-                target_game_id=app_id,
-                genre_tags=genres,
-                price=price,
-                launch_date=release_date,
-                owner_count=owners,
-                limit=10
-            )
+            # Track API call attempt
+            try:
+                comparable_games = self.comparable_analyzer.find_comparable_games(
+                    target_game_id=app_id,
+                    genre_tags=genres,
+                    price=price,
+                    launch_date=release_date,
+                    owner_count=owners,
+                    limit=10
+                )
+
+                if comparable_games:
+                    self.api_verifier.record_success(
+                        "Comparable Games API",
+                        "Steam search & filtering"
+                    )
+                else:
+                    self.api_verifier.record_failure(
+                        "Comparable Games API",
+                        "Steam search",
+                        "No comparable games found in database"
+                    )
+            except Exception as api_error:
+                self.api_verifier.record_failure(
+                    "Comparable Games API",
+                    "Steam search",
+                    str(api_error)
+                )
+                comparable_games = []
 
             if not comparable_games:
                 return "## Comparable Games\n\n*No comparable games found*"
@@ -772,23 +826,68 @@ class ReportOrchestrator:
             game_name = game_data.get('name', 'Unknown')
 
             if not app_id:
+                self.api_verifier.record_skipped(
+                    "Steam Reviews API",
+                    "/appreviews (negative filtering)",
+                    "Missing app_id"
+                )
                 return "*Negative review analysis unavailable*"
 
-            # Fetch and analyze negative reviews
-            reviews = self.negative_analyzer.fetch_negative_reviews(app_id, count=100)
+            if not self.negative_analyzer:
+                self.api_verifier.record_not_configured(
+                    "Claude API",
+                    "Messages endpoint (review analysis)"
+                )
+                return "*Claude API not configured - negative review analysis unavailable*"
 
-            if not reviews:
-                return "*No negative reviews found*"
+            # Track Steam API call for fetching reviews
+            try:
+                reviews = self.negative_analyzer.fetch_negative_reviews(app_id, count=100)
 
-            # Categorize complaints
-            categorization = self.negative_analyzer.categorize_complaints(reviews, game_name)
+                if reviews:
+                    self.api_verifier.record_success(
+                        "Steam Reviews API",
+                        f"/appreviews/{app_id} (negative filtering)"
+                    )
+                else:
+                    self.api_verifier.record_failure(
+                        "Steam Reviews API",
+                        f"/appreviews/{app_id}",
+                        "No negative reviews found"
+                    )
+                    return "*No negative reviews found*"
 
-            # Generate report
-            report = self.negative_analyzer.generate_negative_review_report(
-                categorization, game_name
-            )
+            except Exception as api_error:
+                self.api_verifier.record_failure(
+                    "Steam Reviews API",
+                    f"/appreviews/{app_id}",
+                    str(api_error)
+                )
+                return "*Failed to fetch negative reviews*"
 
-            return report
+            # Track Claude API call for categorization
+            try:
+                categorization = self.negative_analyzer.categorize_complaints(reviews, game_name)
+
+                self.api_verifier.record_success(
+                    "Claude API",
+                    "Messages endpoint (complaint categorization)"
+                )
+
+                # Generate report
+                report = self.negative_analyzer.generate_negative_review_report(
+                    categorization, game_name
+                )
+
+                return report
+
+            except Exception as claude_error:
+                self.api_verifier.record_failure(
+                    "Claude API",
+                    "Messages endpoint",
+                    str(claude_error)
+                )
+                return "*Claude API failed - could not categorize complaints*"
 
         except Exception as e:
             logger.error(f"Error analyzing negative reviews: {e}")
@@ -804,20 +903,42 @@ class ReportOrchestrator:
             if not negative_analysis or negative_analysis.startswith("*"):
                 return "*Salvageability assessment unavailable*"
 
+            if not self.negative_analyzer:
+                self.api_verifier.record_not_configured(
+                    "Claude API",
+                    "Messages endpoint (salvageability)"
+                )
+                return "*Claude API not configured - salvageability assessment unavailable*"
+
             app_id = str(game_data.get('app_id', ''))
             game_name = game_data.get('name', 'Unknown')
             review_score = game_data.get('review_score', 0)
 
             # Fetch negative reviews again (could cache this)
+            # Note: This is already tracked in _generate_negative_review_analysis
             reviews = self.negative_analyzer.fetch_negative_reviews(app_id, count=100)
             categorization = self.negative_analyzer.categorize_complaints(reviews, game_name)
 
-            # Assess salvageability
-            assessment = self.negative_analyzer.assess_salvageability(
-                categorization, review_score, game_name
-            )
+            # Track Claude API call for salvageability assessment
+            try:
+                assessment = self.negative_analyzer.assess_salvageability(
+                    categorization, review_score, game_name
+                )
 
-            return assessment
+                self.api_verifier.record_success(
+                    "Claude API",
+                    "Messages endpoint (salvageability assessment)"
+                )
+
+                return assessment
+
+            except Exception as claude_error:
+                self.api_verifier.record_failure(
+                    "Claude API",
+                    "Messages endpoint (salvageability)",
+                    str(claude_error)
+                )
+                return "*Claude API failed - could not assess salvageability*"
 
         except Exception as e:
             logger.error(f"Error generating salvageability assessment: {e}")
@@ -1232,6 +1353,54 @@ class ReportOrchestrator:
             return "Budget"
         else:
             return "Ultra-budget"
+
+    def _track_input_data_sources(self, game_data: Dict[str, Any]) -> None:
+        """
+        Track which APIs were used to fetch the input game_data.
+
+        This records the data sources that were used before report generation.
+        """
+        # Check for Steam Store API data (basic game info)
+        if game_data.get('name') and game_data.get('price'):
+            self.api_verifier.record_success(
+                "Steam Store API",
+                "/api/appdetails",
+                response_time_ms=None
+            )
+        else:
+            self.api_verifier.record_failure(
+                "Steam Store API",
+                "/api/appdetails",
+                "Game data incomplete - missing basic info"
+            )
+
+        # Check for SteamSpy data (owner counts)
+        if game_data.get('owners'):
+            self.api_verifier.record_success(
+                "SteamSpy API",
+                "/api.php?request=appdetails",
+                response_time_ms=None
+            )
+        else:
+            self.api_verifier.record_failure(
+                "SteamSpy API",
+                "/api.php?request=appdetails",
+                "Owner count unavailable"
+            )
+
+        # Check for Steam Reviews data
+        if game_data.get('review_score') and game_data.get('review_count'):
+            self.api_verifier.record_success(
+                "Steam Reviews API",
+                f"/appreviews/{game_data.get('app_id', 'unknown')}",
+                response_time_ms=None
+            )
+        else:
+            self.api_verifier.record_failure(
+                "Steam Reviews API",
+                f"/appreviews/{game_data.get('app_id', 'unknown')}",
+                "Review data unavailable"
+            )
 
 
 # ========================================================================
