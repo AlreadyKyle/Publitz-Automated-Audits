@@ -26,6 +26,12 @@ from src.negative_review_analyzer import NegativeReviewAnalyzer
 from src.game_search import GameSearch
 from src.game_analyzer import GameAnalyzer
 from src.api_verifier import APIVerifier, APIStatus
+from src.revenue_based_scoring import (
+    classify_revenue_tier,
+    apply_revenue_modifier,
+    calculate_overall_score as calculate_revenue_based_score,
+    generate_reality_check_warning
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +49,8 @@ class ReportMetadata:
     word_count: Dict[str, int]
     has_negative_reviews: bool
     has_comparables: bool
+    revenue_tier: Optional[Any] = None  # RevenueTier object from revenue_based_scoring
+    revenue_reality_check: Optional[str] = None  # Warning message if score was adjusted
 
 
 @dataclass
@@ -141,25 +149,61 @@ class ReportOrchestrator:
         # Track data sources used in game_data input
         self._track_input_data_sources(game_data)
 
-        # Step 1: Calculate overall score
-        score = self._calculate_overall_score(game_data)
-        logger.info(f"Overall score: {score:.1f}/100")
+        # Step 1: NEW - Classify revenue tier (prevents score inflation)
+        revenue_tier = classify_revenue_tier(
+            revenue_estimate=game_data.get('revenue', 0),
+            days_since_launch=game_data.get('days_since_launch', 1)
+        )
+        logger.info(f"Revenue tier: {revenue_tier.tier_name} (${revenue_tier.daily_revenue:.2f}/day)")
 
-        # Step 2: Determine performance tier
+        # Step 2: Calculate old-style section scores (for comparison/adjustment)
+        raw_score = self._calculate_overall_score(game_data)
+        logger.info(f"Raw score (before revenue adjustment): {raw_score:.1f}/100")
+
+        # Step 3: NEW - Apply revenue-based scoring to get realistic final score
+        # This prevents games with $379 revenue from scoring 88/100
+        section_scores = {
+            'base_performance': raw_score
+        }
+        modified_sections = apply_revenue_modifier(section_scores, revenue_tier)
+
+        # Calculate final revenue-adjusted overall score
+        review_metrics = {
+            'review_percentage': game_data.get('review_score', 0),
+            'review_count': game_data.get('review_count', 0)
+        }
+        overall_calc = calculate_revenue_based_score(
+            modified_sections,
+            revenue_tier,
+            review_metrics
+        )
+        score = overall_calc['overall_score']
+        logger.info(f"Final score (after revenue adjustment): {score}/100")
+
+        # Step 4: Determine performance tier based on final score
         tier = self._determine_tier(score)
         tier_name = self._get_tier_name(tier)
         logger.info(f"Performance tier: {tier} ({tier_name})")
 
-        # Step 3: Generate all components
+        # Step 5: Generate reality check warning if needed
+        reality_warning = generate_reality_check_warning(
+            revenue_tier,
+            score,
+            modified_sections
+        )
+        if reality_warning:
+            logger.warning(f"Reality check triggered for {game_data.get('name')}: Score reduced from {raw_score} to {score}")
+
+        # Step 6: Generate all components
         components = self._generate_all_components(game_data, tier, score)
         logger.info("All components generated")
 
-        # Step 4: Assemble three report tiers
-        tier_1_report = self._assemble_executive_brief(components, game_data, tier)
-        tier_2_report = self._assemble_strategic_overview(components, game_data, tier)
-        tier_3_report = self._assemble_full_report(components, game_data, tier)
+        # Step 7: Assemble three report tiers
+        tier_1_report = self._assemble_executive_brief(components, game_data, tier, reality_warning)
+        tier_2_report = self._assemble_strategic_overview(components, game_data, tier, reality_warning)
+        tier_3_report = self._assemble_full_report(components, game_data, tier, reality_warning)
 
-        # Step 5: Calculate metadata
+        # Step 8: Calculate metadata
         metadata = ReportMetadata(
             overall_score=score,
             performance_tier=tier,
@@ -174,7 +218,9 @@ class ReportOrchestrator:
                 'tier_3': self._count_words(tier_3_report)
             },
             has_negative_reviews=components.negative_review_analysis is not None,
-            has_comparables=bool(components.comparable_games)
+            has_comparables=bool(components.comparable_games),
+            revenue_tier=revenue_tier,
+            revenue_reality_check=reality_warning
         )
 
         logger.info(f"Report generation complete - T1: {metadata.word_count['tier_1']} words, "
@@ -355,19 +401,25 @@ class ReportOrchestrator:
         self,
         components: ReportComponents,
         game_data: Dict[str, Any],
-        tier: int
+        tier: int,
+        reality_warning: Optional[str] = None
     ) -> str:
         """
         Assemble Tier 1 Executive Brief (2-3 pages).
 
         Contents:
-        1. Executive Summary
-        2. Data Confidence Scorecard
-        3. Quick Start (Top 3 Actions)
-        4. Key Metrics Dashboard
-        5. [Tier-specific critical section]
+        1. Revenue Reality Check Warning (if applicable)
+        2. Executive Summary
+        3. Data Confidence Scorecard
+        4. Quick Start (Top 3 Actions)
+        5. Key Metrics Dashboard
+        6. [Tier-specific critical section]
         """
         report = self._generate_report_header(game_data, tier, "Executive Brief")
+
+        # CRITICAL: Add revenue reality check warning FIRST if applicable
+        if reality_warning:
+            report += "\n\n" + reality_warning + "\n\n---"
 
         report += "\n\n" + components.executive_summary
         report += "\n\n" + components.confidence_scorecard
@@ -390,13 +442,14 @@ class ReportOrchestrator:
         self,
         components: ReportComponents,
         game_data: Dict[str, Any],
-        tier: int
+        tier: int,
+        reality_warning: Optional[str] = None
     ) -> str:
         """
         Assemble Tier 2 Strategic Overview (8-12 pages).
 
         Contents:
-        - All of Tier 1
+        - All of Tier 1 (with reality warning if applicable)
         - Market Positioning Analysis
         - Comparable Games Comparison
         - Revenue Performance
@@ -404,8 +457,8 @@ class ReportOrchestrator:
         - 30-Day Action Plan (with ROI)
         - [Tier-specific sections]
         """
-        # Start with executive brief
-        report = self._assemble_executive_brief(components, game_data, tier)
+        # Start with executive brief (pass reality warning)
+        report = self._assemble_executive_brief(components, game_data, tier, reality_warning)
 
         # Add strategic sections
         report += "\n\n---\n\n# Strategic Analysis\n\n"
@@ -432,13 +485,14 @@ class ReportOrchestrator:
         self,
         components: ReportComponents,
         game_data: Dict[str, Any],
-        tier: int
+        tier: int,
+        reality_warning: Optional[str] = None
     ) -> str:
         """
         Assemble Tier 3 Deep-dive Report (30-40 pages).
 
         Contents:
-        - All of Tier 1 & 2
+        - All of Tier 1 & 2 (with reality warning if applicable)
         - Detailed Competitive Analysis
         - Regional Market Breakdowns
         - Store Asset Optimization
@@ -446,8 +500,8 @@ class ReportOrchestrator:
         - Complete Methodology
         - Appendices
         """
-        # Start with strategic overview
-        report = self._assemble_strategic_overview(components, game_data, tier)
+        # Start with strategic overview (pass reality warning)
+        report = self._assemble_strategic_overview(components, game_data, tier, reality_warning)
 
         # Add deep-dive sections
         report += "\n\n---\n\n# Deep-Dive Analysis\n\n"
