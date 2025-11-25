@@ -34,6 +34,19 @@ def generate_executive_summary(
     Returns:
         Markdown-formatted executive summary string
     """
+    # Convert parameters to correct types (handles strings from Streamlit)
+    try:
+        overall_score = float(overall_score) if not isinstance(overall_score, (int, float)) else overall_score
+        review_count = int(float(review_count)) if not isinstance(review_count, int) else review_count
+        review_percentage = float(review_percentage) if not isinstance(review_percentage, (int, float)) else review_percentage
+        revenue_estimate = int(float(revenue_estimate)) if not isinstance(revenue_estimate, int) else revenue_estimate
+    except (ValueError, TypeError) as e:
+        # Fallback to safe defaults if conversion fails
+        overall_score = float(overall_score) if isinstance(overall_score, (int, float)) else 0.0
+        review_count = int(review_count) if isinstance(review_count, int) else 0
+        review_percentage = float(review_percentage) if isinstance(review_percentage, (int, float)) else 0.0
+        revenue_estimate = int(revenue_estimate) if isinstance(revenue_estimate, int) else 0
+
     # Determine performance tier
     tier = _get_performance_tier(overall_score)
 
@@ -135,14 +148,20 @@ def _calculate_percentile(score: float) -> int:
         return 3
 
 
-def _format_currency(amount: int) -> str:
-    """Format currency with K/M suffix."""
-    if amount >= 1_000_000:
-        return f"${amount / 1_000_000:.1f}M"
-    elif amount >= 1_000:
-        return f"${amount / 1_000:.0f}K"
+def _format_currency(amount) -> str:
+    """Format currency with K/M suffix. Accepts int, float, or string."""
+    # Convert to float to handle strings and various number types
+    try:
+        amount_num = float(amount) if isinstance(amount, str) else amount
+    except (ValueError, TypeError):
+        return "$0"
+
+    if amount_num >= 1_000_000:
+        return f"${amount_num / 1_000_000:.1f}M"
+    elif amount_num >= 1_000:
+        return f"${amount_num / 1_000:.0f}K"
     else:
-        return f"${amount:,}"
+        return f"${amount_num:,.0f}"
 
 
 def _get_confidence_badge(tier: str) -> str:
@@ -293,15 +312,21 @@ def _get_situation_numbers(
 {_get_numbers_interpretation(tier, review_count, review_pct, velocity)}"""
 
 
-def _get_revenue_tier_description(revenue: int, tier: str) -> str:
-    """Describe revenue tier."""
-    if revenue >= 1_000_000:
+def _get_revenue_tier_description(revenue, tier: str) -> str:
+    """Describe revenue tier. Accepts int, float, or string."""
+    # Convert to number if needed
+    try:
+        revenue_num = float(revenue) if isinstance(revenue, str) else revenue
+    except (ValueError, TypeError):
+        revenue_num = 0
+
+    if revenue_num >= 1_000_000:
         return "major success (>$1M)"
-    elif revenue >= 500_000:
+    elif revenue_num >= 500_000:
         return "strong commercial success ($500K-$1M)"
-    elif revenue >= 100_000:
+    elif revenue_num >= 100_000:
         return "moderate commercial success ($100K-$500K)"
-    elif revenue >= 50_000:
+    elif revenue_num >= 50_000:
         return "modest success ($50K-$100K)"
     else:
         return "early stage or struggling (<$50K)"
@@ -451,8 +476,15 @@ def _get_ignore_list(tier: str) -> str:
 **Focus on:** Strategic expansion and sustaining the quality that got you here."""
 
 
-def _get_realistic_goals(tier: str, revenue: int, review_count: int) -> str:
-    """Set realistic 90-day goals based on tier."""
+def _get_realistic_goals(tier: str, revenue, review_count) -> str:
+    """Set realistic 90-day goals based on tier. Accepts int, float, or string for numeric params."""
+    # Convert to numbers if needed
+    try:
+        revenue = float(revenue) if isinstance(revenue, str) else revenue
+        review_count = int(float(review_count)) if isinstance(review_count, str) else review_count
+    except (ValueError, TypeError):
+        revenue = 0
+        review_count = 0
 
     if tier == "crisis":
         conservative_revenue = int(revenue * 0.8)
