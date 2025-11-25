@@ -382,10 +382,6 @@ class ReportOrchestrator:
             report += "\n\n## Growth Opportunity Summary\n\n"
             report += self._generate_growth_summary(game_data)
 
-        # Add API status section (compact version for executive brief)
-        report += "\n\n---\n\n"
-        report += self.api_verifier.generate_compact_status()
-
         report += self._generate_report_footer("executive")
 
         return report
@@ -427,10 +423,6 @@ class ReportOrchestrator:
         if tier >= 3 and components.market_expansion:
             report += "\n\n## Market Expansion Opportunities\n\n"
             report += components.market_expansion
-
-        # Add full API status section
-        report += "\n\n---\n\n"
-        report += self.api_verifier.generate_status_section(include_timing=False, detailed=True)
 
         report += self._generate_report_footer("strategic")
 
@@ -479,10 +471,6 @@ class ReportOrchestrator:
         # Add appendices
         report += "\n\n---\n\n# Appendices\n\n"
         report += self._generate_appendices(game_data)
-
-        # Add detailed API status section with timing
-        report += "\n\n---\n\n"
-        report += self.api_verifier.generate_status_section(include_timing=True, detailed=True)
 
         report += self._generate_report_footer("deepdive")
 
