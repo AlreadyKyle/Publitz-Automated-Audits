@@ -33,11 +33,16 @@ from src.revenue_based_scoring import (
     generate_reality_check_warning
 )
 from src.score_validation import (
-    GameMetrics,
+    GameMetrics as ScoreGameMetrics,
     calculate_maximum_possible_score,
     enforce_score_cap,
     validate_before_generation,
     generate_cap_explanation_report
+)
+from src.data_consistency import (
+    GameMetrics as DataGameMetrics,
+    pre_flight_check,
+    validate_report_consistency
 )
 
 logger = logging.getLogger(__name__)
@@ -160,13 +165,33 @@ class ReportOrchestrator:
         # Track data sources used in game_data input
         self._track_input_data_sources(game_data)
 
-        # Step 0: VALIDATION - Check if report generation is appropriate
-        game_metrics = GameMetrics(
-            revenue=game_data.get('revenue', 0),
-            days_since_launch=game_data.get('days_since_launch', 1),
-            review_count_total=game_data.get('review_count', 0),
-            review_percentage=game_data.get('review_score', 0),
-            owner_count=game_data.get('owners', 0)
+        # Step 0a: DATA CONSISTENCY VALIDATION - Check for contradictions
+        logger.info("Running pre-flight data consistency check...")
+        is_valid, data_metrics, consistency_messages = pre_flight_check(game_data)
+
+        if not is_valid:
+            logger.error(f"Data consistency check failed for {game_data.get('name')}")
+            for msg in consistency_messages:
+                logger.error(f"  {msg}")
+            # Return error report
+            error_message = "\n".join(consistency_messages)
+            return self._generate_data_error_report(game_data, error_message)
+
+        if consistency_messages:
+            logger.warning(f"Data consistency warnings for {game_data.get('name')}:")
+            for msg in consistency_messages:
+                logger.warning(f"  {msg}")
+
+        # Use validated metrics from here forward
+        logger.info("Data consistency check passed")
+
+        # Step 0b: SCORE VALIDATION - Check if report generation is appropriate
+        game_metrics = ScoreGameMetrics(
+            revenue=data_metrics.revenue_gross,
+            days_since_launch=data_metrics.days_since_launch,
+            review_count_total=data_metrics.review_count_total,
+            review_percentage=data_metrics.review_percentage,
+            owner_count=data_metrics.owner_count
         )
 
         should_generate, validation_warning = validate_before_generation(game_metrics)
@@ -180,9 +205,10 @@ class ReportOrchestrator:
         logger.info(f"Maximum possible score: {score_caps.maximum_score}/100 (limited by {score_caps.limiting_factor})")
 
         # Step 2: Classify revenue tier (prevents score inflation)
+        # Use validated data from data_metrics
         revenue_tier = classify_revenue_tier(
-            revenue_estimate=game_data.get('revenue', 0),
-            days_since_launch=game_data.get('days_since_launch', 1)
+            revenue_estimate=data_metrics.revenue_gross,
+            days_since_launch=data_metrics.days_since_launch
         )
         logger.info(f"Revenue tier: {revenue_tier.tier_name} (${revenue_tier.daily_revenue:.2f}/day)")
 
@@ -1545,6 +1571,86 @@ class ReportOrchestrator:
             overall_score=0,
             performance_tier=0,
             tier_name="Insufficient Data",
+            generated_at=datetime.now(),
+            game_name=game_data.get('name', 'Unknown'),
+            app_id=str(game_data.get('app_id', '')),
+            confidence_level="N/A",
+            word_count={
+                'tier_1': self._count_words(error_report),
+                'tier_2': self._count_words(error_report),
+                'tier_3': self._count_words(error_report)
+            },
+            has_negative_reviews=False,
+            has_comparables=False
+        )
+
+        return {
+            'tier_1_executive': error_report,
+            'tier_2_strategic': error_report,
+            'tier_3_deepdive': error_report,
+            'metadata': metadata,
+            'components': None,
+            'api_status': self.api_verifier.get_summary_dict()
+        }
+
+    def _generate_data_error_report(
+        self,
+        game_data: Dict[str, Any],
+        error_message: str
+    ) -> Dict[str, Any]:
+        """
+        Generate error report for games with data consistency errors.
+
+        Args:
+            game_data: Game data dict with inconsistencies
+            error_message: Detailed error messages from validation
+
+        Returns:
+            Report dict with error explanation
+        """
+        error_report = f"""# Game Audit Report: {game_data.get('name', 'Unknown')}
+
+**Report Type**: Data Consistency Error
+**Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+**App ID**: {game_data.get('app_id', 'Unknown')}
+
+---
+
+## ❌ DATA CONSISTENCY ERRORS
+
+The provided game data contains critical inconsistencies that prevent report generation:
+
+{error_message}
+
+**What This Means:**
+
+The data contains contradictions (e.g., review count exceeds owner count, negative revenue,
+mathematical impossibilities). These errors must be fixed at the data source before a report
+can be generated.
+
+**Next Steps:**
+
+1. Verify data sources (Steam API, SteamSpy, etc.)
+2. Check for data collection errors
+3. Ensure all metrics are from the same time period
+4. Re-run data collection and try again
+
+**Common Causes:**
+
+- Mixing data from different time periods
+- API errors or rate limiting
+- Manual data entry mistakes
+- Cached stale data
+
+---
+
+*This report was generated by Publitz Automated Game Audits*
+"""
+
+        metadata = ReportMetadata(
+            overall_score=0,
+            performance_tier=0,
+            tier_name="Data Error",
             generated_at=datetime.now(),
             game_name=game_data.get('name', 'Unknown'),
             app_id=str(game_data.get('app_id', '')),
