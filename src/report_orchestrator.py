@@ -44,6 +44,19 @@ from src.data_consistency import (
     pre_flight_check,
     validate_report_consistency
 )
+from src.price_analysis import (
+    classify_price_tier,
+    compare_to_competitors,
+    analyze_price_comprehensive,
+    override_score_for_catastrophic_pricing
+)
+from src.generic_detection import (
+    detect_generic_subreddits,
+    detect_generic_influencers,
+    detect_generic_curators,
+    detect_generic_tags,
+    adjust_score_for_generic_data
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +80,9 @@ class ReportMetadata:
     was_capped: bool = False  # Whether score was capped by validation
     original_score: Optional[float] = None  # Score before capping
     cap_explanation: Optional[str] = None  # Explanation of why score was capped
+    price_analysis: Optional[Any] = None  # Price analysis results
+    price_warnings: Optional[str] = None  # Price-related warnings
+    generic_detection_results: Optional[Dict[str, Any]] = None  # Generic data detection results
 
 
 @dataclass
@@ -185,7 +201,106 @@ class ReportOrchestrator:
         # Use validated metrics from here forward
         logger.info("Data consistency check passed")
 
-        # Step 0b: SCORE VALIDATION - Check if report generation is appropriate
+        # Step 0b: PRICE ANALYSIS - Check for catastrophic pricing errors
+        logger.info("Running price analysis...")
+        price_analysis = None
+        price_warnings = []
+
+        if data_metrics.price_usd > 0:  # Only analyze if price is set
+            try:
+                # Get comparable games for price comparison
+                comparable_prices = []
+                comparable_scores = []
+
+                try:
+                    app_id = str(game_data.get('app_id', ''))
+                    genres = game_data.get('genres', [])
+                    if app_id and genres:
+                        comparables = self.comparable_analyzer.find_comparable_games(
+                            target_game_id=app_id,
+                            genre_tags=genres,
+                            price=data_metrics.price_usd,
+                            launch_date=data_metrics.release_date,
+                            owner_count=data_metrics.owner_count,
+                            limit=10
+                        )
+                        if comparables:
+                            comparable_prices = [g.price for g in comparables if g.price > 0]
+                            comparable_scores = [g.review_percentage for g in comparables if g.review_percentage > 0]
+                except Exception as e:
+                    logger.warning(f"Could not fetch comparable games for price analysis: {e}")
+
+                # Run comprehensive price analysis
+                price_analysis = analyze_price_comprehensive(
+                    price_usd=data_metrics.price_usd,
+                    review_score=data_metrics.review_percentage,
+                    revenue=data_metrics.revenue_gross,
+                    units_sold=data_metrics.owner_count,
+                    competitor_prices=comparable_prices if comparable_prices else None,
+                    competitor_review_scores=comparable_scores if comparable_scores else None,
+                    genre_tags=game_data.get('genres', []),
+                    is_early_access=game_data.get('is_early_access', False)
+                )
+
+                # Log critical pricing issues
+                if price_analysis.get('is_critical'):
+                    logger.critical(f"CATASTROPHIC PRICING: {game_data.get('name')} priced at ${data_metrics.price_usd}")
+                    logger.critical(f"  Lost revenue estimate: ${price_analysis.get('lost_revenue', 0):,.0f}")
+                    logger.critical(f"  Recommended price: ${price_analysis.get('potential_price', 0):.2f}")
+
+                logger.info(f"Price tier: {price_analysis['price_tier'].tier} "
+                           f"(severity: {price_analysis['price_tier'].severity})")
+
+                # Generate price warning if critical or severe
+                price_tier = price_analysis['price_tier']
+                if price_tier.severity in ['CRITICAL', 'HIGH']:
+                    warning_msg = f"""## 🚨 PRICING ALERT: {price_tier.severity}
+
+**Current Price**: ${data_metrics.price_usd:.2f}
+**Classification**: {price_tier.tier.replace('_', ' ').title()}
+**Impact on Revenue**: {price_tier.impact_on_sales}%
+
+**Issue**: {price_tier.message}
+
+**Recommended Price Range**: ${price_tier.recommended_min:.2f} - ${price_tier.recommended_max:.2f}
+
+**Revenue Impact**:
+- Current Revenue: ${data_metrics.revenue_gross:,.0f}
+- Potential Revenue: ${price_analysis.get('potential_revenue', 0):,.0f}
+- Lost Revenue: ${price_analysis.get('lost_revenue', 0):,.0f}
+
+**Priority**: {price_tier.severity} - This pricing issue should be addressed {"IMMEDIATELY" if price_tier.severity == "CRITICAL" else "soon"}.
+"""
+                    price_warnings.append(warning_msg)
+
+                # Add competitor comparison warning if available
+                if price_analysis.get('competitor_comparison'):
+                    comp = price_analysis['competitor_comparison']
+                    if comp.issue in ['severe_underpricing', 'moderate_underpricing']:
+                        comp_warning = f"""## 💰 COMPETITOR PRICING ANALYSIS
+
+{comp.message}
+
+**Your Position**:
+- Your Price: ${data_metrics.price_usd:.2f}
+- Competitor Average: ${comp.competitor_avg_price:.2f}
+- Price Difference: {abs(1 - comp.price_ratio) * 100:.0f}% {"cheaper" if comp.price_ratio < 1 else "more expensive"}
+
+**Quality Comparison**:
+- Your Quality: {comp.your_quality:.0f}%
+- Competitor Quality: {comp.competitor_avg_quality:.0f}%
+
+**Recommendation**: {comp.recommendation}
+
+**Lost Revenue Estimate**: ${comp.lost_revenue_estimate:,.0f}
+"""
+                        price_warnings.append(comp_warning)
+
+            except Exception as e:
+                logger.error(f"Price analysis failed: {e}")
+                price_analysis = None
+
+        # Step 0c: SCORE VALIDATION - Check if report generation is appropriate
         game_metrics = ScoreGameMetrics(
             revenue=data_metrics.revenue_gross,
             days_since_launch=data_metrics.days_since_launch,
@@ -273,15 +388,17 @@ class ReportOrchestrator:
         components = self._generate_all_components(game_data, tier, score)
         logger.info("All components generated")
 
-        # Step 10: Assemble three report tiers (with cap explanation)
+        # Step 10: Assemble three report tiers (with all warnings)
+        combined_price_warnings = "\n\n".join(price_warnings) if price_warnings else None
+
         tier_1_report = self._assemble_executive_brief(
-            components, game_data, tier, reality_warning, cap_explanation
+            components, game_data, tier, reality_warning, cap_explanation, combined_price_warnings
         )
         tier_2_report = self._assemble_strategic_overview(
-            components, game_data, tier, reality_warning, cap_explanation
+            components, game_data, tier, reality_warning, cap_explanation, combined_price_warnings
         )
         tier_3_report = self._assemble_full_report(
-            components, game_data, tier, reality_warning, cap_explanation
+            components, game_data, tier, reality_warning, cap_explanation, combined_price_warnings
         )
 
         # Step 11: Calculate metadata
@@ -305,7 +422,10 @@ class ReportOrchestrator:
             score_caps=score_caps,
             was_capped=was_capped,
             original_score=calculated_score if was_capped else None,
-            cap_explanation=cap_result.get('cap_explanation') if was_capped else None
+            cap_explanation=cap_result.get('cap_explanation') if was_capped else None,
+            price_analysis=price_analysis,
+            price_warnings="\n\n".join(price_warnings) if price_warnings else None,
+            generic_detection_results=None  # Will be set if generic detection is applied
         )
 
         logger.info(f"Report generation complete - T1: {metadata.word_count['tier_1']} words, "
@@ -488,23 +608,29 @@ class ReportOrchestrator:
         game_data: Dict[str, Any],
         tier: int,
         reality_warning: Optional[str] = None,
-        cap_explanation: Optional[str] = None
+        cap_explanation: Optional[str] = None,
+        price_warnings: Optional[str] = None
     ) -> str:
         """
         Assemble Tier 1 Executive Brief (2-3 pages).
 
         Contents:
-        1. Revenue Reality Check Warning (if applicable)
-        2. Score Cap Explanation (always shown)
-        3. Executive Summary
-        4. Data Confidence Scorecard
-        5. Quick Start (Top 3 Actions)
-        6. Key Metrics Dashboard
-        7. [Tier-specific critical section]
+        1. Price Warnings (if critical pricing issues)
+        2. Revenue Reality Check Warning (if applicable)
+        3. Score Cap Explanation (always shown)
+        4. Executive Summary
+        5. Data Confidence Scorecard
+        6. Quick Start (Top 3 Actions)
+        7. Key Metrics Dashboard
+        8. [Tier-specific critical section]
         """
         report = self._generate_report_header(game_data, tier, "Executive Brief")
 
-        # CRITICAL: Add revenue reality check warning FIRST if applicable
+        # CRITICAL: Add price warnings FIRST if catastrophic pricing detected
+        if price_warnings:
+            report += "\n\n" + price_warnings + "\n\n---"
+
+        # Add revenue reality check warning if applicable
         if reality_warning:
             report += "\n\n" + reality_warning + "\n\n---"
 
@@ -535,13 +661,14 @@ class ReportOrchestrator:
         game_data: Dict[str, Any],
         tier: int,
         reality_warning: Optional[str] = None,
-        cap_explanation: Optional[str] = None
+        cap_explanation: Optional[str] = None,
+        price_warnings: Optional[str] = None
     ) -> str:
         """
         Assemble Tier 2 Strategic Overview (8-12 pages).
 
         Contents:
-        - All of Tier 1 (with reality warning and cap explanation if applicable)
+        - All of Tier 1 (with price warnings, reality warning and cap explanation if applicable)
         - Market Positioning Analysis
         - Comparable Games Comparison
         - Revenue Performance
@@ -549,8 +676,8 @@ class ReportOrchestrator:
         - 30-Day Action Plan (with ROI)
         - [Tier-specific sections]
         """
-        # Start with executive brief (pass reality warning and cap explanation)
-        report = self._assemble_executive_brief(components, game_data, tier, reality_warning, cap_explanation)
+        # Start with executive brief (pass all warnings)
+        report = self._assemble_executive_brief(components, game_data, tier, reality_warning, cap_explanation, price_warnings)
 
         # Add strategic sections
         report += "\n\n---\n\n# Strategic Analysis\n\n"
@@ -579,13 +706,14 @@ class ReportOrchestrator:
         game_data: Dict[str, Any],
         tier: int,
         reality_warning: Optional[str] = None,
-        cap_explanation: Optional[str] = None
+        cap_explanation: Optional[str] = None,
+        price_warnings: Optional[str] = None
     ) -> str:
         """
         Assemble Tier 3 Deep-dive Report (30-40 pages).
 
         Contents:
-        - All of Tier 1 & 2 (with reality warning and cap explanation if applicable)
+        - All of Tier 1 & 2 (with price warnings, reality warning and cap explanation if applicable)
         - Detailed Competitive Analysis
         - Regional Market Breakdowns
         - Store Asset Optimization
@@ -593,8 +721,8 @@ class ReportOrchestrator:
         - Complete Methodology
         - Appendices
         """
-        # Start with strategic overview (pass reality warning and cap explanation)
-        report = self._assemble_strategic_overview(components, game_data, tier, reality_warning, cap_explanation)
+        # Start with strategic overview (pass all warnings)
+        report = self._assemble_strategic_overview(components, game_data, tier, reality_warning, cap_explanation, price_warnings)
 
         # Add deep-dive sections
         report += "\n\n---\n\n# Deep-Dive Analysis\n\n"
