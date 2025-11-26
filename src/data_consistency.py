@@ -316,17 +316,22 @@ class GameMetrics:
 
         This is the main entry point for converting raw API data into validated metrics.
         """
+        # Calculate positive/negative reviews with proper rounding to avoid truncation errors
+        review_count = game_data.get('review_count', 0)
+        review_score_pct = game_data.get('review_score', 0)
+
+        # Use round() instead of int() to avoid truncation errors (e.g., 355.68 + 100.32 = 456)
+        positive_default = round(review_count * review_score_pct / 100)
+        negative_default = review_count - positive_default  # Calculate from remainder to ensure sum equals total
+
         return cls(
             app_id=str(game_data.get('app_id', '')),
             game_name=game_data.get('name', 'Unknown'),
             revenue_gross=float(game_data.get('revenue', 0)),
             days_since_launch=int(game_data.get('days_since_launch', 1)),
-            review_count_total=int(game_data.get('review_count', 0)),
-            review_count_positive=int(game_data.get('positive_reviews',
-                                        game_data.get('review_count', 0) * game_data.get('review_score', 0) / 100)),
-            review_count_negative=int(game_data.get('negative_reviews',
-                                        game_data.get('review_count', 0) -
-                                        (game_data.get('review_count', 0) * game_data.get('review_score', 0) / 100))),
+            review_count_total=int(review_count),
+            review_count_positive=int(game_data.get('positive_reviews', positive_default)),
+            review_count_negative=int(game_data.get('negative_reviews', negative_default)),
             owner_count=int(game_data.get('owners', 0)),
             price_usd=float(game_data.get('price', 0)),
             release_date=game_data.get('release_date', ''),

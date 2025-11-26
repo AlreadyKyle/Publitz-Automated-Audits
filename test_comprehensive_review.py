@@ -75,11 +75,14 @@ def test_realistic_indie_game():
             print(f"   ✅ Price Analysis: Skipped (price $0)")
 
         # Score capping
-        if metadata.was_capped:
-            print(f"   ✅ Score Capping: {metadata.original_score:.1f} → {metadata.overall_score:.1f}")
-            print(f"      Reason: {metadata.score_caps.limiting_factor}")
+        if metadata.score_caps:
+            if metadata.was_capped:
+                print(f"   ✅ Score Capping: {metadata.original_score:.1f} → {metadata.overall_score:.1f}")
+                print(f"      Reason: {metadata.score_caps.limiting_factor}")
+            else:
+                print(f"   ✅ Score Capping: Within limits ({metadata.overall_score:.1f}/{metadata.score_caps.maximum_score})")
         else:
-            print(f"   ✅ Score Capping: Within limits ({metadata.overall_score:.1f}/{metadata.score_caps.maximum_score})")
+            print(f"   ℹ️  Score Capping: N/A (error or insufficient data)")
 
         # Revenue reality check
         if metadata.revenue_reality_check:

@@ -1749,7 +1749,16 @@ class ReportOrchestrator:
                 'tier_3': self._count_words(error_report)
             },
             has_negative_reviews=False,
-            has_comparables=False
+            has_comparables=False,
+            revenue_tier=None,
+            revenue_reality_check=None,
+            score_caps=None,
+            was_capped=False,
+            original_score=None,
+            cap_explanation=None,
+            price_analysis=None,
+            price_warnings=None,
+            generic_detection_results=None
         )
 
         return {
@@ -1829,7 +1838,16 @@ can be generated.
                 'tier_3': self._count_words(error_report)
             },
             has_negative_reviews=False,
-            has_comparables=False
+            has_comparables=False,
+            revenue_tier=None,
+            revenue_reality_check=None,
+            score_caps=None,
+            was_capped=False,
+            original_score=None,
+            cap_explanation=None,
+            price_analysis=None,
+            price_warnings=None,
+            generic_detection_results=None
         )
 
         return {
