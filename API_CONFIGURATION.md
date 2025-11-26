@@ -79,7 +79,7 @@ GET https://store.steampowered.com/appreviews/{appid}?json=1&filter=all&review_t
 **Rate Limit**: 100,000 requests/day
 **Get Key**: https://steamcommunity.com/dev/apikey
 
-**Current Key**: `7CD62F6A17C80F8E8889CE738578C014`
+**Current Key**: Set via `STEAM_WEB_API_KEY` environment variable
 
 **Endpoints Used**:
 ```
@@ -91,7 +91,7 @@ GET https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?a
 **Configuration**:
 ```bash
 # In .env file
-STEAM_WEB_API_KEY=7CD62F6A17C80F8E8889CE738578C014
+STEAM_WEB_API_KEY=your_steam_web_api_key_here
 ```
 
 ---
@@ -331,7 +331,7 @@ time.sleep(2.0)  # 2 seconds between requests (be respectful)
 ## Conclusion
 
 **You need 2 API keys total:**
-1. Steam Web API key (free) - already have: `7CD62F6A17C80F8E8889CE738578C014`
+1. Steam Web API key (free) - Get at: https://steamcommunity.com/dev/apikey
 2. Anthropic API key (paid) - already configured
 
 **Total monthly cost**: $5-15 for Claude API (if generating 100 reports)

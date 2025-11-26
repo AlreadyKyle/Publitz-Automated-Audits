@@ -6,8 +6,13 @@ This is different from Steam Store API - requires authentication
 
 import requests
 import json
+import os
+from dotenv import load_dotenv
 
-STEAM_WEB_API_KEY = "7CD62F6A17C80F8E8889CE738578C014"
+# Load environment variables
+load_dotenv()
+
+STEAM_WEB_API_KEY = os.getenv("STEAM_WEB_API_KEY", "")
 
 def test_steam_web_api_appdetails():
     """Test Steam Web API - GetAppDetails"""
@@ -172,6 +177,14 @@ def test_steam_web_api_reviews():
 
 
 def main():
+    if not STEAM_WEB_API_KEY:
+        print("\n" + "="*80)
+        print("ERROR: STEAM_WEB_API_KEY not set")
+        print("="*80)
+        print("\nPlease set STEAM_WEB_API_KEY in your .env file")
+        print("Get your free key at: https://steamcommunity.com/dev/apikey")
+        return 1
+
     print("\n" + "="*80)
     print("STEAM WEB API KEY TEST")
     print(f"Key: {STEAM_WEB_API_KEY[:20]}...")

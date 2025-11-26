@@ -25,7 +25,7 @@
 
 **Total: 2 keys (both already configured)**
 
-1. ✅ Steam Web API Key: `7CD62F6A17C80F8E8889CE738578C014`
+1. ✅ Steam Web API Key: Set via `STEAM_WEB_API_KEY` environment variable
 2. ✅ Anthropic API Key: Set in `.env`
 
 ---

@@ -182,7 +182,7 @@ GET /appdetails?appids={app_id}
 
 ---
 
-### Steam Web API (Key: 7CD62F6A17C80F8E8889CE738578C014)
+### Steam Web API (Key: Set via STEAM_WEB_API_KEY environment variable)
 
 **Base URL**: `https://api.steampowered.com`
 
@@ -476,14 +476,14 @@ To generate a basic report, you **absolutely need**:
 Add to `.env`:
 ```bash
 # Critical
-STEAM_WEB_API_KEY=7CD62F6A17C80F8E8889CE738578C014
+STEAM_WEB_API_KEY=your_steam_web_api_key_here
 ANTHROPIC_API_KEY=<your-anthropic-key>
 
 # Optional Enhancement
-RAWG_API_KEY=5353e48dc2a4446489ec7c0bbb1ce9e9
-YOUTUBE_API_KEY=AIzaSyA6J_1QBANsaE2rYt2IXEVww1U6nAysLik
-TWITCH_CLIENT_ID=j6ueihug11unpnzktacouf4y8j6tgb
-TWITCH_CLIENT_SECRET=h3er5mdtlddwf58hyn106gum50hg6w
+RAWG_API_KEY=your_rawg_api_key_here
+YOUTUBE_API_KEY=your_youtube_api_key_here
+TWITCH_CLIENT_ID=your_twitch_client_id_here
+TWITCH_CLIENT_SECRET=your_twitch_client_secret_here
 ```
 
 **When deployed to proper environment, this will enable**:
