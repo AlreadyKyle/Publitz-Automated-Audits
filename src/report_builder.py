@@ -2713,55 +2713,133 @@ class ReportBuilder:
         return report
 
     def _generate_footer(self) -> str:
-        """Generate report footer"""
+        """Generate collapsible report footer"""
         game_name = self.game_data.get('name', 'Unknown Game')
 
         return f"""---
 
-## Data Sources & Methodology
+# Report Documentation
 
-This report aggregates data from multiple authoritative sources to provide comprehensive market intelligence:
+<details>
+<summary><strong>📊 About This Audit</strong> (Click to expand)</summary>
+
+## About Publitz Automated Audits
+
+Professional game market intelligence powered by AI and real-time data aggregation.
+
+**What This Report Provides:**
+- AI-powered competitive analysis and market positioning insights
+- Actionable recommendations with ROI calculations
+- Data-driven scoring across multiple performance dimensions
+- Strategic frameworks tailored to your game's performance tier
+
+**Report Specifications:**
+- **Generated**: {datetime.now().strftime('%Y-%m-%d at %I:%M %p')}
+- **Report Version**: 2.1 (Enhanced with Market Viability + Impact Matrix)
+- **Analysis Type**: {self.report_type}
+- **Overall Score**: {self.overall_score}/100
+
+**Support:**
+For questions or support: support@publitz.com
+
+**Confidentiality:**
+This report contains confidential market intelligence and is intended solely for {game_name}.
+Data accuracy is dependent on third-party API availability and may contain estimates where actual data is unavailable.
+
+</details>
+
+<details>
+<summary><strong>🎯 Understanding Confidence Levels</strong> (Click to expand)</summary>
+
+## How to Interpret Confidence Scores
+
+Each section of this report includes a confidence assessment to help you make informed decisions about which insights to act on immediately vs. which require additional validation.
+
+### ✅ High Confidence - Act With Confidence
+
+These insights are based on verified, real-time data from official APIs. You can make strategic decisions and allocate budget based on these findings without additional validation.
+
+**Examples:**
+- Review scores and volume from Steam API
+- Competitor comparisons using public Steam data
+- Influencer databases with live follower counts
+
+**Recommended Action**: Use for immediate decision-making, budget allocation, and strategic planning.
+
+---
+
+### ⚠️ Medium Confidence - Validate Before Major Investment
+
+These insights are calculated or estimated from reliable sources but include assumptions. They're directionally accurate but may have ±25-35% variance. Validate with additional research before committing significant resources.
+
+**Examples:**
+- Owner count ranges (±25% variance)
+- Revenue estimates (±30% variance)
+- Regional pricing recommendations based on PPP calculations
+
+**Recommended Action**: Use for directional planning. Test assumptions in 1-2 markets before full rollout.
+
+---
+
+### ❌ Low Confidence - Use as Hypotheses Only
+
+These insights are based on industry averages or genre patterns, not your actual data. Treat as hypotheses to investigate, not facts to act on.
+
+**Examples:**
+- Regional revenue splits (based on industry averages)
+- Sentiment themes (generic genre patterns)
+
+**Recommended Action**: Use to generate questions. Seek primary data before acting.
+
+</details>
+
+<details>
+<summary><strong>📁 Data Sources & Methodology</strong> (Click to expand)</summary>
+
+## Data Sources & Analysis Methodology
+
+This report aggregates data from multiple authoritative sources to provide comprehensive market intelligence.
 
 ### Primary Data Sources
+
+**Steam Ecosystem:**
 - **Steam Store API**: Game metadata, pricing, store page elements, supported languages
 - **Steam Community**: Review data, community features, discussion activity
 - **SteamSpy**: Sales estimates, player statistics, market performance data
 - **SteamDB**: Historical pricing, concurrent players, regional availability
 
 ### Market Intelligence Sources
-- **Reddit API**: Community size, engagement metrics, self-promotion policies (r/indiegaming, r/gamedev, etc.)
+
+**Community & Social:**
+- **Reddit API**: Community size, engagement metrics, self-promotion policies
 - **Genre Market Data**: TAM estimates, growth trends, competitive saturation metrics
+
+**Economic & Localization:**
 - **Regional Economic Data**: PPP (Purchasing Power Parity) multipliers, currency conversions
 - **Localization Benchmarks**: Industry-standard translation costs, market reach percentages
 
 ### Influencer & Outreach Data
+
 - **Twitch**: Streamer databases, viewership benchmarks, genre-specific engagement rates
 - **YouTube**: Content creator discovery, subscriber metrics, engagement analysis
 - **Steam Curators**: Curator databases, follower counts, review focus areas, response patterns
 
 ### Analysis Methodology
+
+**Our Approach:**
 - **Competitive Analysis**: Genre-based similarity matching, price positioning analysis
 - **AI Vision Analysis**: Claude 4.5 Sonnet capsule image evaluation across 10 dimensions
 - **Market Viability**: TAM sizing, competitive saturation modeling, success probability calculations
 - **ROI Modeling**: Regional pricing optimization, localization cost-benefit analysis
 
-**Data Freshness**: All data collected on {datetime.now().strftime('%Y-%m-%d at %I:%M %p')}
-**Report Version:** 2.1 (Enhanced with Market Viability + Impact Matrix)
-**Analysis Type:** {self.report_type}
-**Overall Score:** {self.overall_score}/100
+**Data Limitations:**
+- Some APIs may be rate-limited or unavailable in certain environments
+- Estimates are based on industry benchmarks where exact data is unavailable
+- Regional data may include approximations based on purchasing power parity
+
+</details>
 
 ---
-
-## About Publitz Automated Audits
-
-Professional game market intelligence powered by AI and real-time data aggregation.
-
-For questions or support: support@publitz.com
-
----
-
-*This report contains confidential market intelligence and is intended solely for {game_name}.
-Data accuracy is dependent on third-party API availability and may contain estimates where actual data is unavailable.*
 """
 
     def get_structured_data(self) -> Dict[str, Any]:
