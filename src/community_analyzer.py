@@ -116,10 +116,10 @@ def analyze_community_reach(
         curator_list = _generate_curator_recommendations(game_data)
 
     # Convert curator list to expected format (list of strings with curator names)
-    if curator_list and isinstance(curator_list[0], dict):
+    if curator_list and len(curator_list) > 0 and isinstance(curator_list[0], dict):
         curator_names = [c.get('name', str(c)) for c in curator_list]
     else:
-        curator_names = curator_list
+        curator_names = curator_list if curator_list else []
 
     # Detect generic curators and adjust score
     curator_detection = detect_generic_curators(curator_names)
@@ -165,8 +165,8 @@ def _generate_subreddit_recommendations(game_data: Dict[str, Any]) -> List[str]:
     instead of generic ones.
     """
     subreddits = []
-    genres = game_data.get('genres', [])
-    tags = game_data.get('tags', [])
+    genres = game_data.get('genres', []) or []  # Handle None
+    tags = game_data.get('tags', []) or []  # Handle None
 
     # Map genres to specific subreddits
     genre_mapping = {
@@ -217,7 +217,7 @@ def _generate_influencer_recommendations(game_data: Dict[str, Any]) -> List[str]
 
     Returns specific influencer names/channels when possible.
     """
-    genres = game_data.get('genres', [])
+    genres = game_data.get('genres', []) or []  # Handle None
 
     # Genre-specific influencers (these are EXAMPLES - real implementation would use actual data)
     influencers = []
@@ -263,7 +263,7 @@ def _generate_curator_recommendations(game_data: Dict[str, Any]) -> List[str]:
     """
     Generate Steam curator recommendations based on game type.
     """
-    genres = game_data.get('genres', [])
+    genres = game_data.get('genres', []) or []  # Handle None
     curators = []
 
     # Genre-specific curators

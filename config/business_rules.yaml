@@ -1,0 +1,186 @@
+# Publitz Automated Audits - Business Rules Configuration
+# Last Updated: 2025-11-26
+# 
+# This file contains all business logic thresholds and rules.
+# Modify these values to adjust validation and scoring behavior.
+
+# ============================================================================
+# PRICING RULES
+# ============================================================================
+pricing:
+  # Catastrophic pricing threshold (below this = catastrophic)
+  catastrophic_threshold: 2.00
+  
+  # Optimal price ranges by category
+  optimal_range:
+    indie_min: 4.99
+    indie_max: 29.99
+    aaa_min: 39.99
+    aaa_max: 69.99
+  
+  # Severity levels (price ranges)
+  severity_levels:
+    catastrophic:  # $0.01-$1.99
+      min: 0.01
+      max: 1.99
+      severity: "CRITICAL"
+      impact_on_sales: -70
+    
+    too_low:  # $2.00-$4.98
+      min: 2.00
+      max: 4.98
+      severity: "HIGH"
+      impact_on_sales: -40
+    
+    acceptable_low:  # $4.99-$9.99
+      min: 4.99
+      max: 9.99
+      severity: "LOW"
+      impact_on_sales: -10
+    
+    optimal:  # $10.00-$29.99
+      min: 10.00
+      max: 29.99
+      severity: null
+      impact_on_sales: 0
+    
+    premium:  # $30.00-$49.99
+      min: 30.00
+      max: 49.99
+      severity: "LOW"
+      impact_on_sales: -15
+    
+    too_high:  # $50.00-$79.99
+      min: 50.00
+      max: 79.99
+      severity: "MEDIUM"
+      impact_on_sales: -30
+    
+    extremely_high:  # $80.00+
+      min: 80.00
+      max: 999.99
+      severity: "HIGH"
+      impact_on_sales: -50
+  
+  # Competitor comparison thresholds
+  competitor_comparison:
+    severe_underpricing: 0.4  # <40% of competitor average
+    moderate_underpricing: 0.6  # <60% of competitor average
+    moderate_overpricing: 1.5  # >150% of competitor average
+    severe_overpricing: 2.0  # >200% of competitor average
+
+# ============================================================================
+# GENERIC DETECTION RULES
+# ============================================================================
+generic_detection:
+  # Subreddit thresholds and penalties
+  subreddits:
+    generic_threshold: 0.6  # >60% generic = penalized
+    penalty_severe: 40      # >80% generic
+    penalty_moderate: 25    # >60% generic
+    penalty_minor: 10       # >40% generic
+    
+  # Influencer thresholds and penalties
+  influencers:
+    min_specific: 3         # Need at least 3 specific influencers
+    penalty_no_specific: 50  # No specific influencers
+    penalty_few_specific: 30 # <3 specific influencers
+    
+  # Curator thresholds and penalties
+  curators:
+    generic_threshold: 0.5  # >50% generic = penalized
+    penalty_severe: 40      # >70% generic
+    penalty_moderate: 20    # >50% generic
+    
+  # Tag thresholds and penalties
+  tags:
+    generic_threshold: 0.5  # >50% generic = penalized
+    penalty_minor: 15       # >50% generic
+
+# ============================================================================
+# SCORE VALIDATION RULES
+# ============================================================================
+scoring:
+  # Enable/disable score capping
+  hard_caps:
+    enable: true
+    revenue_based: true
+  
+  # Review quality thresholds
+  review_quality:
+    excellent_threshold: 90  # 90%+ = excellent
+    good_threshold: 80      # 80-89% = good
+    acceptable_threshold: 70 # 70-79% = acceptable
+    poor_threshold: 60      # 60-69% = poor
+  
+  # Minimum review counts for validation
+  review_count_thresholds:
+    very_high_confidence: 1000
+    high_confidence: 500
+    medium_confidence: 100
+    low_confidence: 50
+    too_few: 10
+  
+  # Revenue-based scoring adjustments
+  revenue_tiers:
+    tier_5_min: 1000000  # $1M+
+    tier_4_min: 500000   # $500K+
+    tier_3_min: 100000   # $100K+
+    tier_2_min: 10000    # $10K+
+    tier_1_min: 0        # <$10K
+
+# ============================================================================
+# COMMUNITY REACH WEIGHTS
+# ============================================================================
+community:
+  # Component weights (must sum to 1.0)
+  weights:
+    subreddits: 0.4   # 40%
+    influencers: 0.4  # 40%
+    curators: 0.2     # 20%
+  
+  # Base scores (before generic detection)
+  base_scores:
+    subreddits: 85
+    influencers: 80
+    curators: 75
+
+# ============================================================================
+# DATA CONSISTENCY RULES
+# ============================================================================
+data_consistency:
+  # Review rate thresholds (reviews / owners)
+  review_rate:
+    typical_min: 0.02  # 2%
+    typical_max: 0.05  # 5%
+    suspicious_high: 0.15  # 15%+
+    impossible: 1.0    # 100%+
+  
+  # Revenue validation
+  revenue:
+    min_daily_revenue: 1.00  # $1/day minimum
+    max_price_revenue_ratio: 10.0  # revenue can't be >10x price
+  
+  # Temporal validation
+  temporal:
+    max_days_since_launch: 3650  # 10 years
+    min_days_for_analysis: 1
+
+# ============================================================================
+# REPORT GENERATION SETTINGS
+# ============================================================================
+report:
+  # Word count targets
+  word_counts:
+    tier_1_min: 800
+    tier_1_max: 1500
+    tier_2_min: 1200
+    tier_2_max: 2500
+    tier_3_min: 2000
+    tier_3_max: 5000
+  
+  # Quality thresholds
+  quality:
+    minimum_data_completeness: 60  # %
+    minimum_specificity: 50  # %
+    maximum_warnings: 5
