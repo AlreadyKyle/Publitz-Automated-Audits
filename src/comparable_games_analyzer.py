@@ -125,9 +125,9 @@ class ComparableGamesAnalyzer:
             comparable_games.extend(tag_games)
 
         # If we don't have enough, try tag search
-        if len(comparable_games) < limit and genre_list:
+        if len(comparable_games) < limit and genre_tags:
             logger.info(f"Found {len(comparable_games)} games, trying tag search...")
-            tag = genre_list[0] if isinstance(genre_list[0], str) else genre_list[0].get('description', '')
+            tag = genre_tags[0] if isinstance(genre_tags[0], str) else genre_tags[0].get('description', '')
             tag_results = self.game_search._find_by_tag(tag, limit * 2)
             additional_games = self._filter_by_criteria(tag_results, price, target_launch, owner_tier, target_game_id)
             comparable_games.extend(additional_games)

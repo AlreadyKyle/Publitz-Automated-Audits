@@ -284,6 +284,154 @@ class CacheManager:
         logger.info(f"Cache Size: {stats['total_size_kb']:.1f} KB")
         logger.info(f"Cache Directory: {stats['cache_dir']}")
 
+    def get_or_fetch(
+        self,
+        namespace: str,
+        identifier: Any,
+        fetch_func: Callable,
+        ttl_hours: Optional[int] = None,
+        *args,
+        **kwargs
+    ) -> Any:
+        """
+        Get from cache or fetch if missing/expired (smart caching).
+
+        This is the recommended way to use the cache - it handles
+        cache misses automatically by calling the fetch function.
+
+        Args:
+            namespace: Category of data
+            identifier: Unique identifier
+            fetch_func: Function to call if cache miss
+            ttl_hours: Custom TTL (overrides default)
+            *args: Arguments to pass to fetch_func
+            **kwargs: Keyword arguments to pass to fetch_func
+
+        Returns:
+            Cached or freshly fetched data
+
+        Usage:
+            # Instead of:
+            data = cache.get('steam_game', app_id)
+            if data is None:
+                data = fetch_steam_game(app_id)
+                cache.set('steam_game', app_id, data)
+
+            # Use:
+            data = cache.get_or_fetch(
+                'steam_game',
+                app_id,
+                fetch_steam_game,
+                ttl_hours=24,
+                app_id  # passed to fetch_steam_game
+            )
+        """
+        # Try to get from cache
+        cached_data = self.get(namespace, identifier, ttl_hours)
+        if cached_data is not None:
+            return cached_data
+
+        # Cache miss - fetch data
+        logger.info(f"Cache miss - fetching {namespace}:{identifier}")
+        try:
+            data = fetch_func(*args, **kwargs)
+
+            # Store in cache if data is valid
+            if data is not None:
+                self.set(namespace, identifier, data)
+
+            return data
+
+        except Exception as e:
+            logger.error(f"Error fetching {namespace}:{identifier}: {e}")
+            return None
+
+
+class SmartCache(CacheManager):
+    """
+    Extended cache manager with category-specific TTLs and smart features.
+
+    This adds intelligent TTL management for different data types:
+    - Price analysis: 6 hours (prices change frequently)
+    - Comparable games: 24 hours (relatively stable)
+    - SteamSpy data: 12 hours (updates daily)
+    - Steam API data: 6 hours (more frequent updates)
+    """
+
+    def __init__(self, cache_dir: str = ".cache", default_ttl_hours: int = 24):
+        super().__init__(cache_dir, default_ttl_hours)
+
+        # Category-specific TTLs (in hours)
+        self.category_ttls = {
+            'price_analysis': 6,
+            'comparable_games': 24,
+            'steamspy_genre': 12,
+            'steamspy_game': 12,
+            'steam_game': 6,
+            'steam_reviews': 3,
+            'community_data': 24,
+            'generic_detection': 24
+        }
+
+    def get_category_ttl(self, namespace: str) -> int:
+        """
+        Get TTL for a category.
+
+        Args:
+            namespace: Category name
+
+        Returns:
+            TTL in hours
+        """
+        return self.category_ttls.get(namespace, self.default_ttl / 3600)
+
+    def get_smart(self, namespace: str, identifier: Any) -> Optional[Any]:
+        """
+        Get from cache using category-specific TTL.
+
+        Args:
+            namespace: Category name
+            identifier: Unique identifier
+
+        Returns:
+            Cached data or None
+        """
+        ttl_hours = self.get_category_ttl(namespace)
+        return self.get(namespace, identifier, ttl_hours)
+
+    def get_or_fetch_smart(
+        self,
+        namespace: str,
+        identifier: Any,
+        fetch_func: Callable,
+        *args,
+        **kwargs
+    ) -> Any:
+        """
+        Smart version of get_or_fetch with category-specific TTL.
+
+        Automatically uses the appropriate TTL for the data category.
+
+        Args:
+            namespace: Category name
+            identifier: Unique identifier
+            fetch_func: Function to fetch data
+            *args: Arguments for fetch_func
+            **kwargs: Keyword arguments for fetch_func
+
+        Returns:
+            Cached or fetched data
+        """
+        ttl_hours = self.get_category_ttl(namespace)
+        return self.get_or_fetch(
+            namespace,
+            identifier,
+            fetch_func,
+            ttl_hours,
+            *args,
+            **kwargs
+        )
+
 
 # Global cache instance
 _global_cache = None
