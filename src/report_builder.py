@@ -712,13 +712,17 @@ Found {len(subreddits)} relevant subreddits with {reddit_data.get('total_reach',
 
 """
 
-        # Top subreddits table
+        # Top subreddits table - show all subreddits to match the count
         if subreddits:
             markdown += "| Subreddit | Subscribers | Description |\n"
             markdown += "|-----------|-------------|-------------|\n"
 
-            for sub in subreddits[:5]:
-                markdown += f"| r/{sub['name']} | {sub.get('subscribers', 0):,} | {sub.get('description', 'N/A')[:50]}... |\n"
+            # Show all subreddits instead of truncating to 5
+            for sub in subreddits:
+                sub_name = sub.get('name', 'unknown')
+                sub_count = sub.get('subscribers', 0)
+                sub_desc = sub.get('description', 'N/A')[:50]
+                markdown += f"| r/{sub_name} | {sub_count:,} | {sub_desc}... |\n"
 
             markdown += "\n"
 
@@ -781,9 +785,38 @@ class InfluencerSection(ReportSection):
         rating_emoji = {'excellent': '✅', 'good': '🟢', 'fair': '🟡', 'poor': '🔴'}
         emoji = rating_emoji.get(self.rating, '⚪')
 
+        total_reach = twitch_data.get('total_reach', 0) + youtube_data.get('total_reach', 0) + curator_data.get('estimated_total_reach', 0)
+
         markdown = f"""## Influencer Outreach Strategy
 
 **Score: {self.score}/100** {emoji} {self.rating.title()}
+
+### Outreach Strategy & Implementation
+
+**Total Potential Reach**: {total_reach:,} combined audience across platforms
+
+**Recommended Approach:**
+
+1. **Start with Micro-Influencers (5K-50K followers)**: These creators have the highest engagement rates (3-8%) and are most receptive to indie game keys. Target 10-15 creators for initial outreach.
+
+2. **Tier Your Outreach**:
+   - **Week 1-2**: Contact micro-influencers with personalized emails emphasizing authentic fit with their content
+   - **Week 3-4**: Reach out to mid-tier creators (50K-200K) once you have social proof from micro-influencer coverage
+   - **Week 5+**: Approach major creators (200K+) with compilation of existing coverage
+
+3. **Budget Allocation**:
+   - Micro-influencers: Free keys + personalized outreach ($0 cost, 5 hours time)
+   - Mid-tier: $100-300 per creator for sponsored content (optional, only after organic validation)
+   - Curators: Always free - focus on high-response-rate curators first
+
+4. **Success Metrics**:
+   - Response rate: Target 15-25% positive responses from micro-influencers
+   - Coverage: Aim for 5-8 pieces of content in first 30 days
+   - Conversion: Track Steam referral traffic from each creator (use UTM codes)
+
+**Email Template Strategy**: Keep initial outreach under 150 words. Focus on why your game fits their audience, not generic pitches. Include key hook, trailer link, and single-sentence call-to-action.
+
+---
 
 ### Twitch Streamers
 
@@ -921,7 +954,7 @@ class GlobalReachSection(ReportSection):
             current_languages = localization_data.get('current_languages', [])
             current_reach = localization_data.get('current_market_reach_percent', 0)
 
-            markdown += f"**Current Coverage**: {len(current_languages)} languages, ~{current_reach}% of global market\n\n"
+            markdown += f"**Current Coverage**: {len(current_languages)} language{'s' if len(current_languages) != 1 else ''}, ~{current_reach:.0f}% of global market\n\n"
 
             missing_languages = localization_data.get('missing_languages', [])
             if missing_languages:
@@ -929,9 +962,20 @@ class GlobalReachSection(ReportSection):
                 markdown += "| Language | Cost | Potential Revenue | ROI % |\n"
                 markdown += "|----------|------|-------------------|-------|\n"
 
+                # Show top 5 missing languages regardless of priority to avoid blank tables
+                table_populated = False
                 for lang in missing_languages[:5]:
-                    if lang.get('priority') == 'high':
-                        markdown += f"| {lang['language']} | ${lang['localization_cost']:,} | ${lang['additional_revenue']:,.0f} | {lang['roi_percent']:.0f}% |\n"
+                    # Show all languages in top 5, not just high priority
+                    cost = lang.get('localization_cost', 0)
+                    revenue = lang.get('additional_revenue', 0)
+                    roi = lang.get('roi_percent', 0)
+                    priority_marker = " 🔥" if lang.get('priority') == 'high' else ""
+                    markdown += f"| {lang['language']}{priority_marker} | ${cost:,} | ${revenue:,.0f} | {roi:.0f}% |\n"
+                    table_populated = True
+
+                # If no data in table, show message
+                if not table_populated:
+                    markdown += "| No additional languages recommended | - | - | - |\n"
 
                 markdown += "\n"
 
