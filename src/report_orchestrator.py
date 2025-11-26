@@ -32,6 +32,7 @@ from src.revenue_based_scoring import (
     calculate_overall_score as calculate_revenue_based_score,
     generate_reality_check_warning
 )
+from src.quick_start_generator import generate_quick_start  # Use detailed Quick Start system
 
 logger = logging.getLogger(__name__)
 
@@ -338,7 +339,8 @@ class ReportOrchestrator:
         # Universal components (all tiers)
         exec_summary = self._generate_executive_summary(game_data, tier, score)
         confidence_scorecard = self._generate_confidence_scorecard(game_data)
-        quick_start = self._generate_quick_start(game_data, tier)
+        # Use detailed Quick Start system from quick_start_generator.py
+        quick_start = generate_quick_start(game_data)
         key_metrics = self._generate_key_metrics_dashboard(game_data, score)
         market_positioning = self._generate_market_positioning(game_data, tier)
         comparable_games = self._generate_comparable_games(game_data)
@@ -600,22 +602,15 @@ class ReportOrchestrator:
 
         return md
 
-    def _generate_quick_start(self, game_data: Dict[str, Any], tier: int) -> str:
-        """Generate Quick Start section with top 3 actions"""
-        md = "## Quick Start: Top 3 Actions\n\n"
-        md += "*Start here if you only have 30 minutes.*\n\n"
-
-        # Generate top ROI actions
-        actions = self._get_top_actions_for_tier(game_data, tier)
-
-        for i, action in enumerate(actions[:3], 1):
-            md += f"### {i}. {action['name']}\n\n"
-            md += f"**Investment**: {action['time']} hours, ${action['cost']:,.0f}\n\n"
-            md += f"**Expected Return**: ${action['revenue_min']:,.0f} - ${action['revenue_max']:,.0f}\n\n"
-            md += f"**ROI**: {action['roi']:.1f}x | **Payback**: {action['payback']} | **Confidence**: {action['confidence']}\n\n"
-            md += f"**What to do**: {action['description']}\n\n"
-
-        return md
+    # DEPRECATED: This method is no longer used
+    # Quick Start generation now handled by src/quick_start_generator.py
+    # which provides detailed Problem→Competitor→Solution format with full action library
+    #
+    # def _generate_quick_start(self, game_data: Dict[str, Any], tier: int) -> str:
+    #     """DEPRECATED: Use generate_quick_start() from quick_start_generator.py instead"""
+    #     # This simple version has been replaced with the detailed system
+    #     # See src/quick_start_generator.py for the current implementation
+    #     pass
 
     def _generate_key_metrics_dashboard(self, game_data: Dict[str, Any], score: float) -> str:
         """Generate key metrics dashboard"""
