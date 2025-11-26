@@ -57,6 +57,10 @@ from src.generic_detection import (
     detect_generic_tags,
     adjust_score_for_generic_data
 )
+from src.community_analyzer import (
+    analyze_community_reach,
+    generate_community_report
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +101,7 @@ class ReportComponents:
     revenue_performance: str
     strategic_recommendations: str
     action_plan_30_day: str
+    community_reach: Optional[str] = None  # Community reach analysis with generic detection
     negative_review_analysis: Optional[str] = None
     salvageability_assessment: Optional[str] = None
     market_expansion: Optional[str] = None
@@ -551,6 +556,9 @@ class ReportOrchestrator:
         strategic_recs = self._generate_strategic_recommendations(game_data, tier)
         action_plan = self._generate_action_plan_with_roi(game_data, tier)
 
+        # Community reach analysis (all tiers) - with generic detection
+        community_reach = self._generate_community_reach(game_data)
+
         # Tier-specific components
         negative_review_analysis = None
         salvageability_assessment = None
@@ -592,6 +600,7 @@ class ReportOrchestrator:
             revenue_performance=revenue_performance,
             strategic_recommendations=strategic_recs,
             action_plan_30_day=action_plan,
+            community_reach=community_reach,
             negative_review_analysis=negative_review_analysis,
             salvageability_assessment=salvageability_assessment,
             market_expansion=market_expansion,
@@ -684,6 +693,11 @@ class ReportOrchestrator:
         report += components.market_positioning
         report += "\n\n" + components.comparable_games
         report += "\n\n" + components.revenue_performance
+
+        # Add community reach analysis (with generic detection)
+        if components.community_reach:
+            report += "\n\n" + components.community_reach
+
         report += "\n\n" + components.strategic_recommendations
         report += "\n\n" + components.action_plan_30_day
 
@@ -1268,6 +1282,32 @@ class ReportOrchestrator:
         md = "## Regional Market Analysis\n\n"
         md += "*Coming soon - region-specific performance data*\n\n"
         return md
+
+    def _generate_community_reach(self, game_data: Dict[str, Any]) -> str:
+        """
+        Generate community reach analysis with generic detection.
+
+        This analyzes subreddits, influencers, and curators and detects
+        whether recommendations are game-specific or generic.
+        """
+        try:
+            logger.info("Generating community reach analysis with generic detection...")
+
+            # Analyze community reach (auto-generates recommendations based on game data)
+            analysis = analyze_community_reach(game_data)
+
+            # Generate report
+            report = generate_community_report(analysis, game_data.get('name', 'Your Game'))
+
+            logger.info(f"Community reach analysis complete - Overall score: {analysis.overall_score}/100")
+            if analysis.warnings:
+                logger.warning(f"  {len(analysis.warnings)} generic data warnings generated")
+
+            return report
+
+        except Exception as e:
+            logger.error(f"Error generating community reach analysis: {e}")
+            return "## Community Reach\n\n*Community reach analysis unavailable*"
 
     def _generate_store_optimization(self, game_data: Dict[str, Any]) -> str:
         """Generate store page optimization recommendations"""
