@@ -2540,7 +2540,15 @@ class ReportBuilder:
         """Build all standard sections"""
         logger.info("Building report sections")
 
-        # Create market viability section FIRST (most important for decision-making)
+        # Create Quick Start Summary Dashboard FIRST (immediate actionability for users)
+        dashboard_section = CustomDashboardSection("Quick Start Summary Dashboard", {
+            'game_data': self.game_data,
+            'sales_data': self.sales_data,
+            'competitor_data': self.competitor_data
+        })
+        self.add_section(dashboard_section)
+
+        # Create market viability section SECOND (most important for decision-making)
         viability_section = MarketViabilitySection("Market Viability", {
             'game_data': self.game_data,
             'competitors': self.competitor_data,
@@ -2634,13 +2642,8 @@ class ReportBuilder:
         })
         self.add_section(regional_pricing_section)
 
-        # Create custom dashboard section LAST (tracking tools)
-        dashboard_section = CustomDashboardSection("Custom Tracking Dashboard", {
-            'game_data': self.game_data,
-            'sales_data': self.sales_data,
-            'competitor_data': self.competitor_data
-        })
-        self.add_section(dashboard_section)
+        # NOTE: Dashboard section moved to FIRST position (see beginning of build_sections)
+        # Removed duplicate dashboard creation from here
 
         # Create executive summary (references other sections)
         self.executive_summary = ExecutiveSummarySection({
