@@ -30,6 +30,9 @@ class QuickWinAction:
     impact_score: int  # 1-10
     effort_score: int  # 1-10 (10 = easiest, 1 = hardest)
     confidence_score: int  # 1-10
+    # New fields for Problem -> Competitor -> Solution format
+    problem: str = ""  # What's broken/missing and why it matters
+    competitor_approach: str = ""  # How successful games handle this
 
 
 # ACTION LIBRARY: All possible quick wins with ultra-specific instructions
@@ -37,7 +40,9 @@ ACTION_LIBRARY = {
     "regional_pricing": QuickWinAction(
         id="regional_pricing",
         title="Add Regional Pricing for Top 5 Markets",
-        why_matters="Games with regional pricing see +20-30% unit sales from emerging markets (Brazil, Turkey, Argentina, India, Russia). This is pure incremental revenue.",
+        problem="Your game uses a single global price (likely USD), which means it's unaffordable in emerging markets where purchasing power is 3-5x lower. You're leaving 20-30% of potential revenue on the table.",
+        competitor_approach="Successful indie games (Hades, Vampire Survivors, Slay the Spire) use Steam's regional pricing to adjust prices based on local purchasing power. They see Brazil, Argentina, and Turkey as their 2nd-4th largest markets after adding regional pricing.",
+        why_matters="Implement purchasing-power-parity (PPP) based pricing for emerging markets to unlock incremental sales without cannibalizing existing markets.",
         time_hours=0.5,
         cost="Free",
         expected_result="+20-30% unit sales from emerging markets within 30 days",
@@ -71,7 +76,9 @@ ACTION_LIBRARY = {
     "store_page_rewrite": QuickWinAction(
         id="store_page_rewrite",
         title="Rewrite First Paragraph with Benefit-Focused Language",
-        why_matters="The first 2-3 sentences determine if a visitor reads further. Benefit-focused copy increases click-to-wishlist rate by 15-25%.",
+        problem="Your store page opens with feature lists or mechanics explanations instead of emotional hooks. Visitors bounce in seconds because they don't immediately understand why they should care.",
+        competitor_approach="Top-selling games (Hades: 'Defy the god of the dead...', Vampire Survivors: 'Mow down thousands of night creatures...') lead with benefit-driven hooks that trigger emotional responses, not feature lists. They tell you what you'll FEEL, not what buttons you'll press.",
+        why_matters="Rewrite your opening paragraph to lead with player benefits and emotional payoff, using the formula: Emotional Hook + Core Loop + Social Proof.",
         time_hours=1.5,
         cost="Free (or $100-150 if hiring copywriter)",
         expected_result="+15-25% store page engagement (scroll depth, wishlist rate)",
@@ -497,34 +504,43 @@ def evaluate_applicable_actions(game_data: Dict[str, Any]) -> List[Tuple[QuickWi
 
 
 def format_action_markdown(action: QuickWinAction, action_number: int, reason: str = "") -> str:
-    """Format a single action as markdown."""
+    """Format a single action as markdown using Problem -> Competitor -> Solution format."""
 
     markdown = f"""## Action {action_number}: {action.title}
 
-**Why This Matters**: {action.why_matters}
-
-**Time Required**: {action.time_hours} hours | **Cost**: {action.cost} | **Expected Result**: {action.expected_result}
+**The Problem**: {action.problem if action.problem else action.why_matters}
 """
 
     if reason:
-        markdown += f"\n**Why We Recommend This**: {reason}\n"
+        markdown += f"\n*{reason}*\n"
 
-    markdown += "\n**Step-by-Step Instructions**:\n"
+    if action.competitor_approach:
+        markdown += f"""
+**How Competitors Handle This**: {action.competitor_approach}
+"""
+
+    markdown += f"""
+**Recommended Solution**: {action.why_matters}
+
+**Investment Required**: {action.time_hours} hours | **Cost**: {action.cost} | **Expected Impact**: {action.expected_result}
+
+**Implementation Steps**:
+"""
     for i, step in enumerate(action.steps, 1):
         markdown += f"{i}. {step}\n"
 
-    markdown += "\n**How to Measure Success**:\n"
+    markdown += "\n**Success Metrics**:\n"
     for measure in action.measure_success:
         markdown += f"- {measure}\n"
 
-    markdown += f"\n**Good Result**: {action.good_result}\n"
-    markdown += f"**Timeline**: {action.timeline}\n"
+    markdown += f"\n**Target Outcome**: {action.good_result}\n"
+    markdown += f"**Timeline to Results**: {action.timeline}\n"
 
     markdown += "\n**⚠️ Common Mistakes to Avoid**:\n"
     for mistake in action.common_mistakes:
         markdown += f"- {mistake}\n"
 
-    markdown += "\n**Tools You'll Need**:\n"
+    markdown += "\n**Tools Needed**:\n"
     for tool in action.tools_needed:
         markdown += f"- {tool}\n"
 
