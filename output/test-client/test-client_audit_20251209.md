@@ -1,5 +1,5 @@
 # Pre-Launch Steam Audit Report
-## Cyberpunk 2077
+## Unknown
 
 **Prepared for:** Example Studio
 **Generated:** December 09, 2025
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-**🎮 Game:** Cyberpunk 2077
+**🎮 Game:** Unknown
 **📅 Launch Date:** 2025-03-15
 **⏱️  Days Until Launch:** -270
 **💰 Target Price:** $29.99
@@ -21,10 +21,10 @@
 ### Game Information
 
 - **App ID:** 1091500
-- **Current Price:** $CDN$ 27.99
-- **Genres:** RPG, RPG Games
-- **Release Date:** 9 Dec, 2020
-- **Review Score:** 88.3%% (357084 reviews)
+- **Current Price:** $Unknown
+- **Genres:** Unknown
+- **Release Date:** Unknown
+- **Review Score:** N/A% (0 reviews)
 
 ### Competitive Landscape
 
@@ -53,8 +53,8 @@
 ### External Research
 
 **Reddit Insights:**
-- Subreddit: r/IndieGaming
-- Top discussions: 5 found
+- Subreddit: r/None
+- Top discussions: 0 found
 
 **HowLongToBeat:**
 - Data found: No
