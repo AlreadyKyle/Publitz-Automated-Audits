@@ -16,6 +16,17 @@ Generates professional $1,500 Steam game audit reports in 10 minutes:
 
 ---
 
+## 🎯 4 Double-Click Files (No Terminal Needed!)
+
+1. **`SETUP.command`** - First-time setup (run once)
+2. **`RUN_TEST.command`** - Test the system
+3. **`CREATE_CLIENT.command`** - Make new client folder
+4. **`GENERATE_AUDIT.command`** - Generate reports
+
+**That's it!** Just double-click these files to use the system.
+
+---
+
 ## 🚀 Quick Start (First Time - Mac Users)
 
 ### Step 1: Pull Latest Changes (GitHub Desktop)
