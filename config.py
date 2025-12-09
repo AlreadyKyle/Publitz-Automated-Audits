@@ -14,8 +14,8 @@ class Config:
     """Application configuration"""
 
     # API Keys (simplified - only what we actually use)
-    ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
-    RAWG_API_KEY = os.getenv('RAWG_API_KEY', '5353e48dc2a4446489ec7c0bbb1ce9e9')
+    ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '').strip()
+    RAWG_API_KEY = os.getenv('RAWG_API_KEY', '5353e48dc2a4446489ec7c0bbb1ce9e9').strip()
 
     # NOTE: YouTube and Steam Web API removed - they were unreliable/deprecated
     # Primary data source is Steam URL scraping + SteamSpy (both free, no keys)
