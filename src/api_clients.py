@@ -58,20 +58,24 @@ class SteamSpyClient:
 
                 # Check if we got valid data
                 if data and 'name' in data:
+                    # Ensure all numeric values are properly typed
+                    price_raw = data.get('price', 0)
+                    price = int(price_raw) / 100 if price_raw and str(price_raw) != '0' else 0
+
                     return {
                         'found': True,
                         'name': data.get('name', ''),
                         'owners': data.get('owners', '0 .. 0'),
-                        'owners_variance': data.get('owners_variance', 0),
-                        'players_forever': data.get('players_forever', 0),
-                        'average_playtime': data.get('average_forever', 0),  # minutes
-                        'median_playtime': data.get('median_forever', 0),  # minutes
-                        'ccu': data.get('ccu', 0),
-                        'price': data.get('price', 0) / 100 if data.get('price') else 0,  # Convert cents to dollars
-                        'positive': data.get('positive', 0),
-                        'negative': data.get('negative', 0),
-                        'score_rank': data.get('score_rank', ''),
-                        'userscore': data.get('userscore', 0)
+                        'owners_variance': int(data.get('owners_variance', 0) or 0),
+                        'players_forever': int(data.get('players_forever', 0) or 0),
+                        'average_playtime': int(data.get('average_forever', 0) or 0),  # minutes
+                        'median_playtime': int(data.get('median_forever', 0) or 0),  # minutes
+                        'ccu': int(data.get('ccu', 0) or 0),
+                        'price': price,  # Convert cents to dollars
+                        'positive': int(data.get('positive', 0) or 0),
+                        'negative': int(data.get('negative', 0) or 0),
+                        'score_rank': str(data.get('score_rank', '')),
+                        'userscore': int(data.get('userscore', 0) or 0)
                     }
 
         except Exception as e:

@@ -188,7 +188,7 @@ class SimpleDataCollector:
 
             try:
                 # Search for competitor by name
-                comp_data = self.game_search.search_game_by_name(comp_name)
+                comp_data = self.game_search.search_game(comp_name)
 
                 if comp_data:
                     # Get additional data
