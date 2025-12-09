@@ -108,21 +108,26 @@ def generate_audit(client_name: str):
         sys.exit(1)
 
     # ========================================================================
-    # PHASE 3: Report Generation (Coming Soon)
+    # PHASE 3: Report Generation
     # ========================================================================
     print("=" * 80)
     print("PHASE 3: REPORT GENERATION")
     print("=" * 80)
-    print("\n⏳ Report generation with Claude AI (Phase 2 - Coming Soon)")
-    print("   This will generate the full 9-section audit report\n")
 
-    # TODO: Implement Claude report generation
-    # from src.report_generator import ReportGenerator
-    # generator = ReportGenerator()
-    # report_markdown = generator.generate(data, inputs)
+    try:
+        from src.report_generator import ReportGenerator
 
-    # For now, create a placeholder report
-    report_markdown = create_placeholder_report(data, inputs)
+        generator = ReportGenerator()
+        report_markdown = generator.generate_full_report(data, inputs)
+
+    except ImportError as e:
+        print(f"\n⚠️  Report generator not available: {e}")
+        print("   Falling back to placeholder report\n")
+        report_markdown = create_placeholder_report(data, inputs)
+    except Exception as e:
+        print(f"\n❌ Report generation failed: {e}")
+        print("   Falling back to placeholder report\n")
+        report_markdown = create_placeholder_report(data, inputs)
 
     # Save markdown
     markdown_path = output_dir / f"{client_name}_audit_{datetime.now().strftime('%Y%m%d')}.md"
