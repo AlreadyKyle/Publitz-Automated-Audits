@@ -1,107 +1,151 @@
-# Publitz Automated Game Audits
+# Publitz Automated Audits
 
-AI-powered Steam game audit system. Paste a Steam URL, get a professional audit report.
+**Generate professional $1,500 Steam game audit reports in 10 minutes.**
+
+4 simple input files → 35-45 page PDF report + pricing CSV
+
+---
 
 ## Quick Start
 
-### 1. Install Dependencies
-
 ```bash
+# 1. Install dependencies
 pip install -r requirements.txt
+
+# 2. Run test
+python generate_audit.py --test
+
+# 3. Check output
+ls output/test-client/
 ```
 
-### 2. Run the App
+That's it! You'll see a professional PDF report and pricing CSV.
 
-```bash
-streamlit run app.py
-```
+---
 
-That's it! The app will open in your browser.
+## For Complete Instructions
 
-## How to Use
+**📖 Read: [`USER_GUIDE.md`](USER_GUIDE.md)** ← Everything you need is here
 
-1. **Get your Anthropic API Key**: [console.anthropic.com](https://console.anthropic.com/)
-2. **Paste a Steam Game URL**: Like `https://store.steampowered.com/app/292030/The_Witcher_3_Wild_Hunt/`
-3. **Click Generate**: The system will automatically:
-   - Detect if the game is Pre-Launch or Post-Launch
-   - Find 3-10 competitor games
-   - Analyze Steam data
-   - Generate a comprehensive audit report with Claude AI
-4. **Download**: Get your report as a Markdown file
+This guide covers:
+- ✅ How to generate audits (3 steps)
+- ✅ How to fill in the 4 input files
+- ✅ What you get in reports
+- ✅ Troubleshooting
+- ✅ Tips & best practices
 
-## Features
+---
 
-✅ **Paste Steam URL** - No need to type game names
-✅ **Auto-Detect Launch Status** - Automatically determines Pre-Launch vs Post-Launch
-✅ **Always Finds Competitors** - Multi-tier search ensures 3-10 competitors (never zero)
-✅ **AI-Powered Reports** - Uses Claude Sonnet 4.5 for professional analysis
-✅ **Real Steam Data** - Live data from Steam API and SteamSpy
-✅ **One-Click Download** - Export as Markdown
+## What's Included
 
-## What You Get
+### Report Features ($1,500 value)
+- **Owner Estimates** (SteamSpy) - Quantified market sizing
+- **Metacritic Scores** (RAWG) - Quality benchmarks
+- **YouTube Buzz** (YouTube API) - Community interest metrics
+- **Competitive Analysis** - 10-20 competitors with full data
+- **PPP Pricing Audit** - Flags 20-56% overpricing in regions
+- **Vision Analysis** (Claude Vision) - Capsule, screenshots, banner critique
+- **Research-Backed Recommendations** - Launch velocity, Next Fest strategy, timing
 
-### Pre-Launch Reports Include:
-- Executive Summary
-- Market Analysis
-- Competitive Landscape
-- Pricing Strategy
-- Feature Differentiation
-- Marketing Strategy Recommendations
-- Steam Store Optimization
-- Wishlist Strategy
-- Launch Plan
-- Risk Mitigation
+### Deliverables
+1. **PDF Report** (35-45 pages) - Professional branded audit
+2. **Pricing CSV** (50+ countries) - Steam-compatible regional pricing
 
-### Post-Launch Reports Include:
-- Executive Summary
-- Market Positioning Analysis
-- Sales & Revenue Performance
-- Marketing Effectiveness
-- Competitor Comparison
-- Review & Sentiment Analysis
-- Visibility & Discoverability
-- Actionable Recommendations
-- Pricing Strategy
-- Growth Opportunities
+### Cost
+- **Claude API**: $5-8/report
+- **Other APIs**: Free (SteamSpy, RAWG, YouTube, Steam Web API)
+- **Total**: $5-8/report
 
-## Environment Setup (Optional)
+---
 
-To skip entering API key every time, create a `.env` file:
-
-```bash
-ANTHROPIC_API_KEY=your_key_here
-```
-
-## Requirements
+## System Requirements
 
 - Python 3.8+
-- Internet connection
 - Anthropic API key
+- Internet connection
+
+---
 
 ## Project Structure
 
 ```
 Publitz-Automated-Audits/
-├── app.py                      # Main Streamlit web app
-├── src/
-│   ├── ai_generator.py         # Claude AI report generator
-│   ├── game_search.py          # Steam URL parser & competitor finder
-│   └── steamdb_scraper.py      # Steam data scraper
-├── requirements.txt            # Dependencies
-└── README.md                   # This file
+├── README.md                  ← You are here
+├── USER_GUIDE.md              ← Read this for everything
+├── generate_audit.py          ← Run this to generate audits
+├── .env                       ← Your API keys
+│
+├── inputs/                    ← Client data (4 files each)
+│   └── client-name/
+│       ├── steam_url.txt
+│       ├── competitors.txt
+│       ├── intake_form.json
+│       └── strategy_notes.txt
+│
+├── output/                    ← Generated reports
+│   └── client-name/
+│       ├── *_audit_*.pdf      ← DELIVERABLE 1
+│       └── *_pricing_*.csv    ← DELIVERABLE 2
+│
+├── src/                       ← Source code
+├── templates/                 ← PDF templates
+└── docs/                      ← Additional documentation
 ```
-
-## Fixes Applied
-
-✅ **Model Error Fixed**: Updated to `claude-sonnet-4-5-20250929` (was using non-existent model)
-✅ **Zero Competitors Fixed**: Guaranteed minimum 3-10 competitors with multi-tier fallback system
-✅ **URL-Based Input**: Paste Steam URLs instead of searching by name
-✅ **Auto-Detection**: Automatically detects Pre-Launch vs Post-Launch from release date
-
-## Support
-
-Built with Claude AI and Streamlit for Publitz game audits.
 
 ---
 
-**Made with ❤️ for game developers**
+## Documentation
+
+- **[`USER_GUIDE.md`](USER_GUIDE.md)** - **START HERE** - Complete user guide
+- **[`ENHANCEMENTS.md`](ENHANCEMENTS.md)** - Feature list and enhancements
+- **[`claude.md`](claude.md)** - Project context (for developers/Claude)
+- **[`docs/WORKFLOW.md`](docs/WORKFLOW.md)** - Production workflow details
+- **[`docs/TEST_PLAN.md`](docs/TEST_PLAN.md)** - Testing procedures
+
+---
+
+## Getting Help
+
+**Everything you need is in [`USER_GUIDE.md`](USER_GUIDE.md)**
+
+Common issues:
+- API key not set → Check `.env` file
+- No PDF generated → `pip install weasyprint`
+- Takes too long → Normal for 9-12 minutes
+
+---
+
+## Version
+
+**Current**: 2.0 (Enhanced with External APIs)
+**Last Updated**: December 9, 2025
+**Status**: Production Ready ✅
+
+---
+
+## Quick Reference
+
+### Generate Test Audit
+```bash
+python generate_audit.py --test
+```
+
+### Generate Real Audit
+```bash
+# 1. Create client folder
+python generate_audit.py --create-example client-name
+
+# 2. Edit inputs/client-name/* files
+
+# 3. Generate
+python generate_audit.py --client client-name
+```
+
+### Check Output
+```bash
+ls output/client-name/
+```
+
+---
+
+**For complete instructions, see [`USER_GUIDE.md`](USER_GUIDE.md)** 📖

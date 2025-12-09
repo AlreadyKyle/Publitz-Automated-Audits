@@ -5,12 +5,40 @@
 
 ---
 
+## 👤 User Preferences (CRITICAL - READ FIRST)
+
+**Kyle is a non-technical user. Always optimize for ease of use:**
+
+1. **GitHub Desktop over Terminal**
+   - Always provide GitHub Desktop instructions when possible
+   - Only use terminal commands as a last resort
+   - Assume Kyle uses GitHub Desktop on Mac
+
+2. **Simplicity First**
+   - Make everything double-click friendly
+   - Create `.command` files for Mac that open Terminal automatically
+   - No complex terminal workflows
+
+3. **Non-Coder Friendly**
+   - Use plain English, not technical jargon
+   - Explain what things do, not how they work
+   - Focus on "what to click" not "what to run"
+
+4. **Don't Break Things**
+   - Only make usability improvements that don't introduce bugs
+   - Test changes before suggesting them
+   - Keep the system working while making it easier
+
+**When updating this repo, always ask: "Could Kyle do this without touching terminal?"**
+
+---
+
 ## 🎯 Project Goal
 
 **Transform complex Steam audit tool into a simple, automated report generation system.**
 
 **Input**: 4 simple text files from client
-**Output**: Professional 35-45 page PDF audit report worth $800
+**Output**: Professional 35-45 page PDF audit report worth $1,500
 
 **Key Principle**: Focus on deliverable quality, not interface complexity.
 
@@ -569,3 +597,129 @@ pip install -r requirements.txt
 **Last Updated**: December 9, 2025
 **Maintainer**: Project Lead
 **Claude Model**: Sonnet 4.5
+
+---
+
+## 🔄 Git Workflow & PR Rules
+
+### When to Tell User About PRs/Merges
+
+**ALWAYS tell the user when**:
+1. ✅ Major feature is complete and committed
+2. ✅ Ready to merge feature branch to main
+3. ✅ Multiple commits need to be consolidated
+4. ✅ Work is ready for production
+
+**ALWAYS provide GitHub Desktop instructions** (Kyle uses GitHub Desktop, not terminal)
+
+**Format to use**:
+```
+✅ Feature complete and committed!
+
+Next steps in GitHub Desktop:
+1. Click "Fetch origin" button (top)
+2. Switch to branch: claude/feature-name (click "Current Branch")
+3. Click "Branch" menu → "Merge into Current Branch..."
+4. Select "main" and click "Merge"
+5. Click "Push origin" button
+6. Delete old branch: Branch menu → Delete → claude/feature-name
+
+Branch: claude/design-customer-docs-013AU6obijhzjV9JkhWxqose
+Commits: X new commits
+Ready for: Production use
+```
+
+### Current Branch Strategy
+
+**Feature branches**: `claude/<description>-<session-id>`
+- All development happens here
+- Commit frequently with clear messages
+- Push regularly to backup work
+
+**Main branch**: Production-ready code
+- Merge feature branches when complete
+- Tag releases (v1.0, v2.0, etc.)
+- Keep clean and stable
+
+### Commit Message Standards
+
+**Good commit messages**:
+```
+Add Claude Vision integration for asset analysis
+
+- Analyze capsule, screenshots, banner
+- Provide specific design feedback
+- Cache results to avoid duplicate API calls
+- Integrate into Section 2 of reports
+```
+
+**Bad commit messages**:
+```
+fix bug
+update stuff
+wip
+```
+
+### When to Merge to Main
+
+**Merge when**:
+- Feature is fully implemented
+- Tests pass (or syntax validated)
+- Documentation is updated
+- User confirms it's working
+
+**Don't merge if**:
+- Work in progress
+- Bugs not fixed
+- Breaking changes not tested
+- User hasn't reviewed
+
+---
+
+## 📊 Current System Status (Dec 9, 2025)
+
+### ✅ ALL PHASES COMPLETE
+
+**Phase 1**: Input Processing & Data Collection
+- 4-input system working
+- Steam API integration
+- Competitor data collection
+
+**Phase 2**: Claude AI Report Generation
+- 9-section comprehensive reports
+- Claude Vision for visual analysis
+- Research-backed methodology
+
+**Phase 3**: PDF Export & Deliverables
+- Professional PDF with branding
+- Regional pricing CSV (50+ countries)
+- PPP audit warnings
+
+**Phase 4**: API Enhancements (NEW)
+- SteamSpy: Owner estimates
+- RAWG: Metacritic scores
+- YouTube: Buzz metrics
+- Enhanced Steam Web API
+
+**Phase 5**: Final Research Refinements
+- Unit calculation formulas
+- Next Fest strategy
+- Content timing precision
+- 10-20 competitor analysis standard
+
+### 💰 Current Value
+
+**Report Value**: $1,500 (increased from $1,000)
+**Generation Time**: 9-12 minutes
+**Cost Per Report**: $5-8
+**APIs Integrated**: 4 external APIs (all free tier)
+
+### 🎯 Production Status
+
+✅ **PRODUCTION READY**
+- All features implemented
+- Documentation complete
+- Tests passing
+- Error handling robust
+- User guide comprehensive
+
