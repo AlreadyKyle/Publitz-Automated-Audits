@@ -16,17 +16,81 @@ Generates professional $1,500 Steam game audit reports in 10 minutes:
 
 ---
 
-## Quick Start (First Time Setup)
+## 🚀 Quick Start (First Time - Mac Users)
 
-### 1. Verify Your Environment
+### Step 1: Pull Latest Changes (GitHub Desktop)
 
-```bash
-# Check Python version (need 3.8+)
-python3 --version
+1. Open **GitHub Desktop**
+2. Click **"Fetch origin"** (top button)
+3. If you see a branch called `claude/final-docs-merge...`:
+   - Click **"Current Branch"** dropdown
+   - Select the `claude/final-docs-merge...` branch
+   - Click **"Branch"** menu → **"Merge into Current Branch..."**
+   - Select **"main"** and click **"Merge"**
+   - Click **"Push origin"** button
+   - Delete the old branch: **Branch** menu → **Delete**
+4. Make sure you're on the **"main"** branch
 
-# Install dependencies
-pip install -r requirements.txt
-```
+### Step 2: Setup (One Time Only)
+
+**Double-click this file**: `SETUP.command`
+
+This will:
+- Create a virtual environment
+- Install all dependencies
+- Take 2-3 minutes
+
+### Step 3: Run Test
+
+**Double-click this file**: `RUN_TEST.command`
+
+This will:
+- Generate a test report for the game "Hades"
+- Take about 10 minutes
+- Open the output folder when done
+
+✅ **If you see a PDF and CSV file, you're ready to go!**
+
+---
+
+## 📊 How to Generate Client Audits (Mac Users)
+
+### Step 1: Create Client Folder
+
+**Double-click**: `CREATE_CLIENT.command`
+
+- Enter client name (lowercase, no spaces)
+- Example: `awesome-studio`
+- The folder will open automatically
+
+### Step 2: Fill in the 4 Files
+
+The client folder has 4 files to edit (just double-click to open):
+
+1. **steam_url.txt** - Paste the Steam store URL
+2. **competitors.txt** - List 5-10 competitor games
+3. **intake_form.json** - Fill in client info
+4. **strategy_notes.txt** - Paste your call notes
+
+### Step 3: Generate Report
+
+**Double-click**: `GENERATE_AUDIT.command`
+
+- Enter the client name
+- Wait 10 minutes
+- Output folder opens automatically
+
+### Step 4: Deliver to Client
+
+Send these 2 files:
+- `client-name_audit_YYYYMMDD.pdf`
+- `client-name_pricing_YYYYMMDD.csv`
+
+**Done!** 🎉
+
+---
+
+## 🖥️ Terminal Users (Advanced)
 
 ### 2. Verify API Key is Set
 

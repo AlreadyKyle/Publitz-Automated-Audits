@@ -5,12 +5,40 @@
 
 ---
 
+## 👤 User Preferences (CRITICAL - READ FIRST)
+
+**Kyle is a non-technical user. Always optimize for ease of use:**
+
+1. **GitHub Desktop over Terminal**
+   - Always provide GitHub Desktop instructions when possible
+   - Only use terminal commands as a last resort
+   - Assume Kyle uses GitHub Desktop on Mac
+
+2. **Simplicity First**
+   - Make everything double-click friendly
+   - Create `.command` files for Mac that open Terminal automatically
+   - No complex terminal workflows
+
+3. **Non-Coder Friendly**
+   - Use plain English, not technical jargon
+   - Explain what things do, not how they work
+   - Focus on "what to click" not "what to run"
+
+4. **Don't Break Things**
+   - Only make usability improvements that don't introduce bugs
+   - Test changes before suggesting them
+   - Keep the system working while making it easier
+
+**When updating this repo, always ask: "Could Kyle do this without touching terminal?"**
+
+---
+
 ## 🎯 Project Goal
 
 **Transform complex Steam audit tool into a simple, automated report generation system.**
 
 **Input**: 4 simple text files from client
-**Output**: Professional 35-45 page PDF audit report worth $800
+**Output**: Professional 35-45 page PDF audit report worth $1,500
 
 **Key Principle**: Focus on deliverable quality, not interface complexity.
 
@@ -582,14 +610,19 @@ pip install -r requirements.txt
 3. ✅ Multiple commits need to be consolidated
 4. ✅ Work is ready for production
 
+**ALWAYS provide GitHub Desktop instructions** (Kyle uses GitHub Desktop, not terminal)
+
 **Format to use**:
 ```
 ✅ Feature complete and committed!
 
-Next steps:
-1. Review changes on GitHub
-2. Merge branch to main (or let me know if you want a PR)
-3. Delete old feature branch
+Next steps in GitHub Desktop:
+1. Click "Fetch origin" button (top)
+2. Switch to branch: claude/feature-name (click "Current Branch")
+3. Click "Branch" menu → "Merge into Current Branch..."
+4. Select "main" and click "Merge"
+5. Click "Push origin" button
+6. Delete old branch: Branch menu → Delete → claude/feature-name
 
 Branch: claude/design-customer-docs-013AU6obijhzjV9JkhWxqose
 Commits: X new commits
