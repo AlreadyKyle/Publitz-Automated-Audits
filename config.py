@@ -15,6 +15,9 @@ class Config:
 
     # API Keys
     ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
+    RAWG_API_KEY = os.getenv('RAWG_API_KEY', '5353e48dc2a4446489ec7c0bbb1ce9e9')
+    YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY', 'AIzaSyA6J_1QBANsaE2rYt2IXEVww1U6nAysLik')
+    STEAM_WEB_API_KEY = os.getenv('STEAM_WEB_API_KEY', '7CD62F6A17C80F8E8889CE738578C014')
 
     # Claude Settings
     CLAUDE_MODEL = os.getenv('CLAUDE_MODEL', 'claude-sonnet-4-5-20250929')

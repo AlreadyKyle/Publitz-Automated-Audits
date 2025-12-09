@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 # Import existing Steam utilities
 from src.game_search import GameSearch
 from src.steamdb_scraper import SteamDBScraper
+from src.api_clients import create_api_clients
 from config import Config
 
 
@@ -27,6 +28,13 @@ class SimpleDataCollector:
     def __init__(self):
         self.game_search = GameSearch()
         self.steamdb_scraper = SteamDBScraper()
+
+        # Initialize new API clients
+        self.api_clients = create_api_clients(
+            rawg_key=Config.RAWG_API_KEY,
+            youtube_key=Config.YOUTUBE_API_KEY,
+            steam_key=Config.STEAM_WEB_API_KEY
+        )
 
     def collect_all_data(
         self,
@@ -91,6 +99,8 @@ class SimpleDataCollector:
         if not game_data:
             raise ValueError(f"Could not fetch game data from Steam (App ID: {app_id})")
 
+        game_name = game_data.get('name', '')
+
         # Get additional data from SteamDB scraper
         try:
             sales_data = self.steamdb_scraper.get_sales_data(app_id)
@@ -107,6 +117,66 @@ class SimpleDataCollector:
             print(f"⚠️  Warning: Could not fetch review stats: {e}")
             game_data['review_stats'] = {}
 
+        # NEW: Get SteamSpy data (owner estimates, playtime)
+        try:
+            print("  - Fetching SteamSpy data...", end=" ")
+            steamspy_client = self.api_clients['steamspy']
+            steamspy_data = steamspy_client.get_game_data(app_id)
+            game_data['steamspy'] = steamspy_data
+            if steamspy_data.get('found'):
+                print("✅")
+            else:
+                print("⚠️  Not found")
+        except Exception as e:
+            print(f"⚠️  {e}")
+            game_data['steamspy'] = {'found': False}
+
+        # NEW: Get RAWG data (Metacritic score, ratings)
+        if 'rawg' in self.api_clients:
+            try:
+                print("  - Fetching RAWG data (Metacritic)...", end=" ")
+                rawg_client = self.api_clients['rawg']
+                rawg_data = rawg_client.search_game(game_name)
+                game_data['rawg'] = rawg_data if rawg_data else {'found': False}
+                if rawg_data and rawg_data.get('metacritic'):
+                    print(f"✅ (Metacritic: {rawg_data['metacritic']})")
+                else:
+                    print("⚠️  Not found")
+            except Exception as e:
+                print(f"⚠️  {e}")
+                game_data['rawg'] = {'found': False}
+
+        # NEW: Get YouTube presence (buzz metrics)
+        if 'youtube' in self.api_clients:
+            try:
+                print("  - Fetching YouTube data...", end=" ")
+                youtube_client = self.api_clients['youtube']
+                youtube_data = youtube_client.search_game_videos(game_name, max_results=50)
+                game_data['youtube'] = youtube_data
+                if youtube_data.get('found') and youtube_data.get('video_count', 0) > 0:
+                    print(f"✅ ({youtube_data['video_count']} videos, {youtube_data['total_views']:,} views)")
+                else:
+                    print("⚠️  No videos found")
+            except Exception as e:
+                print(f"⚠️  {e}")
+                game_data['youtube'] = {'found': False}
+
+        # NEW: Get enhanced Steam Web API data
+        if 'steam_enhanced' in self.api_clients:
+            try:
+                steam_enhanced = self.api_clients['steam_enhanced']
+
+                # Get player count
+                player_count = steam_enhanced.get_player_count(app_id)
+                game_data['current_players'] = player_count
+
+                # Get detailed review data
+                review_details = steam_enhanced.get_review_details(app_id)
+                if review_details.get('found'):
+                    game_data['review_details'] = review_details
+            except Exception as e:
+                print(f"⚠️  Warning: Enhanced Steam API error: {e}")
+
         return game_data
 
     def _fetch_competitors(self, competitor_names: List[str]) -> List[Dict[str, Any]]:
@@ -114,7 +184,7 @@ class SimpleDataCollector:
         competitors = []
 
         for i, comp_name in enumerate(competitor_names, 1):
-            print(f"  [{i}/{len(competitor_names)}] {comp_name}...", end=" ")
+            print(f"  [{i}/{len(competitor_names)}] {comp_name}...")
 
             try:
                 # Search for competitor by name
@@ -130,16 +200,33 @@ class SimpleDataCollector:
                         except:
                             comp_data['sales_data'] = {}
 
+                        # NEW: Get SteamSpy data for competitor
+                        try:
+                            steamspy_client = self.api_clients['steamspy']
+                            steamspy_data = steamspy_client.get_game_data(str(app_id))
+                            comp_data['steamspy'] = steamspy_data
+                        except:
+                            comp_data['steamspy'] = {'found': False}
+
+                    # NEW: Get RAWG data for competitor (Metacritic)
+                    if 'rawg' in self.api_clients:
+                        try:
+                            rawg_client = self.api_clients['rawg']
+                            rawg_data = rawg_client.search_game(comp_name)
+                            comp_data['rawg'] = rawg_data if rawg_data else {'found': False}
+                        except:
+                            comp_data['rawg'] = {'found': False}
+
                     # Get HLTB data
                     comp_data['playtime'] = self._fetch_howlongtobeat(comp_name)
 
                     competitors.append(comp_data)
-                    print("✅")
+                    print("    ✅ Loaded with enhanced data")
                 else:
-                    print("❌ Not found")
+                    print("    ❌ Not found")
 
             except Exception as e:
-                print(f"❌ Error: {e}")
+                print(f"    ❌ Error: {e}")
 
             # Rate limiting
             time.sleep(1)

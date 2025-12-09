@@ -376,6 +376,15 @@ Provide specific feedback."""
 - Owners: {game.get('owners', 0):,}
 - Estimated Revenue: ${game.get('revenue', 0):,.0f}
 
+**SteamSpy Data (Owner Estimates):**
+{self._format_steamspy_data(game.get('steamspy', {}))}
+
+**Quality Benchmarks (RAWG/Metacritic):**
+{self._format_rawg_data(game.get('rawg', {}))}
+
+**YouTube Presence (Community Buzz):**
+{self._format_youtube_data(game.get('youtube', {}))}
+
 **Store Page Assets:**
 - Description Length: {len(game.get('detailed_description', ''))} characters
 - Screenshot Count: {len(game.get('screenshots', []))}
@@ -417,6 +426,9 @@ Provide specific feedback."""
 
         # Add competitor data
         for i, comp in enumerate(competitors[:10], 1):
+            steamspy = comp.get('steamspy', {})
+            rawg = comp.get('rawg', {})
+
             prompt += f"""
 ### Competitor {i}: {comp.get('name', 'Unknown')}
 
@@ -424,7 +436,8 @@ Provide specific feedback."""
 - **Reviews:** {comp.get('review_score', 0)}% ({comp.get('review_count', 0):,} reviews)
 - **Release Date:** {comp.get('release_date', 'Unknown')}
 - **Genres:** {', '.join(comp.get('genres', []))}
-- **Estimated Owners:** {comp.get('owners', 0):,}
+- **Estimated Owners (SteamSpy):** {steamspy.get('owners', 'Unknown')}
+- **Metacritic Score (RAWG):** {rawg.get('metacritic', 'N/A')}
 - **Estimated Revenue:** ${comp.get('revenue', 0):,.0f}
 """
 
@@ -583,6 +596,89 @@ Generate the complete report now in markdown format.
 
         return output
 
+    def _format_steamspy_data(self, steamspy: Dict[str, Any]) -> str:
+        """Format SteamSpy owner estimate data"""
+        if not steamspy.get('found'):
+            return "- Data not available (game may be unreleased or too new)"
+
+        output = []
+        output.append(f"- **Owner Range:** {steamspy.get('owners', 'Unknown')}")
+        output.append(f"- **Players (Total):** {steamspy.get('players_forever', 0):,}")
+
+        avg_playtime = steamspy.get('average_playtime', 0)
+        if avg_playtime > 0:
+            output.append(f"- **Average Playtime:** {avg_playtime // 60}h {avg_playtime % 60}m")
+
+        median_playtime = steamspy.get('median_playtime', 0)
+        if median_playtime > 0:
+            output.append(f"- **Median Playtime:** {median_playtime // 60}h {median_playtime % 60}m")
+
+        if steamspy.get('positive') or steamspy.get('negative'):
+            total_reviews = steamspy.get('positive', 0) + steamspy.get('negative', 0)
+            positive_pct = (steamspy.get('positive', 0) / total_reviews * 100) if total_reviews > 0 else 0
+            output.append(f"- **Review Score:** {positive_pct:.1f}% positive ({total_reviews:,} reviews)")
+
+        return '\n'.join(output)
+
+    def _format_rawg_data(self, rawg: Dict[str, Any]) -> str:
+        """Format RAWG/Metacritic quality benchmark data"""
+        if not rawg.get('found'):
+            return "- Data not available (game may not be in RAWG database)"
+
+        output = []
+
+        if rawg.get('metacritic'):
+            output.append(f"- **Metacritic Score:** {rawg['metacritic']}/100")
+
+        if rawg.get('rating'):
+            output.append(f"- **RAWG Rating:** {rawg['rating']}/5.0 ({rawg.get('ratings_count', 0):,} ratings)")
+
+        if rawg.get('added'):
+            output.append(f"- **Community Library Adds:** {rawg['added']:,}")
+
+        if rawg.get('playtime'):
+            output.append(f"- **Average Playtime:** {rawg['playtime']} hours")
+
+        if not output:
+            return "- Quality benchmarks not available"
+
+        return '\n'.join(output)
+
+    def _format_youtube_data(self, youtube: Dict[str, Any]) -> str:
+        """Format YouTube presence/buzz metrics"""
+        if not youtube.get('found'):
+            return "- Data not available (API error or no videos found)"
+
+        video_count = youtube.get('video_count', 0)
+
+        if video_count == 0:
+            return "- **No YouTube videos found** (LOW community buzz - marketing gap)"
+
+        output = []
+        output.append(f"- **Video Count:** {video_count} videos")
+        output.append(f"- **Total Views:** {youtube.get('total_views', 0):,}")
+
+        avg_views = youtube.get('average_views', 0)
+        if avg_views > 0:
+            output.append(f"- **Average Views/Video:** {avg_views:,}")
+
+        top_views = youtube.get('top_video_views', 0)
+        if top_views > 0:
+            top_title = youtube.get('top_video_title', 'Unknown')
+            output.append(f"- **Top Video:** {top_views:,} views - \"{top_title[:50]}...\"")
+
+        # Add buzz assessment
+        if video_count < 10:
+            output.append(f"- **Buzz Level:** 🔴 VERY LOW (Need 100+ videos)")
+        elif video_count < 50:
+            output.append(f"- **Buzz Level:** 🟡 LOW (Target 100+ videos)")
+        elif video_count < 200:
+            output.append(f"- **Buzz Level:** 🟢 MODERATE")
+        else:
+            output.append(f"- **Buzz Level:** 🟢 HIGH")
+
+        return '\n'.join(output)
+
     def _get_system_message(self) -> str:
         """
         Get system message with audit methodology and best practices.
@@ -625,9 +721,13 @@ Do NOT simply repeat the vision analysis - synthesize it into actionable recomme
 
 **Launch Velocity Targets** (CRITICAL):
 - Target: $8,000 revenue in first 24 hours for "New & Trending" placement
+- Unit Calculation: $8,000 ÷ launch_price = required Day 1 unit sales
+  * At $19.99: 8000 ÷ 19.99 = 400 units minimum Day 1
+  * At $24.99: 8000 ÷ 24.99 = 320 units minimum Day 1
+  * At $14.99: 8000 ÷ 14.99 = 534 units minimum Day 1
 - Wishlist Conversion: 10-30% of wishlists must convert to Day 1 sales
 - Example: 20,000 wishlists → target 2,000-6,000 Day 1 sales
-- Calculate and include this in Executive Summary
+- Always pre-calculate units needed in Executive Summary
 
 **Regional Pricing Reality** (CRITICAL):
 - USD price = only 20-60% of total global revenue
@@ -648,6 +748,27 @@ Do NOT simply repeat the vision analysis - synthesize it into actionable recomme
 - Localization: 30-50% unit sales increase in newly supported regions
 - Console ports: Substantial long-tail revenue boost
 - Genre fest featuring: Can exceed initial launch sales
+
+**Competitive Analysis Standards**:
+- Analyze 10-20 competitors for accurate market positioning (not 5-7)
+- Use SteamSpy owner estimates to quantify market size
+- Compare Metacritic scores when available (RAWG data)
+- Assess YouTube buzz (video counts = community interest indicator)
+- Segment competitors by tier: AAA, AA, indie, micro-indie
+
+**Steam Next Fest Strategy** (PINNACLE EVENT):
+- Steam Next Fest is THE highest-conversion opportunity pre-launch
+- Front-page featuring can exceed initial launch sales
+- Enter with existing momentum: 5K-10K wishlists minimum
+- "Hot" games get priority featuring - build buzz BEFORE applying
+- Time festival participation strategically: not too early (lose wishlists), not too late (miss momentum)
+
+**External Content Timing Precision**:
+- Align discounts with external content drops for maximum impact
+- YouTuber coverage goes live → activate discount same day (20% spike)
+- Press review embargo lifts → discount window opens immediately
+- Major update launches → temporary discount creates urgency
+- Influencer partnership timing > random discount timing
 
 **Specificity:**
 - Every recommendation must be actionable
