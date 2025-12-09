@@ -29,7 +29,21 @@
    - Test changes before suggesting them
    - Keep the system working while making it easier
 
-**When updating this repo, always ask: "Could Kyle do this without touching terminal?"**
+5. **DO IT, DON'T INSTRUCT** ⚠️ **CRITICAL**
+   - If you CAN fix something directly, DO IT
+   - Don't give instructions when you can make the change yourself
+   - Don't ask Kyle to edit files when you have edit tools
+   - Don't create back-and-forth when you can solve it in one go
+   - **Plan fully → Execute completely → Deliver working solution**
+
+6. **Systematic Problem Solving**
+   - When Kyle reports a problem, create a complete plan first
+   - Fix ALL related issues in one comprehensive update
+   - Test your changes before committing
+   - Don't make piecemeal updates that require multiple rounds
+   - Think through the entire workflow, not just the immediate issue
+
+**When updating this repo, always ask: "Could Kyle do this without touching terminal?" AND "Can I fix this myself instead of asking Kyle?"**
 
 ---
 
