@@ -135,17 +135,31 @@ def generate_audit(client_name: str):
     print(f"✅ Markdown saved: {markdown_path}\n")
 
     # ========================================================================
-    # PHASE 4: PDF Export (Coming Soon)
+    # PHASE 4: PDF Export
     # ========================================================================
     print("=" * 80)
     print("PHASE 4: PDF EXPORT")
     print("=" * 80)
-    print("\n⏳ PDF generation (Phase 3 - Coming Soon)")
-    print("   This will create a beautifully formatted PDF\n")
 
-    # TODO: Implement PDF export
-    # from src.export_pdf import export_to_pdf
-    # pdf_path = export_to_pdf(report_markdown, data['game']['name'], output_dir)
+    try:
+        from src.export_pdf import export_report_to_pdf
+
+        pdf_path = export_report_to_pdf(
+            markdown_path=markdown_path,
+            game_name=data['game']['name'],
+            client_name=inputs.intake_form.get('client_name', 'Unknown'),
+            output_dir=output_dir
+        )
+        print(f"✅ PDF export complete: {pdf_path}\n")
+    except ImportError as e:
+        print(f"\n⚠️  PDF export not available: {e}")
+        print("   Install dependencies: pip install markdown weasyprint jinja2")
+        print("   Markdown report still available at: {markdown_path}\n")
+    except Exception as e:
+        print(f"\n⚠️  PDF export failed: {e}")
+        print(f"   Markdown report still available at: {markdown_path}\n")
+        import traceback
+        traceback.print_exc()
 
     # ========================================================================
     # Complete
@@ -155,15 +169,19 @@ def generate_audit(client_name: str):
     print("=" * 80)
     print("✅ AUDIT GENERATION COMPLETE")
     print("=" * 80)
-    print(f"\n⏱️  Total time: {elapsed:.1f} seconds")
+    print(f"\n⏱️  Total time: {elapsed:.1f} seconds ({elapsed/60:.1f} minutes)")
     print(f"📊 Generated for: {data['game']['name']}")
     print(f"📁 Output directory: {output_dir}")
-    print(f"📄 Markdown report: {markdown_path.name}")
+    print(f"\n📄 Generated files:")
+    print(f"   - Markdown: {markdown_path.name}")
+    if 'pdf_path' in locals():
+        print(f"   - PDF: {pdf_path.name}")
     print("\n💡 Next steps:")
     print("   1. Review the generated report")
-    print("   2. (Phase 2) Claude AI will generate comprehensive analysis")
-    print("   3. (Phase 3) PDF will be automatically formatted")
-    print("   4. Deliver to client\n")
+    print("   2. Verify all recommendations are accurate")
+    print("   3. Deliver PDF to client")
+    print("   4. Follow up with implementation support\n")
+    print("🎉 Report ready for delivery!\n")
 
 
 def create_placeholder_report(data: Dict, inputs: ClientInputs) -> str:
