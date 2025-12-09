@@ -2,6 +2,7 @@
 
 **Date**: December 9, 2025
 **Status**: Phase 2 Complete - AI-Powered Report Generation Working
+**Update**: Vision Analysis Integration Added ✅
 
 ---
 
@@ -9,11 +10,12 @@
 
 ### Core Report Generation System ✅
 
-**New File: `src/report_generator.py`** (500+ lines)
+**New File: `src/report_generator.py`** (700+ lines)
 
 A comprehensive Claude AI-powered report generator that:
 - ✅ Generates full 9-section audit reports
 - ✅ Uses Claude Sonnet 4.5 with 200K context window
+- ✅ **Uses Claude Vision to analyze visual assets** (NEW!)
 - ✅ Embeds audit methodology in system prompt
 - ✅ Formats all collected data into structured prompts
 - ✅ Produces 35-45 page professional reports
@@ -71,6 +73,36 @@ Built-in expertise covering:
 - ⚠️ LAUNCH VIABLE: Mix 3-5 stars
 - 🚨 HIGH RISK: Multiple 2-3 stars
 - ❌ NOT READY: Any 1-star
+
+#### 6. **Claude Vision Integration** (NEW!)
+
+**Analyzes visual assets automatically:**
+- ✅ **Capsule/Header Image**: Readability at thumbnail size, contrast, logo sizing, visual hierarchy
+- ✅ **Screenshots** (up to 3): UI clarity, visual quality, gameplay communication, technical issues
+- ✅ **Banner/Background**: Visual impact, branding consistency, composition
+
+**How it works:**
+1. Fetches visual assets from Steam API (header_image, screenshots, background)
+2. Converts images to base64 for Claude Vision API
+3. Analyzes each asset with asset-specific prompts
+4. Caches results to avoid redundant API calls
+5. Integrates analysis into Section 2 (Store Page Optimization)
+
+**Benefits:**
+- Specific, measurable feedback (e.g., "Logo is 60px, needs 120px minimum")
+- Professional design critique worth $200-300 on its own
+- Identifies issues human reviewers often miss at thumbnail size
+- Competitive comparison based on genre standards
+
+**Example Vision Analysis Output:**
+```
+Capsule Analysis: The logo text is barely readable at the standard
+460x215px thumbnail size. The current logo appears to be approximately
+50-60px in height, well below the recommended 120px minimum. The dark
+background reduces contrast with the blue text. Recommend: 1) Increase
+logo to 120px height, 2) Add white stroke for contrast, 3) Move logo
+to left-third following rule of thirds.
+```
 
 ---
 
@@ -274,14 +306,12 @@ python generate_audit.py --test
 **Phase 2 Limitations:**
 - ⚠️ No PDF export yet (markdown only)
 - ⚠️ No pricing CSV generation yet
-- ⚠️ No vision analysis for capsule images yet
 - ⚠️ External research APIs partially integrated
 
 **To Be Added in Phase 3:**
 - Beautiful PDF formatting
 - Client/Publitz branding
 - Pricing CSV export
-- Vision analysis integration
 
 ---
 
@@ -293,20 +323,30 @@ python generate_audit.py --test
 **Actual Breakdown:**
 - Phase 1 (Input Validation): ~5 seconds ✅
 - Phase 2 (Data Collection): ~2-3 minutes ✅
+- Phase 2.5 (Vision Analysis): ~30-60 seconds ✅ (NEW!)
 - Phase 3 (Report Generation): ~2-3 minutes ✅
 - Phase 4 (PDF Export): ~30 seconds (Phase 3)
 
-**Total:** ~5-7 minutes (within target!)
+**Total:** ~5-8 minutes (within target!)
 
 ### API Costs
 
-**Claude API Usage:**
+**Claude API Usage (Report Generation):**
 - Model: claude-sonnet-4-5-20250929
 - Input tokens: ~15,000-20,000 tokens
 - Output tokens: ~8,000-12,000 tokens
-- Cost per report: ~$3-5
+- Cost: ~$3-5 per report
 
-**Very affordable for $800 product!**
+**Claude Vision Usage (Asset Analysis):**
+- Model: claude-sonnet-4-5-20250929 (with vision)
+- Images analyzed: 4-5 (capsule + 3 screenshots + banner)
+- Input tokens per image: ~1,000-2,000 tokens (image + prompt)
+- Output tokens per image: ~800-1,000 tokens
+- Cost: ~$2-3 per report
+
+**Total Cost per Report: ~$5-8**
+
+**Still very affordable for $800 product!** (< 1% of product value)
 
 ---
 

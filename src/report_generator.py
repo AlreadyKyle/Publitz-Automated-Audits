@@ -3,11 +3,16 @@ Report Generator - Generate comprehensive audit reports using Claude AI
 
 This module takes collected data and generates a professional 9-section
 pre-launch Steam audit report worth $800 in value.
+
+Includes Claude Vision integration for analyzing capsule art, screenshots,
+banners, and other visual assets.
 """
 
 import json
 import os
-from typing import Dict, Any, Optional
+import base64
+import requests
+from typing import Dict, Any, Optional, List
 from anthropic import Anthropic
 from pathlib import Path
 
@@ -39,6 +44,221 @@ class ReportGenerator:
         # Load master prompt template
         self.prompt_template = self._load_prompt_template()
 
+        # Vision analysis cache
+        self.vision_analysis_cache = {}
+
+    def _fetch_image_as_base64(self, image_url: str) -> Optional[str]:
+        """
+        Fetch image from URL and convert to base64 for Claude Vision.
+
+        Args:
+            image_url: URL of the image to fetch
+
+        Returns:
+            Base64 encoded image string, or None if fetch fails
+        """
+        try:
+            response = requests.get(image_url, timeout=10)
+            response.raise_for_status()
+
+            # Get image format from content-type or URL
+            content_type = response.headers.get('content-type', '')
+            if 'jpeg' in content_type or 'jpg' in image_url.lower():
+                media_type = "image/jpeg"
+            elif 'png' in content_type or 'png' in image_url.lower():
+                media_type = "image/png"
+            elif 'gif' in content_type or 'gif' in image_url.lower():
+                media_type = "image/gif"
+            elif 'webp' in content_type or 'webp' in image_url.lower():
+                media_type = "image/webp"
+            else:
+                media_type = "image/jpeg"  # Default
+
+            # Encode to base64
+            image_data = base64.b64encode(response.content).decode('utf-8')
+
+            return f"data:{media_type};base64,{image_data}"
+
+        except Exception as e:
+            print(f"⚠️  Failed to fetch image {image_url}: {e}")
+            return None
+
+    def _analyze_visual_asset(
+        self,
+        image_url: str,
+        asset_type: str,
+        context: Dict[str, Any]
+    ) -> Optional[str]:
+        """
+        Analyze a visual asset (capsule, screenshot, banner) using Claude Vision.
+
+        Args:
+            image_url: URL of the image to analyze
+            asset_type: Type of asset (capsule, screenshot, banner, logo)
+            context: Additional context (game name, genre, competitors)
+
+        Returns:
+            Analysis text from Claude, or None if analysis fails
+        """
+        # Check cache
+        cache_key = f"{asset_type}:{image_url}"
+        if cache_key in self.vision_analysis_cache:
+            return self.vision_analysis_cache[cache_key]
+
+        # Fetch image
+        image_data = self._fetch_image_as_base64(image_url)
+        if not image_data:
+            return None
+
+        # Build analysis prompt based on asset type
+        if asset_type == "capsule":
+            prompt = f"""Analyze this Steam game capsule image for "{context.get('game_name', 'this game')}".
+
+Genre: {context.get('genres', 'Unknown')}
+Target Price: ${context.get('price', 'TBD')}
+
+Evaluate:
+1. **Readability at thumbnail size (460x215px)**: Is the logo/title readable at small size?
+2. **Contrast and visibility**: Does it stand out in a crowded Steam browse page?
+3. **Logo sizing**: Is the logo large enough (120px+ recommended)?
+4. **Visual hierarchy**: Clear focal point and composition?
+5. **Genre appropriateness**: Does it communicate the game's genre effectively?
+6. **Competitive comparison**: How does it compare to successful games in the genre?
+
+Provide specific, actionable feedback with measurements where possible."""
+
+        elif asset_type == "screenshot":
+            prompt = f"""Analyze this Steam screenshot for "{context.get('game_name', 'this game')}".
+
+Genre: {context.get('genres', 'Unknown')}
+
+Evaluate:
+1. **UI clarity**: Is the UI readable and well-designed?
+2. **Visual quality**: Does it showcase the game's production value?
+3. **Gameplay communication**: Does it clearly show what the game is about?
+4. **Action/interest**: Does it capture an engaging moment?
+5. **Technical issues**: Any visible bugs, placeholder text, or quality issues?
+
+Provide specific feedback on what works and what could be improved."""
+
+        elif asset_type == "banner":
+            prompt = f"""Analyze this Steam store page banner/hero image for "{context.get('game_name', 'this game')}".
+
+Evaluate:
+1. **Visual impact**: Does it create a strong first impression?
+2. **Branding consistency**: Does it match the capsule and overall brand?
+3. **Text readability**: Any text overlays readable?
+4. **Composition**: Professional layout and visual hierarchy?
+
+Provide specific feedback."""
+
+        else:  # Generic
+            prompt = f"""Analyze this visual asset for "{context.get('game_name', 'this game')}". Provide specific, actionable feedback on its effectiveness for Steam store page marketing."""
+
+        try:
+            # Call Claude Vision API
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1000,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": image_data.split(';')[0].split(':')[1],
+                                    "data": image_data.split(',')[1]
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ]
+            )
+
+            analysis = response.content[0].text
+
+            # Cache the result
+            self.vision_analysis_cache[cache_key] = analysis
+
+            return analysis
+
+        except Exception as e:
+            print(f"⚠️  Vision analysis failed for {asset_type}: {e}")
+            return None
+
+    def _analyze_all_visual_assets(self, data: Dict[str, Any], inputs: Any) -> Dict[str, Any]:
+        """
+        Analyze all visual assets for the game using Claude Vision.
+
+        Args:
+            data: Collected game data with image URLs
+            inputs: Client inputs
+
+        Returns:
+            Dictionary with vision analysis results for each asset type
+        """
+        print("🔍 Analyzing visual assets with Claude Vision...")
+
+        game = data.get('game', {})
+        context = {
+            'game_name': game.get('name', inputs.intake_form.get('game_name', 'Unknown')),
+            'genres': ', '.join(game.get('genres', [])),
+            'price': game.get('price', inputs.intake_form.get('target_price', 'TBD'))
+        }
+
+        results = {}
+
+        # Analyze capsule image (header image)
+        if game.get('header_image'):
+            print("   → Analyzing capsule/header image...")
+            capsule_analysis = self._analyze_visual_asset(
+                game['header_image'],
+                'capsule',
+                context
+            )
+            if capsule_analysis:
+                results['capsule'] = capsule_analysis
+
+        # Analyze screenshots (up to 3)
+        screenshots = game.get('screenshots', [])
+        if screenshots:
+            results['screenshots'] = []
+            for i, screenshot in enumerate(screenshots[:3], 1):
+                print(f"   → Analyzing screenshot {i}/{min(3, len(screenshots))}...")
+                screenshot_url = screenshot.get('path_full') or screenshot.get('path_thumbnail')
+                if screenshot_url:
+                    analysis = self._analyze_visual_asset(
+                        screenshot_url,
+                        'screenshot',
+                        context
+                    )
+                    if analysis:
+                        results['screenshots'].append({
+                            'index': i,
+                            'analysis': analysis
+                        })
+
+        # Analyze background/banner if available
+        if game.get('background'):
+            print("   → Analyzing banner/background image...")
+            banner_analysis = self._analyze_visual_asset(
+                game['background'],
+                'banner',
+                context
+            )
+            if banner_analysis:
+                results['banner'] = banner_analysis
+
+        print(f"✅ Vision analysis complete ({len(results)} asset types analyzed)\n")
+
+        return results
+
     def _load_prompt_template(self) -> str:
         """Load the master audit prompt template"""
         template_path = Config.TEMPLATE_DIR / "audit_prompt.txt"
@@ -68,7 +288,11 @@ class ReportGenerator:
         print("🤖 CLAUDE AI REPORT GENERATION")
         print("="*80)
 
-        # Build comprehensive prompt with all data
+        # Analyze visual assets with Claude Vision
+        vision_results = self._analyze_all_visual_assets(data, inputs)
+        data['vision_analysis'] = vision_results
+
+        # Build comprehensive prompt with all data (including vision analysis)
         prompt = self._build_prompt(data, inputs)
 
         print(f"\n📝 Prompt size: {len(prompt):,} characters")
@@ -114,6 +338,7 @@ class ReportGenerator:
         competitors = data.get('competitors', [])
         research = data.get('external_research', {})
         context = data.get('client_context', {})
+        vision = data.get('vision_analysis', {})
 
         prompt = f"""Generate a comprehensive Pre-Launch Steam Audit report.
 
@@ -156,6 +381,34 @@ class ReportGenerator:
 - Screenshot Count: {len(game.get('screenshots', []))}
 - Has Trailer: {'Yes' if game.get('movies') else 'No'}
 
+# VISUAL ASSET ANALYSIS (CLAUDE VISION)
+
+"""
+
+        # Add vision analysis results
+        if vision:
+            if vision.get('capsule'):
+                prompt += f"""
+## Capsule/Header Image Analysis
+
+{vision['capsule']}
+"""
+
+            if vision.get('screenshots'):
+                prompt += f"\n## Screenshot Analysis\n"
+                for screenshot_data in vision['screenshots']:
+                    prompt += f"\n### Screenshot {screenshot_data['index']}\n\n{screenshot_data['analysis']}\n"
+
+            if vision.get('banner'):
+                prompt += f"""
+## Banner/Background Analysis
+
+{vision['banner']}
+"""
+        else:
+            prompt += "- Vision analysis not available for this report\n"
+
+        prompt += """
 # COMPETITOR ANALYSIS DATA
 
 **{len(competitors)} Competitors Analyzed:**
@@ -216,11 +469,12 @@ Generate a comprehensive Pre-Launch Steam Audit following this EXACT structure:
    - Specific actions with time estimates
 
 4. **Section 2: Store Page Optimization** (5-6 pages)
-   - Capsule analysis (readability, contrast)
+   - Capsule analysis (readability, contrast) - USE VISION ANALYSIS DATA
    - Description rewrite with strong hook
    - Tag optimization (high-traffic recommendations)
-   - Screenshot strategy
+   - Screenshot strategy - USE VISION ANALYSIS DATA
    - Trailer review (if applicable)
+   - Banner/background review - USE VISION ANALYSIS DATA
 
 5. **Section 3: Regional Pricing Strategy** (3-4 pages)
    - Recommended base price with justification
@@ -344,10 +598,22 @@ Your task is to generate comprehensive, actionable Pre-Launch Steam Audit report
 - Steam algorithm and visibility mechanics
 - Competitive positioning and pricing strategy
 - Store page optimization (capsules, descriptions, tags)
+- Visual design and marketing art analysis (capsules, screenshots, banners)
 - Launch timing and calendar planning
 - Regional pricing and localization
 - Post-launch sales and DLC strategy
 - Multi-platform expansion analysis
+
+# VISUAL ANALYSIS INTEGRATION
+
+You have access to Claude Vision analysis of the game's visual assets (capsule, screenshots, banner). This analysis is provided in the VISUAL ASSET ANALYSIS section of your prompt. When writing Section 2 (Store Page Optimization), you MUST:
+
+1. **Incorporate vision analysis findings** into your capsule, screenshot, and banner recommendations
+2. **Reference specific issues identified** by the vision analysis (e.g., "As noted in the visual analysis, the logo at 60px is too small...")
+3. **Build on the vision feedback** with specific action steps and measurements
+4. **Prioritize visual issues** based on their impact on conversion rates
+
+Do NOT simply repeat the vision analysis - synthesize it into actionable recommendations with the "What / Why / How / Time / Impact" format.
 
 # METHODOLOGY
 
