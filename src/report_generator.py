@@ -603,19 +603,26 @@ Generate the complete report now in markdown format.
 
         output = []
         output.append(f"- **Owner Range:** {steamspy.get('owners', 'Unknown')}")
-        output.append(f"- **Players (Total):** {steamspy.get('players_forever', 0):,}")
 
-        avg_playtime = steamspy.get('average_playtime', 0)
+        # Ensure players_forever is an integer
+        players = int(steamspy.get('players_forever', 0) or 0)
+        output.append(f"- **Players (Total):** {players:,}")
+
+        # Ensure playtime values are integers
+        avg_playtime = int(steamspy.get('average_playtime', 0) or 0)
         if avg_playtime > 0:
             output.append(f"- **Average Playtime:** {avg_playtime // 60}h {avg_playtime % 60}m")
 
-        median_playtime = steamspy.get('median_playtime', 0)
+        median_playtime = int(steamspy.get('median_playtime', 0) or 0)
         if median_playtime > 0:
             output.append(f"- **Median Playtime:** {median_playtime // 60}h {median_playtime % 60}m")
 
-        if steamspy.get('positive') or steamspy.get('negative'):
-            total_reviews = steamspy.get('positive', 0) + steamspy.get('negative', 0)
-            positive_pct = (steamspy.get('positive', 0) / total_reviews * 100) if total_reviews > 0 else 0
+        # Ensure review counts are integers
+        positive = int(steamspy.get('positive', 0) or 0)
+        negative = int(steamspy.get('negative', 0) or 0)
+        if positive or negative:
+            total_reviews = positive + negative
+            positive_pct = (positive / total_reviews * 100) if total_reviews > 0 else 0
             output.append(f"- **Review Score:** {positive_pct:.1f}% positive ({total_reviews:,} reviews)")
 
         return '\n'.join(output)
@@ -628,16 +635,21 @@ Generate the complete report now in markdown format.
         output = []
 
         if rawg.get('metacritic'):
-            output.append(f"- **Metacritic Score:** {rawg['metacritic']}/100")
+            metacritic = int(rawg['metacritic'])
+            output.append(f"- **Metacritic Score:** {metacritic}/100")
 
         if rawg.get('rating'):
-            output.append(f"- **RAWG Rating:** {rawg['rating']}/5.0 ({rawg.get('ratings_count', 0):,} ratings)")
+            rating = float(rawg['rating'])
+            ratings_count = int(rawg.get('ratings_count', 0) or 0)
+            output.append(f"- **RAWG Rating:** {rating}/5.0 ({ratings_count:,} ratings)")
 
         if rawg.get('added'):
-            output.append(f"- **Community Library Adds:** {rawg['added']:,}")
+            added = int(rawg['added'])
+            output.append(f"- **Community Library Adds:** {added:,}")
 
         if rawg.get('playtime'):
-            output.append(f"- **Average Playtime:** {rawg['playtime']} hours")
+            playtime = int(rawg['playtime'])
+            output.append(f"- **Average Playtime:** {playtime} hours")
 
         if not output:
             return "- Quality benchmarks not available"
@@ -649,22 +661,24 @@ Generate the complete report now in markdown format.
         if not youtube.get('found'):
             return "- Data not available (API error or no videos found)"
 
-        video_count = youtube.get('video_count', 0)
+        video_count = int(youtube.get('video_count', 0) or 0)
 
         if video_count == 0:
             return "- **No YouTube videos found** (LOW community buzz - marketing gap)"
 
         output = []
         output.append(f"- **Video Count:** {video_count} videos")
-        output.append(f"- **Total Views:** {youtube.get('total_views', 0):,}")
 
-        avg_views = youtube.get('average_views', 0)
+        total_views = int(youtube.get('total_views', 0) or 0)
+        output.append(f"- **Total Views:** {total_views:,}")
+
+        avg_views = int(youtube.get('average_views', 0) or 0)
         if avg_views > 0:
             output.append(f"- **Average Views/Video:** {avg_views:,}")
 
-        top_views = youtube.get('top_video_views', 0)
+        top_views = int(youtube.get('top_video_views', 0) or 0)
         if top_views > 0:
-            top_title = youtube.get('top_video_title', 'Unknown')
+            top_title = str(youtube.get('top_video_title', 'Unknown'))
             output.append(f"- **Top Video:** {top_views:,} views - \"{top_title[:50]}...\"")
 
         # Add buzz assessment
