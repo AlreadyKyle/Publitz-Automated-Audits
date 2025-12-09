@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        {{ css }}
+    </style>
+</head>
+<body>
+    <!-- Cover Page -->
+    <div class="cover-page">
+        <div class="cover-content">
+            <div class="publitz-logo">
+                <h1>PUBLITZ</h1>
+                <p class="tagline">Professional Game Publishing Audits</p>
+            </div>
+
+            <div class="report-title">
+                <h2>Pre-Launch Steam Audit</h2>
+                <h3>{{ game_name }}</h3>
+            </div>
+
+            <div class="client-info">
+                <p><strong>Prepared for:</strong> {{ client_name }}</p>
+                <p><strong>Date:</strong> {{ date }}</p>
+            </div>
+
+            <div class="cover-value">
+                <p class="value-badge">$800 Professional Audit</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content">
+        {{ content }}
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <div class="footer-content">
+            <p><strong>Publitz</strong> - Professional Game Publishing Audits</p>
+            <p>© {{ date.split()[-1] }} Publitz. All rights reserved.</p>
+            <p class="contact">For questions or support, contact: support@publitz.com</p>
+        </div>
+    </div>
+</body>
+</html>
