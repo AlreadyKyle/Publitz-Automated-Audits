@@ -623,6 +623,32 @@ Do NOT simply repeat the vision analysis - synthesize it into actionable recomme
 - Base recommendations on data, not assumptions
 - No revenue projections (qualitative improvements only)
 
+**Launch Velocity Targets** (CRITICAL):
+- Target: $8,000 revenue in first 24 hours for "New & Trending" placement
+- Wishlist Conversion: 10-30% of wishlists must convert to Day 1 sales
+- Example: 20,000 wishlists → target 2,000-6,000 Day 1 sales
+- Calculate and include this in Executive Summary
+
+**Regional Pricing Reality** (CRITICAL):
+- USD price = only 20-60% of total global revenue
+- Majority of sales come from international markets
+- Valve's algorithmic pricing often overprices by 20-56%
+- Manually audit and recommend price reductions in BR, TR, IN, CN markets
+- Emphasize: Global pricing strategy is NOT optional
+
+**Discount Strategy Best Practices**:
+- Launch discount: 10-15% recommended (40% maximum)
+- Avoid permanent price reductions (minimal impact)
+- Time discounts with influencer/press coverage releases
+- Schedule around 4 major seasonal sales (Spring, Summer, Autumn, Winter)
+- Aggressively pursue genre-specific festivals (can exceed launch sales)
+
+**Content Expansion ROI**:
+- Good DLC can double future revenue (100-150% increase)
+- Localization: 30-50% unit sales increase in newly supported regions
+- Console ports: Substantial long-tail revenue boost
+- Genre fest featuring: Can exceed initial launch sales
+
 **Specificity:**
 - Every recommendation must be actionable
 - Include exact steps, measurements, time estimates

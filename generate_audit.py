@@ -135,12 +135,13 @@ def generate_audit(client_name: str):
     print(f"✅ Markdown saved: {markdown_path}\n")
 
     # ========================================================================
-    # PHASE 4: PDF Export
+    # PHASE 4: DELIVERABLES GENERATION (PDF + Pricing CSV)
     # ========================================================================
     print("=" * 80)
-    print("PHASE 4: PDF EXPORT")
+    print("PHASE 4: DELIVERABLES GENERATION")
     print("=" * 80)
 
+    # Export PDF
     try:
         from src.export_pdf import export_report_to_pdf
 
@@ -154,12 +155,28 @@ def generate_audit(client_name: str):
     except ImportError as e:
         print(f"\n⚠️  PDF export not available: {e}")
         print("   Install dependencies: pip install markdown weasyprint jinja2")
-        print("   Markdown report still available at: {markdown_path}\n")
+        print(f"   Markdown report still available at: {markdown_path}\n")
     except Exception as e:
         print(f"\n⚠️  PDF export failed: {e}")
         print(f"   Markdown report still available at: {markdown_path}\n")
         import traceback
         traceback.print_exc()
+
+    # Export Pricing CSV
+    try:
+        from src.pricing_csv import export_pricing_csv
+
+        # Get target price from intake form
+        target_price = inputs.intake_form.get('target_price', 19.99)
+
+        csv_path = export_pricing_csv(
+            base_price_usd=float(target_price),
+            client_name=client_name,
+            output_dir=output_dir
+        )
+    except Exception as e:
+        print(f"\n⚠️  Pricing CSV generation failed: {e}")
+        print("   Continuing without pricing CSV\n")
 
     # ========================================================================
     # Complete
@@ -176,12 +193,15 @@ def generate_audit(client_name: str):
     print(f"   - Markdown: {markdown_path.name}")
     if 'pdf_path' in locals():
         print(f"   - PDF: {pdf_path.name}")
+    if 'csv_path' in locals():
+        print(f"   - Pricing CSV: {csv_path.name}")
     print("\n💡 Next steps:")
     print("   1. Review the generated report")
     print("   2. Verify all recommendations are accurate")
-    print("   3. Deliver PDF to client")
-    print("   4. Follow up with implementation support\n")
-    print("🎉 Report ready for delivery!\n")
+    print("   3. Deliver PDF + pricing CSV to client")
+    print("   4. Client can upload CSV directly to Steam Partner portal")
+    print("   5. Follow up with implementation support\n")
+    print("🎉 Complete audit package ready for delivery!\n")
 
 
 def create_placeholder_report(data: Dict, inputs: ClientInputs) -> str:
