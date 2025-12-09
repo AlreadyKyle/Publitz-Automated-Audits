@@ -212,63 +212,34 @@ class GameSearch:
 
     def search_game(self, game_name: str) -> Optional[Dict[str, Any]]:
         """
-        Search for a game by name on Steam
+        Search for a game by name - SIMPLIFIED VERSION
+
+        NOTE: Steam's GetAppList API is deprecated and returns 404.
+        This method now returns basic placeholder data.
+        For accurate data, use Steam URLs in competitors.txt instead of game names.
 
         Args:
             game_name: Name of the game to search for
 
         Returns:
-            Game data dictionary or None if not found
+            Basic game data dictionary (placeholder)
         """
-        try:
-            # First, try to get the game list and search
-            response = requests.get(
-                "https://api.steampowered.com/ISteamApps/GetAppList/v2/",
-                headers=self.headers,
-                timeout=10
-            )
-            response.raise_for_status()
+        logger.warning(f"Game name search is limited. For accurate data, use Steam URLs instead of game names.")
+        logger.warning(f"Requested game: {game_name}")
 
-            apps = response.json().get('applist', {}).get('apps', [])
-
-            # Search for matching game (case-insensitive)
-            game_name_lower = game_name.lower()
-            matches = [
-                app for app in apps
-                if game_name_lower in app['name'].lower()
-            ]
-
-            if not matches:
-                return None
-
-            # Get the best match (exact match preferred)
-            best_match = None
-            for match in matches:
-                if match['name'].lower() == game_name_lower:
-                    best_match = match
-                    break
-
-            if not best_match:
-                best_match = matches[0]
-
-            app_id = best_match['appid']
-
-            # Get detailed game information
-            return self.get_game_details(app_id)
-
-        except Exception as e:
-            logger.error(f"Error searching for game: {e}", exc_info=True)
-            # Fallback: create basic game data
-            return {
-                'name': game_name,
-                'app_id': 'unknown',
-                'developer': 'Unknown',
-                'publisher': 'Unknown',
-                'release_date': 'Unknown',
-                'genres': ['Unknown'],
-                'tags': [],
-                'price': 'Unknown'
-            }
+        # Return placeholder data - the data collection will still work
+        # because we pull from SteamSpy and alternative sources
+        return {
+            'name': game_name,
+            'app_id': 'unknown',
+            'developer': 'Unknown',
+            'publisher': 'Unknown',
+            'release_date': 'Unknown',
+            'genres': ['Unknown'],
+            'tags': [],
+            'price': 'Unknown',
+            'note': 'Limited data - please use Steam URL for full details'
+        }
 
     def get_game_details(self, app_id: int) -> Dict[str, Any]:
         """
