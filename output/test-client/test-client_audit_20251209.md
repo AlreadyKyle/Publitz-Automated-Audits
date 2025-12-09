@@ -28,7 +28,27 @@
 
 ### Competitive Landscape
 
-**Analyzed 0 competitors:**
+**Analyzed 5 competitors:**
+
+1. **The Witcher 3: Wild Hunt**
+   - Price: $Unknown
+   - Reviews: N/A% (0)
+
+2. **Deus Ex: Mankind Divided**
+   - Price: $Unknown
+   - Reviews: N/A% (0)
+
+3. **Watch Dogs 2**
+   - Price: $Unknown
+   - Reviews: N/A% (0)
+
+4. **Fallout 4**
+   - Price: $Unknown
+   - Reviews: N/A% (0)
+
+5. **Borderlands 3**
+   - Price: $Unknown
+   - Reviews: N/A% (0)
 
 ### External Research
 
