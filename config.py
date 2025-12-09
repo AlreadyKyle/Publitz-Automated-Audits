@@ -13,11 +13,12 @@ load_dotenv()
 class Config:
     """Application configuration"""
 
-    # API Keys
+    # API Keys (simplified - only what we actually use)
     ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
     RAWG_API_KEY = os.getenv('RAWG_API_KEY', '5353e48dc2a4446489ec7c0bbb1ce9e9')
-    YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY', 'AIzaSyA6J_1QBANsaE2rYt2IXEVww1U6nAysLik')
-    STEAM_WEB_API_KEY = os.getenv('STEAM_WEB_API_KEY', '7CD62F6A17C80F8E8889CE738578C014')
+
+    # NOTE: YouTube and Steam Web API removed - they were unreliable/deprecated
+    # Primary data source is Steam URL scraping + SteamSpy (both free, no keys)
 
     # Claude Settings
     CLAUDE_MODEL = os.getenv('CLAUDE_MODEL', 'claude-sonnet-4-5-20250929')

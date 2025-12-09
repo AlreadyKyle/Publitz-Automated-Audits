@@ -29,11 +29,9 @@ class SimpleDataCollector:
         self.game_search = GameSearch()
         self.steamdb_scraper = SteamDBScraper()
 
-        # Initialize new API clients
+        # Initialize new API clients (simplified - only working APIs)
         self.api_clients = create_api_clients(
-            rawg_key=Config.RAWG_API_KEY,
-            youtube_key=Config.YOUTUBE_API_KEY,
-            steam_key=Config.STEAM_WEB_API_KEY
+            rawg_key=Config.RAWG_API_KEY
         )
 
     def collect_all_data(
@@ -132,7 +130,7 @@ class SimpleDataCollector:
             game_data['steamspy'] = {'found': False}
 
         # NEW: Get RAWG data (Metacritic score, ratings)
-        if 'rawg' in self.api_clients:
+        if 'rawg' in self.api_clients and self.api_clients['rawg']:
             try:
                 print("  - Fetching RAWG data (Metacritic)...", end=" ")
                 rawg_client = self.api_clients['rawg']
@@ -145,38 +143,10 @@ class SimpleDataCollector:
             except Exception as e:
                 print(f"⚠️  {e}")
                 game_data['rawg'] = {'found': False}
+        else:
+            game_data['rawg'] = {'found': False}
 
-        # NEW: Get YouTube presence (buzz metrics)
-        if 'youtube' in self.api_clients:
-            try:
-                print("  - Fetching YouTube data...", end=" ")
-                youtube_client = self.api_clients['youtube']
-                youtube_data = youtube_client.search_game_videos(game_name, max_results=50)
-                game_data['youtube'] = youtube_data
-                if youtube_data.get('found') and youtube_data.get('video_count', 0) > 0:
-                    print(f"✅ ({youtube_data['video_count']} videos, {youtube_data['total_views']:,} views)")
-                else:
-                    print("⚠️  No videos found")
-            except Exception as e:
-                print(f"⚠️  {e}")
-                game_data['youtube'] = {'found': False}
-
-        # NEW: Get enhanced Steam Web API data
-        if 'steam_enhanced' in self.api_clients:
-            try:
-                steam_enhanced = self.api_clients['steam_enhanced']
-
-                # Get player count
-                player_count = steam_enhanced.get_player_count(app_id)
-                game_data['current_players'] = player_count
-
-                # Get detailed review data
-                review_details = steam_enhanced.get_review_details(app_id)
-                if review_details.get('found'):
-                    game_data['review_details'] = review_details
-            except Exception as e:
-                print(f"⚠️  Warning: Enhanced Steam API error: {e}")
-
+        print(f"✅ Loaded: {game_data.get('name', 'Unknown')}")
         return game_data
 
     def _fetch_competitors(self, competitor_names: List[str]) -> List[Dict[str, Any]]:

@@ -463,12 +463,16 @@ class EnhancedSteamClient:
 
 # Convenience function for creating clients with credentials
 def create_api_clients(
-    rawg_key: Optional[str] = None,
-    youtube_key: Optional[str] = None,
-    steam_key: Optional[str] = None
+    rawg_key: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Create all API clients with provided credentials.
+    Create API clients with provided credentials.
+
+    SIMPLIFIED: Only uses working, free APIs:
+    - SteamSpy: Owner estimates (free, no key)
+    - RAWG: Metacritic scores (free tier with key)
+
+    Primary data source is Steam URL scraping via AlternativeDataSource.
 
     Returns dict with initialized clients.
     """
@@ -478,12 +482,6 @@ def create_api_clients(
 
     if rawg_key:
         clients['rawg'] = RAWGClient(rawg_key)
-
-    if youtube_key:
-        clients['youtube'] = YouTubeClient(youtube_key)
-
-    if steam_key:
-        clients['steam_enhanced'] = EnhancedSteamClient(steam_key)
 
     return clients
 
