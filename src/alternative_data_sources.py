@@ -58,19 +58,9 @@ class AlternativeDataSource:
         except ImportError as e:
             print(f"⚠️ Google Trends API unavailable: {e}")
 
-        try:
-            from src.youtube_api import YouTubeApi
-            self.youtube = YouTubeApi()
-            print("✓ YouTube API initialized")
-        except ImportError as e:
-            print(f"⚠️ YouTube API unavailable: {e}")
-
-        try:
-            from src.steam_api import SteamWebApi
-            self.steam = SteamWebApi()
-            print("✓ Steam Web API initialized")
-        except ImportError as e:
-            print(f"⚠️ Steam Web API unavailable: {e}")
+        # YouTube and Steam Web APIs removed - deprecated/not needed
+        self.youtube = None
+        self.steam = None
 
         try:
             from src.hltb_api import HLTBApi

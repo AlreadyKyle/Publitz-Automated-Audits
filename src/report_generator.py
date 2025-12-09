@@ -363,18 +363,18 @@ Provide specific feedback."""
 # GAME DATA
 
 **Steam App ID:** {game.get('app_id', 'Unknown')}
-**Current Price:** ${game.get('price', 0):.2f}
+**Current Price:** ${float(game.get('price', 0) or 0):.2f}
 **Genres:** {', '.join(game.get('genres', ['Unknown']))}
 **Release Date:** {game.get('release_date', 'Unknown')}
 **Tags:** {', '.join(game.get('tags', [])[:10])}
 
 **Reviews:**
 - Score: {game.get('review_score', 0)}% positive
-- Count: {game.get('review_count', 0):,} reviews
+- Count: {int(game.get('review_count', 0) or 0):,} reviews
 
 **Estimated Performance:**
-- Owners: {game.get('owners', 0):,}
-- Estimated Revenue: ${game.get('revenue', 0):,.0f}
+- Owners: {game.get('owners', 'Unknown') if isinstance(game.get('owners'), str) else game.get('owners', 'Unknown')}
+- Estimated Revenue: ${int(game.get('revenue', 0) or 0):,.0f}
 
 **SteamSpy Data (Owner Estimates):**
 {self._format_steamspy_data(game.get('steamspy', {}))}
@@ -432,13 +432,13 @@ Provide specific feedback."""
             prompt += f"""
 ### Competitor {i}: {comp.get('name', 'Unknown')}
 
-- **Price:** ${comp.get('price', 0):.2f}
-- **Reviews:** {comp.get('review_score', 0)}% ({comp.get('review_count', 0):,} reviews)
+- **Price:** ${float(comp.get('price', 0) or 0):.2f}
+- **Reviews:** {comp.get('review_score', 0)}% ({int(comp.get('review_count', 0) or 0):,} reviews)
 - **Release Date:** {comp.get('release_date', 'Unknown')}
 - **Genres:** {', '.join(comp.get('genres', []))}
 - **Estimated Owners (SteamSpy):** {steamspy.get('owners', 'Unknown')}
 - **Metacritic Score (RAWG):** {rawg.get('metacritic', 'N/A')}
-- **Estimated Revenue:** ${comp.get('revenue', 0):,.0f}
+- **Estimated Revenue:** ${int(comp.get('revenue', 0) or 0):,.0f}
 """
 
             # Add playtime data if available
